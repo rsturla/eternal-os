@@ -18,11 +18,8 @@ package:
   license: GPL-3.0-or-later
   source-date-epoch: 1740009600
   upstream: https://www.gnu.org/software/coreutils/
-  maintainers:
-    - name: Eternal Linux maintainers
-      email: maintainers@eternal.sturla.tech
   cpe:
-    vendor: eternal
+    vendor: gnu
     product: coreutils
 
 sources:

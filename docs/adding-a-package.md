@@ -35,12 +35,10 @@ package:
   summary: One line about foo
   license: MIT
   source-date-epoch: 1704067200
-  maintainers:
-    - name: Eternal Linux maintainers
-      email: maintainers@eternal.sturla.tech
-  cpe:
-    vendor: eternal
-    product: foo
+  # Maintainers come from ../../rpmx-defaults.yaml.
+  # cpe: only when the upstream project has one, for example:
+  #   vendor: gnu
+  #   product: foo
 
 build:
   root:
@@ -71,6 +69,12 @@ Rules that matter:
   consumers do not change.
 - `source-date-epoch` is required for reproducible builds. Bump it when the
   packaged content changes.
+- `maintainers` is repository metadata: it lives in `rpmx-defaults.yaml`, not
+  in every recipe. Override it only when a package genuinely has a different
+  owner.
+- `cpe` identifies the **upstream** project for vulnerability matching
+  (`gnu:make`, `gnu:coreutils`). Do not use the Eternal package name or
+  `vendor: eternal`; omit it for Eternal-owned packages with no upstream CPE.
 - `build.dependencies.tools` lists **package names**, not commands: `bash`, not
   `sh`; `gcc`, not `cc`.
 - Use `$STAGE` for the install root and `$PREFIX`/`$LIBDIR` for layout.
@@ -79,6 +83,19 @@ Rules that matter:
 
 See the rpmx recipe reference for the full schema:
 <https://github.com/rsturla/rpmx/blob/main/docs/usage/recipes.md>.
+
+## Tests
+
+- `stage: build` runs in the build sandbox with the source tree. Use it for
+  unit tests and checks that need the compiler or build tools.
+- `stage: installed` gets its own disposable root filesystem. That root
+  contains `bash`, `coreutils`, `build.dependencies.tests`, and the built
+  RPMs. It does not reuse the build root.
+
+`build.dependencies.tests` lists only what the installed tests need beyond
+that base and the package's own runtime requirements. A CLI smoke test that
+only runs the packaged binary usually needs no extra entry; add `bash`,
+`procps-ng`, `grep` and so on only when the test script actually calls them.
 
 ## Sources
 

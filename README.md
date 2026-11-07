@@ -56,6 +56,7 @@ produced by [rpmx](https://github.com/rsturla/rpmx):
 │   └── profiles/                   # bootstrap-only stage profiles
 ├── images/base/                   # base image definition and docs
 ├── packages/                      # one directory per rolling recipe (source of truth)
+├── rpmx-defaults.yaml             # repo-wide package metadata (maintainers)
 ├── profiles/
 │   ├── bootstrap.profile.yaml     # Fedora 44 build root (temporary)
 │   └── eternal.profile.yaml       # the Eternal repository (for consumers)
@@ -222,6 +223,11 @@ Bootstrap recipes are separate on purpose. A bootstrap recipe may pin a
 different epoch, release, build-tool set or source timestamp while the normal
 package is not buildable yet. When it graduates, move it to `packages/<name>/`
 and remove the bootstrap-only variant.
+
+Repository-wide package metadata lives in `rpmx-defaults.yaml`. Maintainers are
+defined there rather than repeated in every recipe; a recipe overrides them only
+when it needs a different owner. CPE identities are per recipe and describe the
+upstream project, not the Eternal package.
 
 To add a rolling package, run:
 

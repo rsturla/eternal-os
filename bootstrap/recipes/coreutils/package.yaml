@@ -18,11 +18,8 @@ package:
   # the effective timestamp and a stage may override it.
   source-date-epoch: 1704067200
   upstream: https://www.gnu.org/software/coreutils/
-  maintainers:
-    - name: Eternal Linux maintainers
-      email: maintainers@eternal.sturla.tech
   cpe:
-    vendor: eternal
+    vendor: gnu
     product: coreutils
 
 sources:

@@ -21,11 +21,8 @@ package:
   license: GPL-3.0-or-later
   source-date-epoch: 1713139200
   upstream: https://www.gnu.org/software/make/
-  maintainers:
-    - name: Eternal Linux maintainers
-      email: maintainers@eternal.sturla.tech
   cpe:
-    vendor: eternal
+    vendor: gnu
     product: make
 
 sources:

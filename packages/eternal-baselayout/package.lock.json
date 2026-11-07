@@ -1,10 +1,14 @@
 {
   "schema": 1,
-  "recipe_digest": "sha512:121bb49fed1093069d42513f36064536bbec6ee61caeafe21ac71a4f3740c4a7830758dfc038cfad3b9e72fb008faac770aa13b869a3aa6e8496b4ab4a0f0e9d",
+  "recipe_digest": "sha512:4919131107d6ebeac758bd33ab178e249187b810e33cd8bdccfe10c95c3033ca55340cde351fa09ada098c9932694b28f0884325ad97a05512cebedfd106fc73",
   "recipe_files": [
     {
       "path": "package.yaml",
-      "digest": "sha512:0ecde86689db1d732779e051263cddc08bf1c71334d7340fb73481c5c6e778832fe2cf0aa66527ff0a2b4744e07d6a05bb41a1d3feee47fa339b98b369976dbe"
+      "digest": "sha512:1569006ff0faabbf391762d4c18743affe1d5fb506510764300b32c40121d02510a42c95cf0ab4c35752ed9ec70e0cf26ef16c9584f77bef8346104fbfdb4d3b"
+    },
+    {
+      "path": "rpmx-defaults.yaml",
+      "digest": "sha512:f562fbaf660b1bcc1d3663420cbb239978a12224c188f0f8770caeccd3d4dfd554e19604a53558d3cc18526218581e0b38bd8024eab627a07fe452cdaa2064f4"
     }
   ],
   "context": {

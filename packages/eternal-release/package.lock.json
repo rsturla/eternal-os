@@ -1,10 +1,14 @@
 {
   "schema": 1,
-  "recipe_digest": "sha512:3911950b82f59ede781d3557d22d68fbce1452f39330eaec69ae06f462c7ae4e8804df58ed63b1a62a55e7727b0dfefcca0e9ca7dcb40091169d6c724d18c138",
+  "recipe_digest": "sha512:d1a051c79583400785b8d34a01d7d1f5b16e9ec9d9b9c65c72e10db7dc9249de940870939e7ea42269e6379e09e59f2ed88772af46c8eab776bc4b2b8d4c2bde",
   "recipe_files": [
     {
       "path": "package.yaml",
-      "digest": "sha512:67abf0d3d1a782a95aefb3d92ed37dfff047c18e4172744e7146a28fce422eca9603c089d34d2d5b2b08c4dcbba98d8073403e9619272736e25fc8018bab47a8"
+      "digest": "sha512:6f8e8ab99730de6acd0765c248042002553338525d48da2ca8bf7158e35865d4da0f6139a959ff056aa2b7646e81a2267521b2848e7f25ee046d0b221b65f165"
+    },
+    {
+      "path": "rpmx-defaults.yaml",
+      "digest": "sha512:f562fbaf660b1bcc1d3663420cbb239978a12224c188f0f8770caeccd3d4dfd554e19604a53558d3cc18526218581e0b38bd8024eab627a07fe452cdaa2064f4"
     }
   ],
   "context": {

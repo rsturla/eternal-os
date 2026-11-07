@@ -1,0 +1,10 @@
+# Repository-wide package metadata.
+#
+# A recipe inherits these values only when it omits the field. Keep this file
+# for facts that are true for every Eternal package, not for upstream identity
+# (license, CPE, upstream URL) or package-specific build settings.
+schema: 1
+package:
+  maintainers:
+    - name: Eternal Linux maintainers
+      email: maintainers@eternal.sturla.tech

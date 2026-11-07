@@ -20,12 +20,6 @@ package:
   license: MIT
   source-date-epoch: 1704067200
   upstream: https://github.com/rsturla/eternal-os
-  maintainers:
-    - name: Eternal Linux maintainers
-      email: maintainers@eternal.sturla.tech
-  cpe:
-    vendor: eternal
-    product: eternal
 
 context: files
 
