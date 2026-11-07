@@ -139,6 +139,34 @@ The image package set is `images/base/packages.txt`, shared by `make image`
 and CI. The image is built from the repository produced in the same run, so a
 bad package cannot slip into an image before the repository is published.
 
+### Why not Buck2 yet?
+
+The package graph and content-addressed cache above are deliberately small:
+about 200 lines of shell around `rpmx plan --json` and `git ls-files`. They give
+the properties that matter today: affected-package selection, correct
+invalidation, local/CI parity and a safe fallback (a cache miss means a
+rebuild).
+
+A general build system such as Buck2 or Bazel would replace them with a proper
+action graph, hermetic input declaration and a remote cache. The blocker is not
+the graph; it is that an `rpmx build` action is not hermetic: it needs
+`podman` to resolve and assemble the build root (network) and `bubblewrap` to
+run steps (namespaces). Remote execution workers usually cannot nest those
+privileges. Adopting Buck2 now would mean writing Starlark rules around a
+non-hermetic action and still running everything locally.
+
+The migration path is:
+
+1. keep recipes and `rpmx` as the unit of work;
+2. make the build root a declared input (resolve once, hash the assembled
+   root) so a build action has no network;
+3. move root assembly and image composition to tasks that are allowed to be
+   non-hermetic;
+4. then wrap package actions in a real build system and point CI and developers
+   at the same remote cache.
+
+Until then, the shell entry points are intentionally boring and reviewable.
+
 ## Roadmap
 
 1. Add `eternal-keys` once a signing key exists (see `docs/signing.md`).

@@ -10,7 +10,7 @@ TAG ?= $(RELEASE)
 PACKAGES ?= $(shell cat images/base/packages.txt)
 BASE ?= origin/HEAD
 
-.PHONY: help bootstrap doctor check lint affected hash build build-affected build-all lock repo image push all ci clean
+.PHONY: help bootstrap doctor check lint affected hash build build-affected build-all lock lock-check repo image push all ci clean
 
 help:
 	@echo "Eternal Linux"
@@ -25,6 +25,7 @@ help:
 	@echo "  make build-affected  Build only packages affected since $(BASE)"
 	@echo "  make build-all       Force a rebuild of every package"
 	@echo "  make lock            Write package.lock.json for every recipe"
+	@echo "  make lock-check      Fail when a lock is stale (network)"
 	@echo "  make repo            Assemble $(SITE)/$(RELEASE)/<arch>/ from $(OUT)/"
 	@echo "  make image           Compose $(IMAGE):$(TAG) from $(SITE)/"
 	@echo "  make push            Push $(IMAGE):$(TAG)"
@@ -62,6 +63,9 @@ build-all:
 
 lock:
 	RPMX=$(RPMX) ./scripts/lock-all.sh
+
+lock-check:
+	RPMX=$(RPMX) ./scripts/lock-all.sh --check
 
 repo: build
 	./scripts/publish-repo.sh \

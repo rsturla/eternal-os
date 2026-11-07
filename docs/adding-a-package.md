@@ -103,9 +103,12 @@ script, rpmx revision or in-tree build dependency changes. Use
 `./scripts/build-all.sh --affected --since origin/main` to rebuild only what a
 branch touches, or `make build-all` to force everything.
 
-Commit `packages/foo/package.lock.json` with the recipe. CI builds with
-`--locked` once the lock exists in a follow-up change; until then the lock is
-recorded and reviewed.
+Commit `packages/foo/package.lock.json` with the recipe. It records the
+resolved build root and step digests, and the package content hash covers it.
+`make lock-check` re-resolves and exits non-zero on drift. CI does not pass
+`--locked` yet: the bootstrap profile follows live Fedora 44, so the recorded
+root closure moves when Fedora updates. Pin the bootstrap repositories (or add
+a committed root lock) before making the builds refuse drift.
 
 When `foo` gains users, `scripts/package-graph.sh` picks up build edges from
 `build.dependencies` and runtime edges from `outputs[].dependencies.run` via
