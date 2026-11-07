@@ -56,18 +56,18 @@ outputs:
     files:
       include:
         - /usr/bin/foo
+    tests:
+      - name: installed-smoke
+        stage: installed
+        environment:
+          contents:
+            packages: [grep]
+        argv: ["sh", "-c", "foo --version | grep -q foo"]
 
 tests:
   - name: smoke
     stage: build
     argv: ["foo", "--version"]
-
-  - name: installed-smoke
-    stage: installed
-    environment:
-      contents:
-        packages: [grep]
-    argv: ["sh", "-c", "foo --version | grep -q foo"]
 ```
 
 Rules that matter:
@@ -100,13 +100,19 @@ See the rpmx recipe reference for the full schema:
   contains `bash`, `coreutils`, `build.dependencies.tests`, the packages in
   that test's `environment.contents.packages`, and the built RPMs. It does not
   reuse the build root.
+- A test under an output installs only that output and the sibling outputs that
+  provide its runtime dependencies. A recipe-level installed test installs
+  every output and is useful for integration coverage.
 
 `test.environment.contents.packages` lists packages needed only by that test.
-Tests with the same package set share one root; a different set gets its own
-disposable root. `build.dependencies.tests` is the package-wide list applied to
-every installed test; use it only for tools that every installed test needs.
-`test.environment.environment` sets variables for that test's steps; a step's
-own `env` wins.
+Tests with the same output and package set share one root; a different set gets
+its own disposable root. `build.dependencies.tests` is the package-wide list
+applied to every installed test; use it only for tools that every installed
+test needs. `test.environment.environment` sets variables for that test's
+steps; a step's own `env` wins.
+
+When several outputs reuse a test name, select one with
+`rpmx test --test <output>/<name>`.
 
 A CLI smoke test that only runs the packaged binary usually needs no extra
 entry; add `procps-ng`, `grep` and so on only when the test script actually
