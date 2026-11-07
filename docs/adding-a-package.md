@@ -45,7 +45,7 @@ build:
     profile: ../../profiles/bootstrap.profile.yaml
   dependencies:
     tools: [bash, coreutils]
-    # tests: [procps-ng]  # extra packages for the disposable installed-test root
+    # tests: [procps-ng]  # package-wide packages for every installed test
   pipeline:
     - runs: |
         install -D -m 0755 foo "$STAGE/usr/bin/foo"
@@ -61,6 +61,13 @@ tests:
   - name: smoke
     stage: build
     argv: ["foo", "--version"]
+
+  - name: installed-smoke
+    stage: installed
+    environment:
+      contents:
+        packages: [grep]
+    argv: ["sh", "-c", "foo --version | grep -q foo"]
 ```
 
 Rules that matter:
@@ -90,13 +97,20 @@ See the rpmx recipe reference for the full schema:
 - `stage: build` runs in the build sandbox with the source tree. Use it for
   unit tests and checks that need the compiler or build tools.
 - `stage: installed` gets its own disposable root filesystem. That root
-  contains `bash`, `coreutils`, `build.dependencies.tests`, and the built
-  RPMs. It does not reuse the build root.
+  contains `bash`, `coreutils`, `build.dependencies.tests`, the packages in
+  that test's `environment.contents.packages`, and the built RPMs. It does not
+  reuse the build root.
 
-`build.dependencies.tests` lists only what the installed tests need beyond
-that base and the package's own runtime requirements. A CLI smoke test that
-only runs the packaged binary usually needs no extra entry; add `bash`,
-`procps-ng`, `grep` and so on only when the test script actually calls them.
+`test.environment.contents.packages` lists packages needed only by that test.
+Tests with the same package set share one root; a different set gets its own
+disposable root. `build.dependencies.tests` is the package-wide list applied to
+every installed test; use it only for tools that every installed test needs.
+`test.environment.environment` sets variables for that test's steps; a step's
+own `env` wins.
+
+A CLI smoke test that only runs the packaged binary usually needs no extra
+entry; add `procps-ng`, `grep` and so on only when the test script actually
+calls them.
 
 ## Sources
 
