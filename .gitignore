@@ -1,0 +1,21 @@
+# rpmx and local build output
+out/
+site/
+.rpmx/
+*.rpm
+
+# Nested defaults written by `rpmx init`; the repository has its own
+packages/*/packages/
+packages/*/.rpmx/
+
+# Signing material must never be committed
+*.key
+*.secret
+.secrets/
+.env
+
+# Editors and tooling
+.vscode/
+.idea/
+.cache/
+__pycache__/

@@ -1,0 +1,9 @@
+[eternal]
+name=Eternal Linux $releasever - $basearch
+baseurl=https://rsturla.github.io/eternal-os/$releasever/$basearch
+enabled=1
+# Signing is wired up by docs/signing.md. Flip this to 1 once the eternal-keys
+# package ships /etc/pki/rpm-gpg/RPM-GPG-KEY-eternal and CI has a key.
+gpgcheck=0
+metadata_expire=6h
+countme=0

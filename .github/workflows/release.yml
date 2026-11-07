@@ -1,0 +1,148 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  packages:
+    name: Packages
+    uses: ./.github/workflows/_build-packages.yml
+    with:
+      sign: true
+    secrets: inherit
+
+  repository:
+    name: Repository
+    needs: packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    env:
+      RPMX_SIGNING_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
+      RPMX_PUBLIC_KEY: ${{ secrets.RPMX_PUBLIC_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup rpmx
+        uses: ./.github/actions/setup-rpmx
+
+      - name: Download packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: rpm-*
+          path: out
+          merge-multiple: true
+
+      - name: Write keys
+        env:
+          PRIVATE_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
+          PUBLIC_KEY: ${{ secrets.RPMX_PUBLIC_KEY }}
+        run: |
+          install -d -m 0700 "$RUNNER_TEMP/signing"
+          if [ -n "$PRIVATE_KEY" ]; then
+            printf '%s' "$PRIVATE_KEY" > "$RUNNER_TEMP/signing/rpmx.asc"
+            chmod 0600 "$RUNNER_TEMP/signing/rpmx.asc"
+          fi
+          if [ -n "$PUBLIC_KEY" ]; then
+            printf '%s' "$PUBLIC_KEY" > "$RUNNER_TEMP/signing/rpmx.asc.pub"
+            chmod 0644 "$RUNNER_TEMP/signing/rpmx.asc.pub"
+          fi
+
+      - name: Assemble repository
+        run: |
+          args=(--packages out --output site --release 44)
+          if [ -f "$RUNNER_TEMP/signing/rpmx.asc" ]; then
+            args+=(--signing-key "$RUNNER_TEMP/signing/rpmx.asc")
+          fi
+          if [ -f "$RUNNER_TEMP/signing/rpmx.asc.pub" ]; then
+            args+=(--public-key "$RUNNER_TEMP/signing/rpmx.asc.pub")
+          fi
+          ./scripts/publish-repo.sh "${args[@]}"
+
+      - name: Configure Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+
+      - name: Upload repository artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: repo-site
+          path: site
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy repository
+    needs: repository
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+  image:
+    name: Base image
+    needs: repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download repository
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: repo-site
+          path: site
+
+      - name: Install podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            podman fuse-overlayfs uidmap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
+      - name: Log in to GHCR
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compose and push
+        run: |
+          image="ghcr.io/${{ github.repository }}/base"
+          ./scripts/build-image.sh \
+            --repo site/44/x86_64 \
+            --releasever 44 \
+            --arch x86_64 \
+            --tag "$image:44" \
+            --tag "$image:latest" \
+            --push

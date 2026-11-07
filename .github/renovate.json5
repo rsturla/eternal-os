@@ -1,0 +1,33 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+
+  // Use the basic Renovate preset, and allow settings to be overridden
+  "extends": [
+    "config:best-practices"
+  ],
+
+  "packageRules": [
+    {
+      // Keep GitHub Actions current. Digests are pinned so every update is a
+      // one-line review.
+      "automerge": true,
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest", "pinDigest"],
+      "matchManagers": [
+        "github-actions"
+      ]
+    }
+  ],
+
+  // The pinned rpmx revision is managed by hand in
+  // .github/actions/setup-rpmx/action.yml and scripts/install-rpmx.sh.
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^scripts/install-rpmx\\.sh$/"],
+      "matchStrings": ["RPMX_REV:-?(?<currentValue>[0-9a-f]{40})"],
+      "depNameTemplate": "rsturla/rpmx",
+      "datasourceTemplate": "git-refs",
+      "versioningTemplate": "git"
+    }
+  ]
+}

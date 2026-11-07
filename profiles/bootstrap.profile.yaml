@@ -1,0 +1,46 @@
+# The build root used to produce Eternal packages.
+#
+# Eternal Linux is greenfield, but a distribution still needs a working
+# toolchain before it can build itself. This profile borrows Fedora 44 to run
+# rpmx build steps and to provide the packages the first recipes need. It is a
+# build dependency, not the distribution identity: Eternal owns its release
+# package, repository and images.
+#
+# As packages are brought in-tree, remove them from `packages.install` here and
+# add them to `eternal-base` instead. The bootstrap root should shrink over
+# time; it must never become the definition of the distribution.
+document: rpmx-profile
+version: 1
+name: bootstrap-fedora-44
+releasever: "44"
+dist-tag: .eternal44
+archs: [x86_64]
+builder:
+  image: registry.fedoraproject.org/fedora:44
+repositories:
+  - id: fedora
+    metalink: https://mirrors.fedoraproject.org/metalink?repo=fedora-$releasever&arch=$basearch
+  - id: updates
+    metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch
+packages:
+  install:
+    - bash
+    - coreutils
+    - findutils
+    - gcc
+    - make
+    - patch
+    - tar
+    - gzip
+    - sed
+    - grep
+    - gawk
+    - diffutils
+    - pkgconf-pkg-config
+sbom: true
+options:
+  weak_deps: false
+  docs: false
+paths:
+  prefix: /usr
+  libdir: /usr/lib64

@@ -1,0 +1,32 @@
+# The distribution profile: the repositories an Eternal system or image sees.
+#
+# The Eternal repository is versioned by releasever. The bootstrap
+# repositories are still required while the base package set is not yet
+# self-hosting; they are pinned to Fedora 44 literally so that `$releasever`
+# keeps referring to Eternal's release. Remove them once every package in
+# `eternal-base` has an in-tree recipe.
+document: rpmx-profile
+version: 1
+name: eternal-44
+releasever: "44"
+dist-tag: .eternal44
+archs: [x86_64]
+builder:
+  image: registry.fedoraproject.org/fedora:44
+repositories:
+  - id: eternal
+    baseurl: https://rsturla.github.io/eternal-os/$releasever/$basearch
+  # Bootstrap repositories. Delete when self-hosting.
+  - id: bootstrap
+    metalink: https://mirrors.fedoraproject.org/metalink?repo=fedora-44&arch=$basearch
+  - id: bootstrap-updates
+    metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f44&arch=$basearch
+packages:
+  install:
+    - eternal-base
+options:
+  weak_deps: false
+  docs: false
+paths:
+  prefix: /usr
+  libdir: /usr/lib64

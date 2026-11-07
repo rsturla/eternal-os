@@ -1,0 +1,15 @@
+NAME="Eternal Linux"
+VERSION="44"
+ID=eternal
+ID_LIKE="fedora"
+VERSION_ID="44"
+PRETTY_NAME="Eternal Linux 44"
+ANSI_COLOR="0;31"
+CPE_NAME="cpe:/o:eternal:eternal:44"
+DEFAULT_HOSTNAME="eternal"
+HOME_URL="https://github.com/rsturla/eternal-os"
+DOCUMENTATION_URL="https://github.com/rsturla/eternal-os/blob/main/README.md"
+SUPPORT_URL="https://github.com/rsturla/eternal-os/issues"
+BUG_REPORT_URL="https://github.com/rsturla/eternal-os/issues"
+VARIANT="Base"
+VARIANT_ID=base

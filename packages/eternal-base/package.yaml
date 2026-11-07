@@ -1,0 +1,66 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# The definition of the Eternal base system. This is the package that an image
+# composes (see scripts/build-image.sh), and it is the checklist for
+# self-hosting: every dependency that still resolves from the bootstrap
+# repositories is a package Eternal does not own yet.
+#
+# Today most of these names come from Fedora 44. As each one gains an in-tree
+# recipe with the same package name, this file does not change; only the
+# repositories in profiles/eternal.profile.yaml do.
+schema: 1
+
+package:
+  name: eternal-base
+  version: "44"
+  release: 1
+  summary: The Eternal Linux base system
+  description: |
+    Metapackage for the Eternal base system. It pulls in the release identity,
+    the shell and core utilities, the package manager and the certificates and
+    time zone data a usable base image needs.
+  license: MIT
+  source-date-epoch: 1704067200
+  upstream: https://github.com/rsturla/eternal-os
+  maintainers:
+    - name: Eternal Linux maintainers
+      email: maintainers@eternal.sturla.tech
+  cpe:
+    vendor: eternal
+    product: eternal
+
+context: files
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [bash]
+  pipeline:
+    - runs: |
+        install -d "$STAGE/usr/share/licenses/eternal-base"
+        install -m 0644 LICENSE \
+          "$STAGE/usr/share/licenses/eternal-base/LICENSE"
+
+outputs:
+  - name: eternal-base
+    summary: The Eternal Linux base system
+    metapackage: true
+    files:
+      include:
+        - /usr/share/licenses/eternal-base/LICENSE
+      license:
+        - /usr/share/licenses/eternal-base/LICENSE
+    dependencies:
+      run:
+        - eternal-release
+        - eternal-baselayout
+        # Bootstrap-owned today. Each name becomes an Eternal recipe in time.
+        - basesystem
+        - bash
+        - coreutils
+        - dnf5
+        - ca-certificates
+        - tzdata
+        - util-linux
+        - shadow-utils

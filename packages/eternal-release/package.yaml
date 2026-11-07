@@ -1,0 +1,107 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# The distribution identity package. It owns /etc/os-release and the Eternal
+# repository definition, and it declares the capabilities that replace the
+# bootstrap release package.
+#
+# The release files live in files/ next to this recipe. `context` copies that
+# directory into the source workspace, so the build reads them directly.
+schema: 1
+
+package:
+  name: eternal-release
+  version: "44"
+  release: 1
+  summary: Eternal Linux release files
+  description: |
+    The distribution identity for Eternal Linux: /etc/os-release, the legacy
+    release files, and the Eternal package repository definition.
+  license: MIT
+  source-date-epoch: 1704067200
+  upstream: https://github.com/rsturla/eternal-os
+  maintainers:
+    - name: Eternal Linux maintainers
+      email: maintainers@eternal.sturla.tech
+  cpe:
+    vendor: eternal
+    product: eternal
+
+context: files
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [bash, coreutils]
+  pipeline:
+    - runs: |
+        install -d "$STAGE/etc/yum.repos.d" \
+                   "$STAGE/usr/share/licenses/eternal-release"
+        install -m 0644 os-release "$STAGE/etc/os-release"
+        install -m 0644 system-release "$STAGE/etc/system-release"
+        install -m 0644 redhat-release "$STAGE/etc/redhat-release"
+        install -m 0644 eternal.repo "$STAGE/etc/yum.repos.d/eternal.repo"
+        install -m 0644 LICENSE \
+          "$STAGE/usr/share/licenses/eternal-release/LICENSE"
+
+outputs:
+  - name: eternal-release
+    summary: Eternal Linux release files
+    description: |
+      The distribution identity and repository definition for Eternal Linux.
+    arch: noarch
+    files:
+      include:
+        - /etc/os-release
+        - /etc/system-release
+        - /etc/redhat-release
+        - /etc/yum.repos.d/eternal.repo
+        - /usr/share/licenses/eternal-release/LICENSE
+      license:
+        - /usr/share/licenses/eternal-release/LICENSE
+      config:
+        - /etc/os-release
+        - /etc/system-release
+        - /etc/redhat-release
+        - /etc/yum.repos.d/eternal.repo
+      noreplace:
+        - /etc/os-release
+        - /etc/system-release
+        - /etc/redhat-release
+        - /etc/yum.repos.d/eternal.repo
+    dependencies:
+      provides:
+        - system-release
+        - system-release(44)
+      conflicts:
+        - fedora-release
+        - fedora-release-common
+        - fedora-release-container
+        - fedora-release-variant
+        - generic-release
+        - redhat-release
+
+tests:
+  - name: release-files
+    stage: build
+    argv:
+      - sh
+      - -c
+      - |
+        grep -q '^ID=eternal$' os-release
+        grep -q '^VERSION_ID="44"$' os-release
+        grep -q '^PRETTY_NAME="Eternal Linux 44"$' os-release
+        test -f system-release
+        test -f redhat-release
+        grep -q 'baseurl=https://rsturla.github.io/eternal-os/' eternal.repo
+
+  - name: installed
+    stage: installed
+    argv:
+      - sh
+      - -c
+      - |
+        . /etc/os-release
+        test "$ID" = eternal
+        test "$VERSION_ID" = "44"
+        test -f /etc/yum.repos.d/eternal.repo

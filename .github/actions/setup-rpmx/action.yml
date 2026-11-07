@@ -1,0 +1,38 @@
+name: Setup rpmx
+description: Install the pinned rpmx revision and the host tools it needs.
+
+runs:
+  using: composite
+  steps:
+    - name: Install host tools
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          bubblewrap podman fuse-overlayfs uidmap
+        # Ubuntu 24.04 restricts unprivileged user namespaces via AppArmor,
+        # which rootless podman needs for root resolution.
+        sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      with:
+        toolchain: stable
+
+    - name: Cache cargo and rpmx
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          ~/.local/share/rpmx
+        key: rpmx-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.rpmx-revision') }}
+
+    - name: Install rpmx
+      shell: bash
+      run: |
+        root="$HOME/.local/share/rpmx"
+        if [ ! -x "$root/bin/rpmx" ]; then
+          ./scripts/install-rpmx.sh --root "$root"
+        fi
+        echo "$root/bin" >> "$GITHUB_PATH"

@@ -1,0 +1,83 @@
+name: Build packages
+
+on:
+  workflow_call:
+    inputs:
+      sign:
+        description: Sign packages when RPMX_SIGNING_KEY is available.
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      RPMX_SIGNING_KEY:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  list:
+    name: List packages
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.packages.outputs.packages }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Find recipes
+        id: packages
+        run: |
+          packages=$(./scripts/list-packages.sh \
+            | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "packages=$packages" >> "$GITHUB_OUTPUT"
+          echo "recipes: $packages"
+
+  build:
+    name: Build ${{ matrix.package }}
+    needs: list
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.list.outputs.packages) }}
+    env:
+      RPMX_SIGNING_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup rpmx
+        uses: ./.github/actions/setup-rpmx
+
+      - name: Restore build root cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/rpmx
+          key: rpmx-root-${{ runner.os }}-${{ hashFiles('profiles/**') }}
+          restore-keys: |
+            rpmx-root-${{ runner.os }}-
+
+      - name: Write signing key
+        if: ${{ inputs.sign && env.RPMX_SIGNING_KEY != '' }}
+        env:
+          KEY: ${{ secrets.RPMX_SIGNING_KEY }}
+        run: |
+          install -d -m 0700 "$RUNNER_TEMP/signing"
+          printf '%s' "$KEY" > "$RUNNER_TEMP/signing/rpmx.asc"
+          chmod 0600 "$RUNNER_TEMP/signing/rpmx.asc"
+
+      - name: Build
+        run: |
+          args=(--package "${{ matrix.package }}" --output out)
+          if [ -f "$RUNNER_TEMP/signing/rpmx.asc" ]; then
+            args+=(--signing-key "$RUNNER_TEMP/signing/rpmx.asc")
+          fi
+          ./scripts/build-all.sh "${args[@]}"
+
+      - name: Upload packages
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rpm-${{ matrix.package }}
+          path: out/
+          if-no-files-found: error

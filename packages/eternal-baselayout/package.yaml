@@ -1,0 +1,92 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# The directory layout Eternal owns today. The bootstrap `filesystem` package
+# still owns the FHS directories, so this package only claims Eternal-specific
+# paths. When the distribution self-hosts, the recipes that replace `filesystem`
+# take over /etc, /usr, /var and the rest, and this package grows with them.
+schema: 1
+
+package:
+  name: eternal-baselayout
+  version: "1"
+  release: 1
+  summary: Eternal Linux base directory layout
+  description: |
+    Eternal-specific directories and the baselayout marker file. Kept separate
+    from the bootstrap filesystem package until Eternal owns the full FHS
+    layout.
+  license: MIT
+  source-date-epoch: 1704067200
+  upstream: https://github.com/rsturla/eternal-os
+  maintainers:
+    - name: Eternal Linux maintainers
+      email: maintainers@eternal.sturla.tech
+  cpe:
+    vendor: eternal
+    product: eternal
+
+context: files
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [bash, coreutils]
+  pipeline:
+    - runs: |
+        install -d -m 0755 "$STAGE/etc/eternal"
+        install -d -m 0755 "$STAGE/usr/lib/eternal"
+        install -d -m 0755 "$STAGE/usr/share/eternal"
+        install -d -m 0755 "$STAGE/var/lib/eternal"
+        install -d -m 0750 "$STAGE/var/log/eternal"
+        install -d -m 0755 "$STAGE/usr/share/licenses/eternal-baselayout"
+        install -m 0644 LICENSE \
+          "$STAGE/usr/share/licenses/eternal-baselayout/LICENSE"
+        printf 'Eternal Linux base layout\n' > "$STAGE/usr/lib/eternal/baselayout"
+        chmod 0644 "$STAGE/usr/lib/eternal/baselayout"
+
+outputs:
+  - name: eternal-baselayout
+    summary: Eternal Linux base directory layout
+    arch: noarch
+    files:
+      include:
+        - /usr/lib/eternal/baselayout
+        - /usr/share/licenses/eternal-baselayout/LICENSE
+      license:
+        - /usr/share/licenses/eternal-baselayout/LICENSE
+      directories:
+        - path: /etc/eternal
+          mode: "0755"
+          user: root
+          group: root
+        - path: /usr/lib/eternal
+          mode: "0755"
+          user: root
+          group: root
+        - path: /usr/share/eternal
+          mode: "0755"
+          user: root
+          group: root
+        - path: /var/lib/eternal
+          mode: "0755"
+          user: root
+          group: root
+        - path: /var/log/eternal
+          mode: "0750"
+          user: root
+          group: root
+
+tests:
+  - name: layout
+    stage: build
+    argv:
+      - sh
+      - -c
+      - |
+        test -d "$STAGE/etc/eternal"
+        test -d "$STAGE/usr/lib/eternal"
+        test -d "$STAGE/usr/share/eternal"
+        test -d "$STAGE/var/lib/eternal"
+        test -d "$STAGE/var/log/eternal"
+        test -f "$STAGE/usr/lib/eternal/baselayout"
