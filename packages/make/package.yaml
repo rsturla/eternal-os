@@ -9,9 +9,11 @@ schema: 1
 
 package:
   name: make
+  # Make's upstream epoch is 1. Keep it so Eternal's EVR matches the
+  # ecosystem and package comparison stays compatible.
   epoch: 1
   version: "4.4.1"
-  release: 100
+  release: 1
   summary: GNU Make build automation tool
   description: |
     GNU Make is a tool which controls the generation of executables and other

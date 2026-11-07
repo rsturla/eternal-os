@@ -1,19 +1,22 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
-# GNU Coreutils is part of the bootstrap toolchain and the base userland. The
-# release is higher than Fedora's so a bootstrap stage prefers this package
-# when both repositories are visible.
+# GNU coreutils is part of the bootstrap toolchain and the base userland. The
+# ladder hides the seed provider while a stage builds this package, so the EVR
+# does not need to outrank Fedora's copy.
 schema: 1
 
 package:
   name: coreutils
   version: "9.10"
-  release: 100
+  release: 1
   summary: GNU core utilities
   description: |
     The GNU core utilities are the basic file, shell and text manipulation
     utilities expected on every Unix-like operating system.
   license: GPL-3.0-or-later
+  # Fallback for standalone `rpmx lint`/`rpmx build`; the ladder supplies
+  # the effective timestamp and a stage may override it.
+  source-date-epoch: 1704067200
   upstream: https://www.gnu.org/software/coreutils/
   maintainers:
     - name: Eternal Linux maintainers
@@ -64,6 +67,13 @@ outputs:
         - /usr/share/licenses/**
       license:
         - /usr/share/licenses/coreutils/COPYING
+    dependencies:
+      # Fedora exposes these command sets through both `coreutils` and the
+      # single-binary `coreutils-single`; either name must resolve to this
+      # package when the seed providers are hidden.
+      provides:
+        - coreutils-full
+        - coreutils-single
 
 tests:
   - name: build

@@ -10,7 +10,7 @@ schema: 1
 package:
   name: coreutils
   version: "9.10"
-  release: 100
+  release: 1
   summary: GNU core utilities
   description: |
     The GNU core utilities are the basic file, shell and text manipulation
@@ -67,6 +67,13 @@ outputs:
         - /usr/share/licenses/**
       license:
         - /usr/share/licenses/coreutils/COPYING
+    dependencies:
+      # Fedora exposes these command sets through both `coreutils` and the
+      # single-binary `coreutils-single`; either name must resolve to this
+      # package when the seed providers are hidden.
+      provides:
+        - coreutils-full
+        - coreutils-single
 
 tests:
   - name: build

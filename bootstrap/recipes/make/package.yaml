@@ -1,20 +1,23 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
-# GNU Make is part of the bootstrap toolchain. The epoch and release mirror the
-# bootstrap package it replaces, but use an Eternal release so a stage can
-# prefer this build over Fedora's copy.
+# GNU Make is part of the bootstrap toolchain. The ladder hides the seed
+# provider while a stage builds this package, so the EVR does not need to
+# outrank Fedora's copy. Epoch 1 is make's upstream epoch.
 schema: 1
 
 package:
   name: make
   epoch: 1
   version: "4.4.1"
-  release: 100
+  release: 1
   summary: GNU Make build automation tool
   description: |
     GNU Make is a tool which controls the generation of executables and other
     non-source files of a program from the program's source files.
   license: GPL-3.0-or-later
+  # Fallback for standalone `rpmx lint`/`rpmx build`; the ladder supplies
+  # the effective timestamp and a stage may override it.
+  source-date-epoch: 1704067200
   upstream: https://www.gnu.org/software/make/
   maintainers:
     - name: Eternal Linux maintainers

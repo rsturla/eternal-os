@@ -32,7 +32,9 @@ stages:
     # a rename only needs an entry here (and a `provides` in the recipe).
     replaces:
       make: make
-      coreutils: coreutils
+      # Fedora ships both `coreutils` and the single-binary `coreutils-single`;
+      # either can satisfy a `coreutils` dependency. Hide both.
+      coreutils: [coreutils, coreutils-single]
 
   - name: stage1
     profile: profiles/bootstrap-stage1.profile.yaml
@@ -41,4 +43,6 @@ stages:
     fixed-point: [make, coreutils]
     replaces:
       make: make
-      coreutils: coreutils
+      # Fedora ships both `coreutils` and the single-binary `coreutils-single`;
+      # either can satisfy a `coreutils` dependency. Hide both.
+      coreutils: [coreutils, coreutils-single]
