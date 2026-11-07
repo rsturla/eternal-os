@@ -15,4 +15,5 @@ exec cargo install \
   --git https://github.com/rsturla/rpmx \
   --rev "$revision" \
   --locked \
+  rpmx \
   "$@"

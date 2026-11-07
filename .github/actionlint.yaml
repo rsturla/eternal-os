@@ -1,0 +1,7 @@
+# actionlint ships a snapshot of GitHub's hosted-runner labels. Ubuntu 26.04
+# is available on GitHub (x64 and arm64) even when actionlint's snapshot still
+# only lists 24.04; declare the labels so local linting matches the workflows.
+self-hosted-runner:
+  labels:
+    - ubuntu-26.04
+    - ubuntu-26.04-arm

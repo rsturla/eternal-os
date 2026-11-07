@@ -33,7 +33,7 @@ jobs:
   repository:
     name: Repository
     needs: packages
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       pages: write
@@ -120,7 +120,7 @@ jobs:
   deploy:
     name: Deploy repository
     needs: repository
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       pages: write
       id-token: write
@@ -142,9 +142,9 @@ jobs:
         arch: ${{ fromJSON(needs.packages.outputs.arches) }}
         include:
           - arch: x86_64
-            runner: ubuntu-latest
+            runner: ubuntu-26.04
           - arch: aarch64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-26.04-arm
     permissions:
       contents: read
       packages: write
@@ -186,7 +186,7 @@ jobs:
   manifest:
     name: Multi-arch image
     needs: [image, packages]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       packages: write

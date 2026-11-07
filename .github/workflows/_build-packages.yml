@@ -53,7 +53,7 @@ permissions:
 jobs:
   prepare:
     name: Plan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       packages: ${{ steps.plan.outputs.packages }}
       arches: ${{ steps.plan.outputs.arches }}
@@ -132,9 +132,9 @@ jobs:
         package: ${{ fromJSON(needs.prepare.outputs.packages) }}
         include:
           - arch: x86_64
-            runner: ubuntu-latest
+            runner: ubuntu-26.04
           - arch: aarch64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-26.04-arm
     env:
       RPMX_SIGNING_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
     steps:
