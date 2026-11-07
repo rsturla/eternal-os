@@ -109,6 +109,10 @@ make build-affected  # only packages affected since BASE
 make build-all       # force a full rebuild
 ```
 
+The package cache key includes `.cache-generation`; bump that file to force
+every package through a rebuild. This is how the whole repository is moved to
+a new release-counter format without touching individual recipes.
+
 `scripts/affected.sh` walks the package graph from `rpmx plan --json`: a
 recipe change rebuilds that package plus everything that builds against it;
 a profile, script or rpmx revision change rebuilds everything. Runtime

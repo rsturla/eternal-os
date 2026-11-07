@@ -164,7 +164,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: out/
-          key: rpm-${{ runner.os }}-${{ matrix.arch }}-${{ matrix.package }}-${{ steps.hash.outputs.hash }}-signed${{ needs.prepare.outputs.signed }}-${{ inputs.sign && 'release' || 'pr' }}
+          key: rpm-${{ runner.os }}-${{ matrix.arch }}-${{ matrix.package }}-${{ steps.hash.outputs.hash }}-signed${{ needs.prepare.outputs.signed }}-${{ inputs.sign && 'release' || 'pr' }}-${{ hashFiles('.cache-generation') }}
 
       - name: Restore build root cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
