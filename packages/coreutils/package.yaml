@@ -1,0 +1,81 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# Rolling package definition for coreutils. The bootstrap variant lives in
+# bootstrap/recipes/coreutils/package.yaml and may pin a different release or
+# build-tool set while the seed is still in use. Keep this recipe buildable
+# from the current self-hosted root; promote changes here once they work
+# without bootstrap-only overrides.
+schema: 1
+
+package:
+  name: coreutils
+  version: "9.10"
+  release: 100
+  summary: GNU core utilities
+  description: |
+    The GNU core utilities are the basic file, shell and text manipulation
+    utilities expected on every Unix-like operating system.
+  license: GPL-3.0-or-later
+  source-date-epoch: 1740009600
+  upstream: https://www.gnu.org/software/coreutils/
+  maintainers:
+    - name: Eternal Linux maintainers
+      email: maintainers@eternal.sturla.tech
+  cpe:
+    vendor: eternal
+    product: coreutils
+
+sources:
+  - name: coreutils-9.10.tar.xz
+    kind: archive
+    digest: "sha512:976ccfb8b906273a687ec330938a25ab72fb130988ca2fcad4fb6e12f4b621eb76b6e9ee091ad060361e95a8da26835b2484fffd3b5f9c7cdb100c1eb7b7d676"
+    locators:
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/coreutils/coreutils-9.10.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils]
+    host: [gmp-devel, libacl-devel, libattr-devel, libcap-devel, libselinux-devel]
+  pipeline:
+    - runs: |
+        ./configure \
+          --prefix=/usr \
+          --libdir=/usr/lib64 \
+          --enable-no-install-program=groups,hostname,kill,uptime
+        make -j"$JOBS"
+        make install DESTDIR="$STAGE"
+        install -D -m 0644 COPYING \
+          "$STAGE/usr/share/licenses/coreutils/COPYING"
+    - uses: strip
+
+outputs:
+  - name: coreutils
+    summary: GNU core utilities
+    files:
+      include:
+        - /usr/bin/**
+        - /usr/libexec/coreutils/**
+        - /usr/share/info/**
+        - /usr/share/locale/**
+        - /usr/share/man/**
+        - /usr/share/licenses/**
+      license:
+        - /usr/share/licenses/coreutils/COPYING
+
+tests:
+  - name: build
+    stage: build
+    argv:
+      - sh
+      - -c
+      - test -x "$STAGE/usr/bin/ls" && test -x "$STAGE/usr/bin/cat"
+
+  - name: installed
+    stage: installed
+    argv: [ls, --version]

@@ -2,7 +2,8 @@
 
 This directory is the dedicated, stage-oriented build definition for bringing
 Eternal up from the pinned Fedora seed. It is intentionally separate from
-`packages/`:
+`packages/`, which keeps the production/rolling definition for the same
+package name:
 
 - `bootstrap.yaml` is the ladder. It owns stage order, roots, repositories,
   fixed-point packages, and the seed-package mapping (`replaces`).
@@ -27,10 +28,11 @@ still say `foo` resolve to the Eternal package. The mapping only controls which
 provider the bootstrap resolver is allowed to see; it does not create RPM
 metadata.
 
-A bootstrap recipe graduates to `packages/<name>/package.yaml` once the normal
-rolling package can be built from the self-hosted root. Until then, keep the
-bootstrap-only epoch/release/build dependencies here rather than leaking them
-into the normal package graph.
+The same output name may exist in both places. `packages/<name>/package.yaml`
+is the production recipe; `bootstrap/recipes/<name>/package.yaml` is the
+bootstrap variant. Keep bootstrap-only epoch/release/build dependencies in the
+variant rather than leaking them into the production recipe. When the variant
+is no longer needed, delete it; the production recipe stays.
 
 Build locally with:
 
