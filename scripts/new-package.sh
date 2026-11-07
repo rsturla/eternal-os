@@ -56,6 +56,8 @@ rm -rf "$directory/profiles" "$directory/.gitignore" "$directory/README.md"
 sed -i \
   's|profile: fedora-44|profile: ../../profiles/bootstrap.profile.yaml|' \
   "$directory/package.yaml"
+# Maintainers are repository defaults; keep the generated recipe lean.
+sed -i '/^  maintainers:$/,/^      email:/d' "$directory/package.yaml"
 
 echo "created ${directory#"$root"/}/package.yaml"
 echo "next: edit the recipe, then run ./scripts/lint-all.sh"
