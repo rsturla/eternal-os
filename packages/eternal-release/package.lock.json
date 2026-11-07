@@ -1,21 +1,21 @@
 {
   "schema": 1,
-  "recipe_digest": "sha512:dd0370543ac5570092119172bb084ca9508a4929484a8026e9b0d6814a5336547691007ba90f5a29d7152d80483a4b46e0bb204c9b71d7548fa0e44f81b51c04",
+  "recipe_digest": "sha512:3911950b82f59ede781d3557d22d68fbce1452f39330eaec69ae06f462c7ae4e8804df58ed63b1a62a55e7727b0dfefcca0e9ca7dcb40091169d6c724d18c138",
   "recipe_files": [
     {
       "path": "package.yaml",
-      "digest": "sha512:9bf3fe8c9518f34701129c6d0a6c4213ff799fb7b80bdddc1b7e15ed338cf0e99bdf2cb3cfedf9a1293c2d4fccfe09336ef22e674365d051266239e35e910859"
+      "digest": "sha512:67abf0d3d1a782a95aefb3d92ed37dfff047c18e4172744e7146a28fce422eca9603c089d34d2d5b2b08c4dcbba98d8073403e9619272736e25fc8018bab47a8"
     }
   ],
   "context": {
     "path": "files",
-    "digest": "sha512:f1253ec6d9997d23d919a266304700a7900b8eb0c44b27f9ae871d702b4a51bd2049d42abe020312269ba1736de9d8a596cfe6604686586fe94b40e4d35db83f"
+    "digest": "sha512:17274f867716f146a549ec3c999fb2b189fc8caad6c5af5edac27dc46c0bee452bee3772dd1d8fff86858c7c0c944e458d804f20a31ed4687f0e61ae89b3fc70"
   },
   "source_date_epoch": 1704067200,
   "policy": {},
   "root": {
     "profile": "bootstrap-fedora-44",
-    "requirement": "sha512:e528107f51dbca177f8918867d60e3d95f81afbab491fbe6a8f85ef385a495f640bb952aaf3fc3d6c73683d60eb9932e891adfaaef53847e315a430f3d3522c1",
+    "requirement": "sha512:ef44a0e02e819c7b275237890eb785c66927142a769db29029fb2a101b8052afcc412e9600f520a3c73f6fa783d44d5dab1dbf1be711577ae24b22bed2e9ad12",
     "arch": "x86_64",
     "closure_digest": "sha512:4f80207dfffe84566016e774ea6b787fa5212119fde30b555e88f5d206ac558f5ac50d9715339ea266e2235732dd0b6105cdc812daf41a63ba2c12d681d4e581",
     "root_digest": "sha512:3e36cbf2ca2ae48ecac603499a1630e79d4514e2ae4405dad086dcdd15d0fc36cb5ab2c2afc2ffe888741b1abb497c27a90895aad3e3256fd71b288e79b98978"
@@ -25,8 +25,8 @@
     {
       "id": "",
       "package": "eternal-release",
-      "version": "44",
-      "release": "1.eternal44",
+      "version": "rolling",
+      "release": "1.eternal",
       "outputs": [
         "eternal-release"
       ],

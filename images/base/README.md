@@ -7,7 +7,7 @@ composes it from the published repository:
 repository RPMs
       |
       v
-dnf5 --installroot  ->  rootfs/  ->  podman import  ->  ghcr.io/rsturla/eternal-os/base:44
+dnf5 --installroot  ->  rootfs/  ->  podman import  ->  ghcr.io/rsturla/eternal-os/base:rolling
 ```
 
 ## What is in it
@@ -27,21 +27,22 @@ gains an in-tree recipe with the same name, no change is needed here.
 ```console
 make repo
 make image
-podman run --rm -it ghcr.io/rsturla/eternal-os/base:44
+podman run --rm -it ghcr.io/rsturla/eternal-os/base:rolling
 ```
 
 Check the identity:
 
 ```console
-podman run --rm ghcr.io/rsturla/eternal-os/base:44 \
+podman run --rm ghcr.io/rsturla/eternal-os/base:rolling \
   sh -c '. /etc/os-release && echo "$PRETTY_NAME"'
 ```
 
 ## Publish
 
 `release.yml` builds the image from the repository assembled in the same run
-and pushes `:44` and `:latest` to GHCR. The image is not built from a branch
-checkout; it only ever contains packages that were just published.
+and pushes `:rolling`, `:latest` and `:sha-<commit>` manifest lists to GHCR,
+covering x86_64 and aarch64. The image is not built from a branch checkout; it
+only ever contains packages that were just published.
 
 ## Design notes
 

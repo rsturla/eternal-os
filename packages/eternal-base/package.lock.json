@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "recipe_digest": "sha512:8cf0483fb18562f5538858a94fa4f5123cd9519315fee568f588a799a4e3beacf50b52cd671b340c307ffcf6ea134408d775031861f7fcd263f234c2b7477ae5",
+  "recipe_digest": "sha512:4c080dbd68e57da1dbc7f340b066f5e241f44371b46af48cb81f33ea6c324feed95162e12d23af1713771935ad37e4d473f31c2d67cccd300d8df00cd037266d",
   "recipe_files": [
     {
       "path": "package.yaml",
-      "digest": "sha512:c22f53eefd83c1ea2c52347b72aff4bc94fa8a38d3cfb4aab520b10d68c4f1cf3367d785db9fc265893f9514c0c979f728eea41eb97038adabc7e4cb9d53a4a9"
+      "digest": "sha512:112f8c7c2be7829d17c38125a8f621f416e5785f8eed7c539f3f19d708bd2a4bce3a70c77372236fb1fcdce82856bbfb40239eea931296bd25104d08a1473e5c"
     }
   ],
   "context": {
@@ -15,7 +15,7 @@
   "policy": {},
   "root": {
     "profile": "bootstrap-fedora-44",
-    "requirement": "sha512:e528107f51dbca177f8918867d60e3d95f81afbab491fbe6a8f85ef385a495f640bb952aaf3fc3d6c73683d60eb9932e891adfaaef53847e315a430f3d3522c1",
+    "requirement": "sha512:ef44a0e02e819c7b275237890eb785c66927142a769db29029fb2a101b8052afcc412e9600f520a3c73f6fa783d44d5dab1dbf1be711577ae24b22bed2e9ad12",
     "arch": "x86_64",
     "closure_digest": "sha512:4f80207dfffe84566016e774ea6b787fa5212119fde30b555e88f5d206ac558f5ac50d9715339ea266e2235732dd0b6105cdc812daf41a63ba2c12d681d4e581",
     "root_digest": "sha512:3e36cbf2ca2ae48ecac603499a1630e79d4514e2ae4405dad086dcdd15d0fc36cb5ab2c2afc2ffe888741b1abb497c27a90895aad3e3256fd71b288e79b98978"
@@ -25,8 +25,8 @@
     {
       "id": "",
       "package": "eternal-base",
-      "version": "44",
-      "release": "1.eternal44",
+      "version": "rolling",
+      "release": "1.eternal",
       "outputs": [
         "eternal-base"
       ],

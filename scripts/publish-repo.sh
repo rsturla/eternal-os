@@ -20,7 +20,7 @@ rpmx=${RPMX:-rpmx}
 
 packages=
 output=site
-release=44
+release=rolling
 signing_key=
 public_key=
 base_url=https://rsturla.github.io/eternal-os
@@ -31,7 +31,7 @@ usage: publish-repo.sh --packages DIR [options]
 
   --packages DIR     Artifacts root produced by build-all.sh
   --output DIR       Repository mirror to write (default: site)
-  --release VER      Release directory under the mirror (default: 44)
+  --release VER      Release directory under the mirror (default: rolling)
   --signing-key FILE Sign repodata with this OpenPGP secret key
   --public-key FILE  Copy this public key to RPM-GPG-KEY-eternal
   --base-url URL     Consumer-facing repository base URL
@@ -92,7 +92,8 @@ mkdir -p "$output/$release"
 
 # Group every binary RPM by its parent directory's name (the architecture).
 # Depth 2 covers out/<arch>/*.rpm; depth 3 covers out/<package>/<arch>/*.rpm.
-# Source RPMs live one level deeper under src/ and are excluded.
+# Source RPMs live one level deeper under src/; they are collected separately
+# below and published under <release>/SRPMS.
 declare -A seen
 found=0
 while IFS= read -r -d '' rpm; do
@@ -109,6 +110,17 @@ if ((found == 0)); then
   exit 1
 fi
 
+# Collect source RPMs separately. They are built under
+# out/<package>/<arch>/src/ and are architecture-independent, so the same
+# filename from two arches collapses to one copy in the source repository.
+source_stage="$stage/SRPMS"
+source_found=0
+while IFS= read -r -d '' rpm; do
+  mkdir -p "$source_stage"
+  cp -f "$rpm" "$source_stage/"
+  source_found=$((source_found + 1))
+done < <(find "$packages" -type f -name '*.src.rpm' -print0)
+
 for arch in "${!seen[@]}"; do
   dest="$output/$release/$arch"
   rm -rf "$dest"
@@ -119,6 +131,16 @@ for arch in "${!seen[@]}"; do
   echo "==> repo $arch -> ${dest#"$root"/}"
   "${cmd[@]}"
 done
+
+if ((source_found > 0)); then
+  dest="$output/$release/SRPMS"
+  rm -rf "$dest"
+  mkdir -p "$dest"
+  cmd=("$rpmx" repo --rpms "$source_stage" --output "$dest")
+  [[ -n $signing_key ]] && cmd+=(--signing-key "$signing_key")
+  echo "==> repo SRPMS -> ${dest#"$root"/}"
+  "${cmd[@]}"
+fi
 
 # GitHub Pages serves the tree as static files.
 touch "$output/.nojekyll"
@@ -136,15 +158,22 @@ cat >"$output/index.html" <<'HTML'
     <p>
       Configure dnf with the <code>eternal.repo</code> file published beside
       this page. Release directories are laid out as
-      <code>&lt;releasever&gt;/&lt;basearch&gt;</code>.
+      <code>&lt;releasever&gt;/&lt;basearch&gt;</code>; source packages live
+      under <code>&lt;releasever&gt;/SRPMS</code>.
     </p>
     <ul>
       <li><a href="eternal.repo">eternal.repo</a></li>
       <li><a href="RPM-GPG-KEY-eternal">RPM-GPG-KEY-eternal</a></li>
+      <li><a href="__RELEASE__/SRPMS/">__RELEASE__/SRPMS</a></li>
     </ul>
   </body>
 </html>
 HTML
+
+if ((source_found == 0)); then
+  sed -i '\|__RELEASE__/SRPMS|d' "$output/index.html"
+fi
+sed -i "s|__RELEASE__|$release|g" "$output/index.html"
 
 gpgcheck=0
 if [[ -n $public_key ]]; then
@@ -162,5 +191,19 @@ gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-eternal
 metadata_expire=6h
 countme=0
 EOF
+
+if ((source_found > 0)); then
+  cat >>"$output/eternal.repo" <<EOF
+
+[eternal-source]
+name=Eternal Linux \$releasever - Source
+baseurl=${base_url}/\$releasever/SRPMS
+enabled=0
+gpgcheck=${gpgcheck}
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-eternal
+metadata_expire=6h
+countme=0
+EOF
+fi
 
 echo "repository written to ${output#"$root"/}/$release"

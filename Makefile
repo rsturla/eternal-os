@@ -3,14 +3,14 @@ SHELL := /bin/bash
 RPMX ?= rpmx
 OUT ?= out
 SITE ?= site
-RELEASE ?= 44
+RELEASE ?= rolling
 ARCH ?= x86_64
 IMAGE ?= ghcr.io/rsturla/eternal-os/base
 TAG ?= $(RELEASE)
 PACKAGES ?= $(shell cat images/base/packages.txt)
 BASE ?= origin/HEAD
 
-.PHONY: help bootstrap doctor check lint affected hash build build-affected build-all lock lock-check repo image push all ci clean
+.PHONY: help bootstrap doctor check lint arches affected hash build build-affected build-all lock lock-check repo image push all ci clean
 
 help:
 	@echo "Eternal Linux"
@@ -19,6 +19,7 @@ help:
 	@echo "  make doctor          Check the host toolchain"
 	@echo "  make check           pre-commit + lint every recipe (same as CI)"
 	@echo "  make lint            Validate every recipe"
+	@echo "  make arches          List target architectures from the profile"
 	@echo "  make affected        List packages affected since $(BASE)"
 	@echo "  make hash            Print content hashes for every package"
 	@echo "  make build           Build packages whose content hash changed"
@@ -45,6 +46,9 @@ check:
 
 lint:
 	RPMX=$(RPMX) ./scripts/lint-all.sh
+
+arches:
+	./scripts/list-arches.sh
 
 affected:
 	RPMX=$(RPMX) ./scripts/affected.sh --base $(BASE)
@@ -77,7 +81,8 @@ image: repo
 	./scripts/build-image.sh \
 		--repo $(SITE)/$(RELEASE)/$(ARCH) \
 		--packages "$(PACKAGES)" \
-		--releasever $(RELEASE) \
+		--releasever 44 \
+		--image-version $(RELEASE) \
 		--arch $(ARCH) \
 		--tag $(IMAGE):$(TAG)
 

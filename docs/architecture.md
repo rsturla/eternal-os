@@ -40,7 +40,7 @@ The bootstrap root is deliberately contained:
 - It is named `bootstrap-*`, never `eternal-*`.
 - It only supplies the build toolchain and the packages `eternal-base` still
   needs.
-- Its `dist-tag` is `.eternal44`, so the RPMs it produces are Eternal packages,
+- Its `dist-tag` is `.eternal`, so the RPMs it produces are Eternal packages,
   not Fedora packages.
 - `profiles/eternal.profile.yaml` lists the bootstrap repositories separately
   from the Eternal repository, pinned to Fedora 44 literally so that
@@ -56,11 +56,18 @@ change as ownership moves in-tree.
 The repository is laid out as `<releasever>/<basearch>`:
 
 ```text
-https://rsturla.github.io/eternal-os/44/x86_64/
+https://rsturla.github.io/eternal-os/rolling/x86_64/
 ```
 
-Today there is one channel: `eternal`. A future `eternal-updates` channel gets
-its own directory and its own `.repo` stanza; consumers opt in.
+Eternal is a rolling distribution, so there is one channel: `rolling`.
+`releasever` is literally `rolling`, and every push to `main` replaces the
+repository at that path. There is no stable/updates split yet.
+
+Packages that rebuild in a release run get `+build<run-number>` appended to
+their release, so a dnf client sees a newer NEVRA. Unchanged packages are
+restored from the content-addressed cache and keep their previous NEVRA. The
+image is published as a multi-arch manifest under `:rolling`, `:latest` and an
+immutable `:sha-<commit>` tag.
 
 Release identity lives in `packages/eternal-release`:
 
@@ -107,7 +114,8 @@ credentials.
 2. the fan-in verifies that every package in the plan produced artifacts, then
    assembles and signs `repodata` in `site/`;
 3. deploys `site/` to GitHub Pages and keeps it as a workflow artifact;
-4. composes the base image from that repository and pushes it to GHCR.
+4. composes the base image per architecture (native x86_64 and aarch64
+   runners) and pushes a multi-arch manifest to GHCR.
 
 ### Incremental model
 

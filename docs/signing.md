@@ -46,7 +46,7 @@ Use the same scripts and flags as CI:
 ```console
 ./scripts/build-all.sh --output out \
   --signing-key ~/eternal-signing-key.asc
-./scripts/publish-repo.sh --packages out --output site --release 44 \
+./scripts/publish-repo.sh --packages out --output site --release rolling \
   --signing-key ~/eternal-signing-key.asc \
   --public-key ~/eternal-signing-key.asc.pub
 
@@ -86,7 +86,7 @@ Then flip `gpgcheck=0` to `1` in the release package and rebuild.
 ```console
 rpm --import RPM-GPG-KEY-eternal
 dnf --disablerepo='*' --enablerepo=eternal makecache
-rpm -q --checksig packages/44/x86_64/eternal-release-*.rpm
+rpm -q --checksig packages/rolling/x86_64/eternal-release-*.rpm
 rpmx repo --rpms out/x86_64 --output /tmp/verify \
   --signing-key eternal-signing-key.asc
 ```

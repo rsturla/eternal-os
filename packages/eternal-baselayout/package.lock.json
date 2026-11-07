@@ -15,7 +15,7 @@
   "policy": {},
   "root": {
     "profile": "bootstrap-fedora-44",
-    "requirement": "sha512:e528107f51dbca177f8918867d60e3d95f81afbab491fbe6a8f85ef385a495f640bb952aaf3fc3d6c73683d60eb9932e891adfaaef53847e315a430f3d3522c1",
+    "requirement": "sha512:ef44a0e02e819c7b275237890eb785c66927142a769db29029fb2a101b8052afcc412e9600f520a3c73f6fa783d44d5dab1dbf1be711577ae24b22bed2e9ad12",
     "arch": "x86_64",
     "closure_digest": "sha512:4f80207dfffe84566016e774ea6b787fa5212119fde30b555e88f5d206ac558f5ac50d9715339ea266e2235732dd0b6105cdc812daf41a63ba2c12d681d4e581",
     "root_digest": "sha512:3e36cbf2ca2ae48ecac603499a1630e79d4514e2ae4405dad086dcdd15d0fc36cb5ab2c2afc2ffe888741b1abb497c27a90895aad3e3256fd71b288e79b98978"
@@ -26,7 +26,7 @@
       "id": "",
       "package": "eternal-baselayout",
       "version": "1",
-      "release": "1.eternal44",
+      "release": "1.eternal",
       "outputs": [
         "eternal-baselayout"
       ],

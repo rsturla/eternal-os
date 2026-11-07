@@ -94,8 +94,13 @@ repository needs a new toolchain component.
 ```console
 ./scripts/lint-all.sh
 ./scripts/build-all.sh --package foo --output out
+./scripts/build-all.sh --package foo --arch aarch64 --output out
 ./scripts/lock-all.sh
 ```
+
+Every push to `main` rebuilds both `x86_64` and `aarch64` on native
+GitHub-hosted runners; run both locally when a recipe has architecture-specific
+sources or tests.
 
 A package's output is `out/foo/<arch>/`. The content hash is recorded in
 `out/.stamps/`, so the next `make build` skips it until a recipe, profile,

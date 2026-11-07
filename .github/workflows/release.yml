@@ -42,6 +42,7 @@ jobs:
       RPMX_SIGNING_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
       RPMX_PUBLIC_KEY: ${{ secrets.RPMX_PUBLIC_KEY }}
       PACKAGES: ${{ needs.packages.outputs.packages }}
+      ARCHES: ${{ needs.packages.outputs.arches }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -59,15 +60,18 @@ jobs:
       - name: Verify the plan is complete
         run: |
           mapfile -t planned < <(jq -r '.[]' <<<"$PACKAGES")
+          mapfile -t arches < <(jq -r '.[]' <<<"$ARCHES")
           missing=0
           for package in "${planned[@]}"; do
-            if ! compgen -G "out/$package/*/*.rpm" >/dev/null; then
-              echo "missing artifacts for $package" >&2
-              missing=1
-            fi
+            for arch in "${arches[@]}"; do
+              if ! compgen -G "out/$package/$arch/*.rpm" >/dev/null; then
+                echo "missing artifacts for $package on $arch" >&2
+                missing=1
+              fi
+            done
           done
           ((missing == 0)) || exit 1
-          echo "all ${#planned[@]} packages downloaded"
+          echo "all ${#planned[@]} packages downloaded for ${arches[*]}"
 
       - name: Write keys
         env:
@@ -86,7 +90,8 @@ jobs:
 
       - name: Assemble repository
         run: |
-          args=(--packages out --output site --release 44)
+          args=(--packages out --output site --release rolling
+            --base-url "https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}")
           if [ -f "$RUNNER_TEMP/signing/rpmx.asc" ]; then
             args+=(--signing-key "$RUNNER_TEMP/signing/rpmx.asc")
           fi
@@ -97,6 +102,8 @@ jobs:
 
       - name: Configure Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+        with:
+          enablement: true
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
@@ -126,9 +133,18 @@ jobs:
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
   image:
-    name: Base image
-    needs: repository
-    runs-on: ubuntu-latest
+    name: Base image (${{ matrix.arch }})
+    needs: [repository, packages]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: ${{ fromJSON(needs.packages.outputs.arches) }}
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
     permissions:
       contents: read
       packages: write
@@ -156,13 +172,54 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compose and push
+      - name: Compose and push architecture image
         run: |
           image="ghcr.io/${{ github.repository }}/base"
           ./scripts/build-image.sh \
-            --repo site/44/x86_64 \
+            --repo "site/rolling/${{ matrix.arch }}" \
             --releasever 44 \
-            --arch x86_64 \
-            --tag "$image:44" \
-            --tag "$image:latest" \
+            --image-version rolling \
+            --arch "${{ matrix.arch }}" \
+            --tag "$image:rolling-${{ matrix.arch }}" \
             --push
+
+  manifest:
+    name: Multi-arch image
+    needs: [image, packages]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push manifest lists
+        env:
+          ARCHES: ${{ needs.packages.outputs.arches }}
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY}/base"
+          mapfile -t arches < <(jq -r '.[]' <<<"$ARCHES")
+          refs=()
+          for arch in "${arches[@]}"; do
+            refs+=("$image:rolling-$arch")
+          done
+          for tag in rolling latest "sha-${GITHUB_SHA::12}"; do
+            docker manifest create "$image:$tag" "${refs[@]}"
+            docker manifest push "$image:$tag"
+          done
+
+      - name: Make the package public
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          package="${GITHUB_REPOSITORY#*/}/base"
+          encoded=${package//\//%2F}
+          gh api -X PATCH \
+            "/orgs/${GITHUB_REPOSITORY_OWNER}/packages/container/${encoded}" \
+            -f visibility=public

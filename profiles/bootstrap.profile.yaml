@@ -13,8 +13,8 @@ document: rpmx-profile
 version: 1
 name: bootstrap-fedora-44
 releasever: "44"
-dist-tag: .eternal44
-archs: [x86_64]
+dist-tag: .eternal
+archs: [x86_64, aarch64]
 builder:
   image: registry.fedoraproject.org/fedora:44
 repositories:

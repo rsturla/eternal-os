@@ -12,7 +12,7 @@ schema: 1
 
 package:
   name: eternal-base
-  version: "44"
+  version: "rolling"
   release: 1
   summary: The Eternal Linux base system
   description: |

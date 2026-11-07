@@ -10,7 +10,7 @@ schema: 1
 
 package:
   name: eternal-release
-  version: "44"
+  version: "rolling"
   release: 1
   summary: Eternal Linux release files
   description: |
@@ -72,7 +72,7 @@ outputs:
     dependencies:
       provides:
         - system-release
-        - system-release(44)
+        - system-release(rolling)
       conflicts:
         - fedora-release
         - fedora-release-common
@@ -89,8 +89,8 @@ tests:
       - -c
       - |
         grep -q '^ID=eternal$' os-release
-        grep -q '^VERSION_ID="44"$' os-release
-        grep -q '^PRETTY_NAME="Eternal Linux 44"$' os-release
+        grep -q '^VERSION_ID="rolling"$' os-release
+        grep -q '^PRETTY_NAME="Eternal Linux Rolling"$' os-release
         test -f system-release
         test -f redhat-release
         grep -q 'baseurl=https://rsturla.github.io/eternal-os/' eternal.repo
@@ -103,5 +103,5 @@ tests:
       - |
         . /etc/os-release
         test "$ID" = eternal
-        test "$VERSION_ID" = "44"
+        test "$VERSION_ID" = "rolling"
         test -f /etc/yum.repos.d/eternal.repo

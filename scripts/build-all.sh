@@ -15,6 +15,7 @@ since=
 output=out
 arch=
 signing_key=
+build_release=
 jobs=
 force=0
 locked=0
@@ -33,6 +34,7 @@ usage: build-all.sh [options]
   --output DIR       Artifacts root; each architecture writes DIR/<arch>
   --arch ARCH        Target architecture (default: rpmx default)
   --signing-key FILE Sign RPMs with this OpenPGP secret key
+  --build-release N  Append +buildN to rebuilt packages (rolling releases)
   --jobs N           Parallel build jobs exported to steps as JOBS
   --locked           Refuse recipe, source or root drift
   --no-tests         Build without running the recipe's tests
@@ -73,6 +75,10 @@ while (($# > 0)); do
       ;;
     --signing-key)
       signing_key=${2:?--signing-key needs a file}
+      shift 2
+      ;;
+    --build-release)
+      build_release=${2:?--build-release needs a number}
       shift 2
       ;;
     --jobs)
@@ -173,6 +179,7 @@ for recipe in "${recipes[@]}"; do
   cmd=("$rpmx" build "$recipe" --output "$pkg_output")
   [[ -n $arch ]] && cmd+=(--arch "$arch")
   [[ -n $signing_key ]] && cmd+=(--signing-key "$signing_key")
+  [[ -n $build_release ]] && cmd+=(--build-release "$build_release")
   [[ -n $jobs ]] && cmd+=(--jobs "$jobs")
   cmd+=("${extra[@]}")
 

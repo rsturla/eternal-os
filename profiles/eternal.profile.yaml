@@ -7,10 +7,10 @@
 # `eternal-base` has an in-tree recipe.
 document: rpmx-profile
 version: 1
-name: eternal-44
-releasever: "44"
-dist-tag: .eternal44
-archs: [x86_64]
+name: eternal-rolling
+releasever: "rolling"
+dist-tag: .eternal
+archs: [x86_64, aarch64]
 builder:
   image: registry.fedoraproject.org/fedora:44
 repositories:

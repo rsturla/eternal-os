@@ -8,6 +8,7 @@ set -euo pipefail
 
 repo=
 releasever=44
+image_version=rolling
 arch=x86_64
 packages=
 work=
@@ -24,6 +25,7 @@ usage: build-image.sh --repo DIR --tag REF [options]
   --tag REF          Image reference (repeatable)
   --packages LIST    Space-separated package set (default: images/base/packages.txt)
   --releasever VER   dnf releasever used during composition (default: 44)
+  --image-version V  OCI version label (default: rolling)
   --arch ARCH        Architecture of the repository (default: x86_64)
   --work DIR         Keep the rootfs under DIR instead of a temporary directory
   --push             Push every tag after building
@@ -47,6 +49,10 @@ while (($# > 0)); do
       ;;
     --releasever)
       releasever=${2:?--releasever needs a version}
+      shift 2
+      ;;
+    --image-version)
+      image_version=${2:?--image-version needs a value}
       shift 2
       ;;
     --arch)
@@ -148,7 +154,7 @@ podman unshare tar --numeric-owner --acls --xattrs -C "$rootfs" -cf - . |
     --change 'LABEL org.opencontainers.image.description=The Eternal Linux base system' \
     --change 'LABEL org.opencontainers.image.source=https://github.com/rsturla/eternal-os' \
     --change 'LABEL org.opencontainers.image.licenses=MIT' \
-    --change "LABEL org.opencontainers.image.version=$releasever" \
+    --change "LABEL org.opencontainers.image.version=$image_version" \
     - "${tags[0]}"
 
 for tag in "${tags[@]:1}"; do

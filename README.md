@@ -25,9 +25,10 @@ produced by [rpmx](https://github.com/rsturla/rpmx):
 | Area | State |
 | --- | --- |
 | Package recipes | `eternal-release`, `eternal-baselayout`, `eternal-base` |
-| Repository | Published to GitHub Pages at `https://rsturla.github.io/eternal-os/44/$basearch` |
-| Images | `ghcr.io/rsturla/eternal-os/base:44` |
-| Architectures | `x86_64` (the layout is ready for `aarch64`) |
+| Release model | Rolling: every push to `main` republishes the `rolling` channel |
+| Repository | Rolling channel at `https://rsturla.github.io/eternal-os/rolling/$basearch` |
+| Images | `ghcr.io/rsturla/eternal-os/base:rolling` (`:latest`, `:sha-<commit>`) |
+| Architectures | `x86_64` and `aarch64` (GitHub-hosted ARM runners) |
 | Signing | Optional in CI and locally; see [`docs/signing.md`](docs/signing.md) |
 
 ## Repository layout
@@ -73,8 +74,8 @@ make bootstrap     # cargo install the pinned rpmx revision
 make doctor        # check podman/bubblewrap/dnf5
 make check         # pre-commit + lint every recipe
 make build         # build only packages whose content hash changed
-make repo          # assemble site/44/<arch>/ with repodata
-make image         # compose ghcr.io/rsturla/eternal-os/base:44
+make repo          # assemble site/rolling/<arch>/ with repodata
+make image         # compose ghcr.io/rsturla/eternal-os/base:rolling
 make all           # check + build + repo + image
 ```
 
@@ -142,7 +143,7 @@ The only difference is secret delivery. CI writes `RPMX_SIGNING_KEY` and
 
 ```console
 ./scripts/build-all.sh --signing-key ~/eternal-signing-key.asc
-./scripts/publish-repo.sh --packages out --output site --release 44 \
+./scripts/publish-repo.sh --packages out --output site --release rolling \
   --signing-key ~/eternal-signing-key.asc \
   --public-key ~/eternal-signing-key.asc.pub
 ```
@@ -159,12 +160,18 @@ workflow.
 1. lint, then build **every** package in a matrix. Content-addressed caches
    mean only changed packages execute `rpmx build`.
 2. A fan-in job downloads the per-package artifacts, verifies that the plan is
-   complete, and rebuilds `repodata` into `site/44/<arch>/`. When a key is
-   configured it signs the RPMs and `repomd.xml`, and writes `eternal.repo`,
-   `RPM-GPG-KEY-eternal` and `.nojekyll` beside it.
+   complete, and rebuilds `repodata` into `site/rolling/<arch>/` plus
+   `site/rolling/SRPMS/`. When a key is configured it signs the RPMs and
+   `repomd.xml`, and writes `eternal.repo`, `RPM-GPG-KEY-eternal` and
+   `.nojekyll` beside it.
 3. deploys `site/` to GitHub Pages;
-4. composes the base image from the just-built repository and pushes it to
-   GHCR.
+4. composes the base image per architecture from the just-built repository and
+   pushes `:rolling`, `:latest` and `:sha-<commit>` manifest lists to GHCR.
+
+Eternal is a rolling distribution: every push to `main` republishes the
+`rolling` channel. Packages that actually rebuild get a `+build<run>` release
+suffix so `dnf upgrade` always sees a newer NEVRA; unchanged packages are
+restored from cache.
 
 GitHub's matrix job outputs merge cells into a map, but only for statically
 declared output names. A dynamic package matrix cannot name one output per
