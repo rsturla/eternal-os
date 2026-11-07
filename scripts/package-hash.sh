@@ -121,9 +121,10 @@ closure_hash() {
   sha256sum "$inner" | cut -d' ' -f1
 }
 
-for name in "${names[@]}"; do
+# Every package in the graph may be a dependency of a selected package.
+while IFS= read -r name; do
   own_hash_for "$name"
-done
+done < <(jq -r 'keys[]' "$graph_file")
 for name in "${names[@]}"; do
   memo[$name]=$(closure_hash "$name")
 done
