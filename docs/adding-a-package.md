@@ -45,6 +45,7 @@ build:
     profile: ../../profiles/bootstrap.profile.yaml
   dependencies:
     tools: [bash, coreutils]
+    # tests: [procps-ng]  # extra packages for the disposable installed-test root
   pipeline:
     - runs: |
         install -D -m 0755 foo "$STAGE/usr/bin/foo"
