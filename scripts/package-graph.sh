@@ -27,7 +27,7 @@ if [[ -z ${names[*]-} ]]; then
   exit 1
 fi
 
-declare -A plan provides provider build run
+declare -A plan provider build run
 
 # First pass: collect plans and the capability -> package index.
 for name in "${names[@]}"; do

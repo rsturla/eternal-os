@@ -97,14 +97,25 @@ repository needs a new toolchain component.
 ./scripts/lock-all.sh
 ```
 
+A package's output is `out/foo/<arch>/`. The content hash is recorded in
+`out/.stamps/`, so the next `make build` skips it until a recipe, profile,
+script, rpmx revision or in-tree build dependency changes. Use
+`./scripts/build-all.sh --affected --since origin/main` to rebuild only what a
+branch touches, or `make build-all` to force everything.
+
 Commit `packages/foo/package.lock.json` with the recipe. CI builds with
 `--locked` once the lock exists in a follow-up change; until then the lock is
 recorded and reviewed.
+
+When `foo` gains users, `scripts/package-graph.sh` picks up build edges from
+`build.dependencies` and runtime edges from `outputs[].dependencies.run` via
+`rpmx plan --json`; no separate dependency file to maintain.
 
 ## Pull request checklist
 
 - [ ] `rpmx lint` is clean (warnings explained).
 - [ ] The package builds with `./scripts/build-all.sh --package NAME`.
+- [ ] `make affected` includes the package and anything that builds against it.
 - [ ] At least one test fails if the packaged files disappear.
 - [ ] `package.lock.json` is committed.
 - [ ] No secrets, signing keys or local paths are in the recipe.

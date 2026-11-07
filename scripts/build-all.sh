@@ -107,6 +107,9 @@ if [[ -n $package && $selection == affected ]]; then
 fi
 
 recipes=()
+graph_file=$(mktemp)
+trap 'rm -f "$graph_file"' EXIT
+"$root/scripts/package-graph.sh" >"$graph_file"
 if [[ -n $package ]]; then
   recipe="$root/packages/$package/package.yaml"
   if [[ ! -f $recipe ]]; then
@@ -115,7 +118,7 @@ if [[ -n $package ]]; then
   fi
   recipes+=("$recipe")
 elif [[ $selection == affected ]]; then
-  affected_args=(--base "${since:-origin/HEAD}")
+  affected_args=(--graph "$graph_file" --base "${since:-origin/HEAD}")
   while IFS= read -r name; do
     [[ -n $name ]] || continue
     recipes+=("$root/packages/$name/package.yaml")
@@ -138,7 +141,7 @@ for recipe in "${recipes[@]}"; do
 done
 
 # One graph and one hashing pass for the whole selection.
-mapfile -t hashes < <("$root/scripts/package-hash.sh" "${names[@]}")
+mapfile -t hashes < <("$root/scripts/package-hash.sh" --graph "$graph_file" "${names[@]}")
 declare -A hash_of
 for line in "${hashes[@]}"; do
   hash_of[${line%% *}]=${line##* }

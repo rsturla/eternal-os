@@ -2,8 +2,6 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -16,24 +14,12 @@ concurrency:
 jobs:
   lint:
     name: Lint
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup rpmx
-        uses: ./.github/actions/setup-rpmx
-
-      - name: pre-commit
-        run: |
-          python3 -m pip install --user pre-commit
-          export PATH="$HOME/.local/bin:$PATH"
-          pre-commit run --all-files --show-diff-on-failure
-
-      - name: Lint recipes
-        run: ./scripts/lint-all.sh
+    uses: ./.github/workflows/_lint.yml
 
   packages:
     name: Packages
     needs: lint
     uses: ./.github/workflows/_build-packages.yml
+    with:
+      selection: affected
+      base: ${{ github.event.pull_request.base.sha }}

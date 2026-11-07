@@ -37,8 +37,9 @@ produced by [rpmx](https://github.com/rsturla/rpmx):
 ├── .github/
 │   ├── actions/setup-rpmx/       # pinned rpmx + host toolchain
 │   └── workflows/
-│       ├── _build-packages.yml    # reusable package build
-│       ├── ci.yml                 # lint and build every package on a PR
+│       ├── _lint.yml              # reusable lint (pre-commit + rpmx lint)
+│       ├── _build-packages.yml    # plan + affected matrix + per-package build
+│       ├── ci.yml                 # affected packages on a PR
 │       └── release.yml            # sign, publish the repo, push the image
 ├── docs/
 │   ├── adding-a-package.md
@@ -50,11 +51,16 @@ produced by [rpmx](https://github.com/rsturla/rpmx):
 │   ├── bootstrap.profile.yaml     # Fedora 44 build root (temporary)
 │   └── eternal.profile.yaml       # the Eternal repository (for consumers)
 ├── scripts/                       # local and CI entry points
+│   ├── affected.sh                # package selection from a git diff
+│   ├── package-graph.sh           # in-tree build/run edges from rpmx plan
+│   ├── package-hash.sh            # content hashes and cache keys
+│   ├── build-all.sh               # incremental per-package builds
+│   └── ...
 └── Makefile
 ```
 
-Build output goes to `out/<arch>/`; the published repository mirror is written
-to `site/`. Both are ignored by Git.
+Build output goes to `out/<package>/<arch>/`; the published repository mirror
+is written to `site/`. Both are ignored by Git.
 
 ## Quick start
 
@@ -66,7 +72,7 @@ Root resolution and test roots run through `podman`; build steps run through
 make bootstrap     # cargo install the pinned rpmx revision
 make doctor        # check podman/bubblewrap/dnf5
 make check         # pre-commit + lint every recipe
-make build         # build every package into out/<arch>/
+make build         # build only packages whose content hash changed
 make repo          # assemble site/44/<arch>/ with repodata
 make image         # compose ghcr.io/rsturla/eternal-os/base:44
 make all           # check + build + repo + image
@@ -76,11 +82,41 @@ The first build resolves the bootstrap root (network, a few minutes). Later
 builds reuse the cached root. The pinned rpmx revision lives in
 `.rpmx-revision`; Renovate manages it.
 
-Build one package:
+Build one package, or only the packages touched since a ref:
 
 ```console
 ./scripts/build-all.sh --package eternal-release --output out
+./scripts/build-all.sh --affected --since origin/main --output out
 ```
+
+Per-package artifacts land in `out/<package>/<arch>/`. Keeping package outputs
+separate matters: an installed-stage test root must not see RPMs from unrelated
+packages.
+
+## Incremental builds
+
+Every package has a content hash over its recipe, context, lock, profiles,
+build scripts, the pinned rpmx revision, and its in-tree build dependencies
+transitively. `scripts/build-all.sh` records the hash in `out/.stamps/` and
+skips a package when the stamp matches and its RPMs are present.
+
+```console
+make hash            # content hashes, one per package
+make affected        # packages affected since BASE (default origin/HEAD)
+make build           # consider every package, skip unchanged ones
+make build-affected  # only packages affected since BASE
+make build-all       # force a full rebuild
+```
+
+`scripts/affected.sh` walks the package graph from `rpmx plan --json`: a
+recipe change rebuilds that package plus everything that builds against it;
+a profile, script or rpmx revision change rebuilds everything. Runtime
+dependents are only followed with `--with-runtime-dependents`, because a
+version-only change does not alter their NEVRA.
+
+CI uses the same hash as a cache key. The release matrix still covers every
+package so the published repository is complete, but unchanged packages are
+restored from cache without running `rpmx build`.
 
 ## Local and CI run the same commands
 
@@ -90,16 +126,16 @@ There is no CI-only build logic. Every workflow step calls a script in
 | Local | CI |
 | --- | --- |
 | `make bootstrap` | `./.github/actions/setup-rpmx` calls `scripts/install-rpmx.sh` |
-| `make check` | `scripts/lint-all.sh` + `pre-commit` |
-| `make build` | `scripts/build-all.sh`, one matrix job per package |
+| `make check` | `_lint.yml` calls `scripts/lint-all.sh` + `pre-commit` |
+| `make build` / `build-affected` | `_build-packages.yml` calls `scripts/build-all.sh` |
 | `make repo` | `scripts/publish-repo.sh` |
 | `make image` | `scripts/build-image.sh` |
 | `make push` | the same script with `--push` |
 
-The package matrix comes from `scripts/list-packages.sh`, the image package
-set from `images/base/packages.txt`, and the rpmx revision from
-`.rpmx-revision`. A local build and a CI build therefore consume exactly the
-same inputs.
+The plan comes from `scripts/list-packages.sh`, `scripts/affected.sh`,
+`scripts/package-graph.sh` and `scripts/package-hash.sh`; the image package
+set from `images/base/packages.txt`; the rpmx revision from `.rpmx-revision`.
+A local build and a CI build therefore consume exactly the same inputs.
 
 The only difference is secret delivery. CI writes `RPMX_SIGNING_KEY` and
 `RPMX_PUBLIC_KEY` to temporary files; locally, pass the files directly:
@@ -113,16 +149,27 @@ The only difference is secret delivery. CI writes `RPMX_SIGNING_KEY` and
 
 ## How a release works
 
-1. `ci.yml` lints every recipe and builds each package in a matrix on every PR.
-2. `release.yml` runs on `main`, on `v*` tags and on demand:
-   - builds every package, signing with `RPMX_SIGNING_KEY` when the secret is
-     configured;
-   - rebuilds `repodata` into `site/44/<arch>/`, signs `repomd.xml` when a key
-     is available, and writes `eternal.repo`, `RPM-GPG-KEY-eternal` and
-     `.nojekyll` beside it;
-   - deploys `site/` to GitHub Pages;
-   - composes the base image from the just-built repository and pushes it to
-     GHCR.
+`ci.yml` runs on pull requests and on demand. A `prepare` job computes the
+package plan and hashes, then a matrix builds only the affected packages in
+parallel and uploads each package's artifacts. Lint runs first as a reusable
+workflow.
+
+`release.yml` runs on `main`, on `v*` tags and on demand:
+
+1. lint, then build **every** package in a matrix. Content-addressed caches
+   mean only changed packages execute `rpmx build`.
+2. A fan-in job downloads the per-package artifacts, verifies that the plan is
+   complete, and rebuilds `repodata` into `site/44/<arch>/`. When a key is
+   configured it signs the RPMs and `repomd.xml`, and writes `eternal.repo`,
+   `RPM-GPG-KEY-eternal` and `.nojekyll` beside it.
+3. deploys `site/` to GitHub Pages;
+4. composes the base image from the just-built repository and pushes it to
+   GHCR.
+
+GitHub's matrix job outputs merge cells into a map, but only for statically
+declared output names. A dynamic package matrix cannot name one output per
+package, so the plan and hashes are produced once by `prepare` and the RPMs
+travel as artifacts. The fan-in uses the plan as its completeness check.
 
 Packages are always built from source; the repository is the only artifact
 consumers see.

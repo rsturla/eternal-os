@@ -17,7 +17,6 @@
 set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-rpmx=${RPMX:-rpmx}
 graph_file=
 names=()
 

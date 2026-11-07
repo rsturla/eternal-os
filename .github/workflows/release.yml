@@ -17,10 +17,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  lint:
+    name: Lint
+    uses: ./.github/workflows/_lint.yml
+
   packages:
     name: Packages
+    needs: lint
     uses: ./.github/workflows/_build-packages.yml
     with:
+      selection: all
       sign: true
     secrets: inherit
 
@@ -35,6 +41,7 @@ jobs:
     env:
       RPMX_SIGNING_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
       RPMX_PUBLIC_KEY: ${{ secrets.RPMX_PUBLIC_KEY }}
+      PACKAGES: ${{ needs.packages.outputs.packages }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -49,6 +56,19 @@ jobs:
           path: out
           merge-multiple: true
 
+      - name: Verify the plan is complete
+        run: |
+          mapfile -t planned < <(jq -r '.[]' <<<"$PACKAGES")
+          missing=0
+          for package in "${planned[@]}"; do
+            if ! compgen -G "out/$package/*/*.rpm" >/dev/null; then
+              echo "missing artifacts for $package" >&2
+              missing=1
+            fi
+          done
+          ((missing == 0)) || exit 1
+          echo "all ${#planned[@]} packages downloaded"
+
       - name: Write keys
         env:
           PRIVATE_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
@@ -56,11 +76,11 @@ jobs:
         run: |
           install -d -m 0700 "$RUNNER_TEMP/signing"
           if [ -n "$PRIVATE_KEY" ]; then
-            printf '%s' "$PRIVATE_KEY" > "$RUNNER_TEMP/signing/rpmx.asc"
+            printf '%s' "$PRIVATE_KEY" >"$RUNNER_TEMP/signing/rpmx.asc"
             chmod 0600 "$RUNNER_TEMP/signing/rpmx.asc"
           fi
           if [ -n "$PUBLIC_KEY" ]; then
-            printf '%s' "$PUBLIC_KEY" > "$RUNNER_TEMP/signing/rpmx.asc.pub"
+            printf '%s' "$PUBLIC_KEY" >"$RUNNER_TEMP/signing/rpmx.asc.pub"
             chmod 0644 "$RUNNER_TEMP/signing/rpmx.asc.pub"
           fi
 

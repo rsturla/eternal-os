@@ -13,17 +13,18 @@
 set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-rpmx=${RPMX:-rpmx}
 base=
 all=0
 json=0
 runtime=0
+graph_file=
 
 usage() {
   cat <<'EOF'
 usage: affected.sh [options]
 
   --base REF                   Compare against REF (default: origin/HEAD)
+  --graph FILE                 Reuse a graph produced by package-graph.sh
   --all                        Select every package
   --json                       Emit a JSON array
   --with-runtime-dependents    Also follow runtime edges
@@ -35,6 +36,10 @@ while (($# > 0)); do
   case "$1" in
     --base)
       base=${2:?--base needs a ref}
+      shift 2
+      ;;
+    --graph)
+      graph_file=${2:?--graph needs a file}
       shift 2
       ;;
     --all)
@@ -145,7 +150,11 @@ fi
 
 graph=$(mktemp)
 trap 'rm -f "$changed" "$graph"' EXIT
-"$root/scripts/package-graph.sh" >"$graph"
+if [[ -n $graph_file ]]; then
+  cp "$graph_file" "$graph"
+else
+  "$root/scripts/package-graph.sh" >"$graph"
+fi
 
 edge=build
 ((runtime)) && edge=both

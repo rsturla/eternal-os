@@ -8,24 +8,29 @@ ARCH ?= x86_64
 IMAGE ?= ghcr.io/rsturla/eternal-os/base
 TAG ?= $(RELEASE)
 PACKAGES ?= $(shell cat images/base/packages.txt)
+BASE ?= origin/HEAD
 
-.PHONY: help bootstrap doctor check lint build lock repo image push all ci clean
+.PHONY: help bootstrap doctor check lint affected hash build build-affected build-all lock repo image push all ci clean
 
 help:
 	@echo "Eternal Linux"
 	@echo
-	@echo "  make bootstrap   Install the pinned rpmx revision (.rpmx-revision)"
-	@echo "  make doctor      Check the host toolchain"
-	@echo "  make check       pre-commit + lint every recipe (same as CI)"
-	@echo "  make lint        Validate every recipe"
-	@echo "  make build       Build every package into $(OUT)/<arch>/"
-	@echo "  make lock        Write package.lock.json for every recipe"
-	@echo "  make repo        Assemble $(SITE)/$(RELEASE)/<arch>/ from $(OUT)/"
-	@echo "  make image       Compose $(IMAGE):$(TAG) from $(SITE)/"
-	@echo "  make push        Push $(IMAGE):$(TAG)"
-	@echo "  make all         check + build + repo + image"
-	@echo "  make ci          Alias for 'make all'"
-	@echo "  make clean       Remove build and publish output"
+	@echo "  make bootstrap       Install the pinned rpmx revision (.rpmx-revision)"
+	@echo "  make doctor          Check the host toolchain"
+	@echo "  make check           pre-commit + lint every recipe (same as CI)"
+	@echo "  make lint            Validate every recipe"
+	@echo "  make affected        List packages affected since $(BASE)"
+	@echo "  make hash            Print content hashes for every package"
+	@echo "  make build           Build packages whose content hash changed"
+	@echo "  make build-affected  Build only packages affected since $(BASE)"
+	@echo "  make build-all       Force a rebuild of every package"
+	@echo "  make lock            Write package.lock.json for every recipe"
+	@echo "  make repo            Assemble $(SITE)/$(RELEASE)/<arch>/ from $(OUT)/"
+	@echo "  make image           Compose $(IMAGE):$(TAG) from $(SITE)/"
+	@echo "  make push            Push $(IMAGE):$(TAG)"
+	@echo "  make all             check + build + repo + image"
+	@echo "  make ci              Alias for 'make all'"
+	@echo "  make clean           Remove build and publish output"
 
 bootstrap:
 	./scripts/install-rpmx.sh
@@ -40,8 +45,20 @@ check:
 lint:
 	RPMX=$(RPMX) ./scripts/lint-all.sh
 
+affected:
+	RPMX=$(RPMX) ./scripts/affected.sh --base $(BASE)
+
+hash:
+	RPMX=$(RPMX) ./scripts/package-hash.sh
+
 build:
 	RPMX=$(RPMX) ./scripts/build-all.sh --output $(OUT)
+
+build-affected:
+	RPMX=$(RPMX) ./scripts/build-all.sh --affected --since $(BASE) --output $(OUT)
+
+build-all:
+	RPMX=$(RPMX) ./scripts/build-all.sh --all --force --output $(OUT)
 
 lock:
 	RPMX=$(RPMX) ./scripts/lock-all.sh

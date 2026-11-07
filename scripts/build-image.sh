@@ -100,7 +100,9 @@ if [[ -z $work ]]; then
   cleanup=$work
 fi
 rootfs="$work/rootfs"
-rm -rf "$rootfs"
+if [[ -e $rootfs ]]; then
+  podman unshare rm -rf "$rootfs"
+fi
 mkdir -p "$rootfs"
 
 # dnf resolves packages inside a bootstrap container but installs them into the
@@ -114,14 +116,14 @@ podman run --rm --privileged --network=host --security-opt label=disable \
   "registry.fedoraproject.org/fedora:$releasever" \
   bash -euxo pipefail -c "
     dnf5 -y --installroot=/work/rootfs --releasever=$releasever \
+      --use-host-config \
       --setopt=install_weak_deps=False \
       --setopt=tsflags=nodocs \
       --setopt=keepcache=False \
       --repofrompath=eternal,/run/eternal-repo \
       --setopt=eternal.gpgcheck=0 \
       --setopt=eternal.repo_gpgcheck=0 \
-      --allowerasing \
-      install $packages
+      install --allowerasing $packages
     dnf5 -y --installroot=/work/rootfs clean all
     rm -rf /work/rootfs/var/cache/dnf /work/rootfs/var/cache/libdnf5 \
            /work/rootfs/var/log/dnf5.log /work/rootfs/var/log/dnf.log
@@ -135,7 +137,10 @@ if [[ ! -e $rootfs/etc/hostname ]]; then
 fi
 
 echo "==> import ${tags[0]}"
-tar --numeric-owner --acls --xattrs -C "$rootfs" -cf - . |
+# tar must run in the rootless user namespace: /etc/shadow is mode 000, and the
+# namespace makes the invoking user root for the read while preserving the
+# container-relative numeric ownership that import expects.
+podman unshare tar --numeric-owner --acls --xattrs -C "$rootfs" -cf - . |
   podman import \
     --change 'ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' \
     --change 'CMD ["/bin/bash"]' \
@@ -158,5 +163,5 @@ if ((push)); then
 fi
 
 if [[ -n $cleanup ]]; then
-  rm -rf "$cleanup"
+  podman unshare rm -rf "$cleanup"
 fi

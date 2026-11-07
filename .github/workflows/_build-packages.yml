@@ -1,13 +1,45 @@
 name: Build packages
 
+# Fan-out workflow: the prepare job computes the package plan and content
+# hashes, the matrix builds each selected package in parallel, and the caller's
+# fan-in assembles a repository from the uploaded artifacts.
+#
+# GitHub's matrix job outputs merge cells into a map, but only for statically
+# declared output names. A dynamic package matrix cannot name one output per
+# package, so the plan and hashes are produced once by `prepare` and exposed as
+# workflow outputs. The RPM binaries travel as artifacts; job outputs carry
+# strings only.
 on:
   workflow_call:
     inputs:
+      selection:
+        description: 'Either "affected" or "all".'
+        required: false
+        type: string
+        default: affected
+      base:
+        description: Base ref for --affected (empty uses origin/HEAD).
+        required: false
+        type: string
+        default: ""
       sign:
         description: Sign packages when RPMX_SIGNING_KEY is available.
         required: false
         type: boolean
         default: false
+    outputs:
+      packages:
+        description: JSON array of package names in this build.
+        value: ${{ jobs.prepare.outputs.packages }}
+      hashes:
+        description: JSON object mapping package name to content hash.
+        value: ${{ jobs.prepare.outputs.hashes }}
+      skip:
+        description: "true when no package is selected."
+        value: ${{ jobs.prepare.outputs.skip }}
+      signed:
+        description: "1 when a signing key is available, otherwise 0."
+        value: ${{ jobs.prepare.outputs.signed }}
     secrets:
       RPMX_SIGNING_KEY:
         required: false
@@ -16,31 +48,80 @@ permissions:
   contents: read
 
 jobs:
-  list:
-    name: List packages
+  prepare:
+    name: Plan
     runs-on: ubuntu-latest
     outputs:
-      packages: ${{ steps.packages.outputs.packages }}
+      packages: ${{ steps.plan.outputs.packages }}
+      hashes: ${{ steps.plan.outputs.hashes }}
+      skip: ${{ steps.plan.outputs.skip }}
+      signed: ${{ steps.plan.outputs.signed }}
+    env:
+      RPMX_SIGNING_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
-      - name: Find recipes
-        id: packages
+      - name: Setup rpmx
+        uses: ./.github/actions/setup-rpmx
+
+      - name: Plan
+        id: plan
+        env:
+          SELECTION: ${{ inputs.selection }}
+          BASE_REF: ${{ inputs.base }}
         run: |
-          packages=$(./scripts/list-packages.sh \
-            | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "packages=$packages" >> "$GITHUB_OUTPUT"
-          echo "recipes: $packages"
+          graph=$(mktemp)
+          ./scripts/package-graph.sh >"$graph"
+
+          if [ "$SELECTION" = "affected" ]; then
+            args=(--json --graph "$graph")
+            if [ -n "$BASE_REF" ]; then
+              args+=(--base "$BASE_REF")
+            fi
+            packages=$(./scripts/affected.sh "${args[@]}")
+          else
+            packages=$(./scripts/list-packages.sh \
+              | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          fi
+
+          echo "packages=$packages" >>"$GITHUB_OUTPUT"
+          echo "plan: $packages"
+
+          if [ "$packages" = "[]" ]; then
+            echo "skip=true" >>"$GITHUB_OUTPUT"
+            echo "hashes={}" >>"$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >>"$GITHUB_OUTPUT"
+            mapfile -t names < <(jq -r '.[]' <<<"$packages")
+            hashes=$(./scripts/package-hash.sh --graph "$graph" "${names[@]}" \
+              | jq -R -s -c '
+                  split("\n")
+                  | map(select(length > 0)
+                        | split(" ")
+                        | {key: .[0], value: .[1]})
+                  | from_entries')
+            echo "hashes=$hashes" >>"$GITHUB_OUTPUT"
+            echo "hashes: $hashes"
+          fi
+
+          if [ -n "${RPMX_SIGNING_KEY:-}" ]; then
+            echo "signed=1" >>"$GITHUB_OUTPUT"
+          else
+            echo "signed=0" >>"$GITHUB_OUTPUT"
+          fi
 
   build:
     name: Build ${{ matrix.package }}
-    needs: list
+    needs: prepare
+    if: needs.prepare.outputs.skip != 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        package: ${{ fromJSON(needs.list.outputs.packages) }}
+        package: ${{ fromJSON(needs.prepare.outputs.packages) }}
     env:
       RPMX_SIGNING_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
     steps:
@@ -49,6 +130,21 @@ jobs:
 
       - name: Setup rpmx
         uses: ./.github/actions/setup-rpmx
+
+      - name: Package hash
+        id: hash
+        env:
+          HASHES: ${{ needs.prepare.outputs.hashes }}
+        run: |
+          hash=$(jq -r --arg package '${{ matrix.package }}' '.[$package]' <<<"$HASHES")
+          echo "hash=$hash" >>"$GITHUB_OUTPUT"
+          echo "${{ matrix.package }}: $hash"
+
+      - name: Restore package cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: out/
+          key: rpm-${{ runner.os }}-${{ matrix.package }}-${{ steps.hash.outputs.hash }}-signed${{ needs.prepare.outputs.signed }}
 
       - name: Restore build root cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -64,7 +160,7 @@ jobs:
           KEY: ${{ secrets.RPMX_SIGNING_KEY }}
         run: |
           install -d -m 0700 "$RUNNER_TEMP/signing"
-          printf '%s' "$KEY" > "$RUNNER_TEMP/signing/rpmx.asc"
+          printf '%s' "$KEY" >"$RUNNER_TEMP/signing/rpmx.asc"
           chmod 0600 "$RUNNER_TEMP/signing/rpmx.asc"
 
       - name: Build

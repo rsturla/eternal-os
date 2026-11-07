@@ -91,18 +91,49 @@ CI runs the same scripts a developer runs. `make check`, `make build`,
 materialization, artifact transfer between jobs and the GitHub Pages/GHCR
 credentials.
 
-`ci.yml` runs on every pull request:
+`ci.yml` runs on pull requests and on demand:
 
 - lint every recipe with `rpmx lint` (`make check` also runs pre-commit);
-- build every package in a matrix from `scripts/list-packages.sh`, which runs
-the recipe's tests by default.
+- `prepare` computes the affected package list and content hashes from the
+  recipe graph (`scripts/affected.sh`, `scripts/package-graph.sh`);
+- a matrix builds only the affected packages in parallel, which runs the
+  recipe's tests by default, and uploads per-package artifacts.
 
 `release.yml` runs on `main`, on `v*` tags and on demand:
 
-1. build every package in a matrix, signing when `RPMX_SIGNING_KEY` is set;
-2. assemble and sign `repodata` in `site/`;
-3. deploy `site/` to GitHub Pages and keep it as a workflow artifact;
-4. compose the base image from that repository and push it to GHCR.
+1. lint, then run the full package matrix. Each package restores its
+   content-addressed cache, so only changed packages execute `rpmx build`.
+   Signing is applied when `RPMX_SIGNING_KEY` is set;
+2. the fan-in verifies that every package in the plan produced artifacts, then
+   assembles and signs `repodata` in `site/`;
+3. deploys `site/` to GitHub Pages and keeps it as a workflow artifact;
+4. composes the base image from that repository and pushes it to GHCR.
+
+### Incremental model
+
+```text
+rpmx plan --json  ->  graph (build + run edges)
+        |
+        v
+git diff  ->  affected.sh  ->  matrix JSON  ->  build-all.sh
+                                                    |
+                                content hash  <-----+
+                                                    |
+                                                    v
+                                        out/.stamps + CI cache keys
+```
+
+The hash covers the recipe bundle, profiles, build scripts, pinned rpmx and
+the transitive hashes of in-tree build dependencies. Two builds with the same
+hash are interchangeable. A missing cache is safe: it only causes a rebuild.
+There is no mutable "latest repository" state; the published repository is
+assembled from the artifacts of the current run.
+
+GitHub's matrix job outputs merge cells into a map, but only for statically
+declared output names. With a dynamic package matrix, the plan and hashes are
+produced once by `prepare` and exposed as reusable-workflow outputs; the RPMs
+travel as artifacts. A future persistent repository or OCI registry can
+replace the artifact hop without changing the recipe model.
 
 The image package set is `images/base/packages.txt`, shared by `make image`
 and CI. The image is built from the repository produced in the same run, so a
