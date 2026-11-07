@@ -116,6 +116,7 @@ trap 'rm -f "$changed"' EXIT
 } >"$changed"
 
 declare -A changed_package
+changed_count=0
 global=0
 while IFS= read -r -d '' path; do
   [[ -n $path ]] || continue
@@ -127,7 +128,7 @@ while IFS= read -r -d '' path; do
     packages/*/*)
       rest=${path#packages/}
       name=${rest%%/*}
-      [[ -n ${known[$name]:-} ]] && changed_package[$name]=1
+      [[ -n ${known[$name]:-} ]] && { changed_package[$name]=1; changed_count=$((changed_count + 1)); }
       ;;
   esac
 done <"$changed"
@@ -137,7 +138,7 @@ if ((global)); then
   exit 0
 fi
 
-if ((${#changed_package[@]} == 0)); then
+if ((changed_count == 0)); then
   emit
   exit 0
 fi

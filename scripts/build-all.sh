@@ -127,7 +127,7 @@ else
   done < <("$root/scripts/list-packages.sh")
 fi
 
-if ((${#recipes[@]} == 0)); then
+if [[ -z ${recipes[*]-} ]]; then
   echo "no packages selected" >&2
   exit 0
 fi

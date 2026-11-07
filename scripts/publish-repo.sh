@@ -94,15 +94,17 @@ mkdir -p "$output/$release"
 # Depth 2 covers out/<arch>/*.rpm; depth 3 covers out/<package>/<arch>/*.rpm.
 # Source RPMs live one level deeper under src/ and are excluded.
 declare -A seen
+found=0
 while IFS= read -r -d '' rpm; do
   arch=$(basename "$(dirname "$rpm")")
   [[ $arch == src ]] && continue
   mkdir -p "$stage/$arch"
   cp -f "$rpm" "$stage/$arch/"
   seen[$arch]=1
+  found=$((found + 1))
 done < <(find "$packages" -mindepth 2 -maxdepth 3 -type f -name '*.rpm' -print0)
 
-if ((${#seen[@]} == 0)); then
+if ((found == 0)); then
   echo "no RPMs found under $packages" >&2
   exit 1
 fi

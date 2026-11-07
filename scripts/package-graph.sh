@@ -22,7 +22,7 @@ command -v jq >/dev/null 2>&1 || {
 }
 
 mapfile -t names < <("$root/scripts/list-packages.sh")
-if ((${#names[@]} == 0)); then
+if [[ -z ${names[*]-} ]]; then
   echo "no packages found" >&2
   exit 1
 fi

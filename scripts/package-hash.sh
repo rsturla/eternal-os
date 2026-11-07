@@ -64,10 +64,9 @@ if [[ -z $graph_file ]]; then
   "$root/scripts/package-graph.sh" >"$graph_file"
 fi
 
-if ((${#names[@]} == 0)); then
+if [[ -z ${names[*]-} ]]; then
   mapfile -t names < <(jq -r 'keys[]' "$graph_file")
 fi
-
 for name in "${names[@]}"; do
   jq -e --arg n "$name" 'has($n)' "$graph_file" >/dev/null || {
     echo "unknown package: $name" >&2
