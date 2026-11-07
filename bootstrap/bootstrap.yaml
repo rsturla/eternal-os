@@ -1,0 +1,44 @@
+# The first Eternal bootstrap ladder.
+#
+# Stage 0 builds the first in-tree userspace packages inside the Fedora 44
+# seed. Stage 1 rebuilds them with the stage 0 repository in the root, so the
+# build itself uses Eternal make and coreutils. glibc, gcc and binutils are
+# still supplied by the seed and are the next packages to import.
+document: rpmx-bootstrap
+version: 1
+name: eternal
+archs: [x86_64, aarch64]
+recipe-root: recipes
+roots: .work/roots
+locks: .work/locks
+source-date-epoch: 1704067200
+max-iterations: 3
+
+seed:
+  name: fedora-44
+  image: registry.fedoraproject.org/fedora:44
+  releasever: "44"
+  generation: "2026.11"
+
+stages:
+  - name: stage0
+    profile: ../profiles/bootstrap.profile.yaml
+    packages: [make, coreutils]
+    output: .work/out/stage0
+    seed: true
+    fixed-point: [make, coreutils]
+    # Bootstrapping is name-based: this is the only place that says which
+    # seed package each Eternal output replaces. They happen to match today;
+    # a rename only needs an entry here (and a `provides` in the recipe).
+    replaces:
+      make: make
+      coreutils: coreutils
+
+  - name: stage1
+    profile: profiles/bootstrap-stage1.profile.yaml
+    packages: [make, coreutils]
+    output: .work/out/stage1
+    fixed-point: [make, coreutils]
+    replaces:
+      make: make
+      coreutils: coreutils

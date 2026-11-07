@@ -18,7 +18,9 @@ package.yaml + profile + sources
 
 | Concern | Owner |
 | --- | --- |
-| Package recipes | `packages/<name>/package.yaml` in this repository |
+| Rolling package recipes | `packages/<name>/package.yaml` |
+| Bootstrap recipes | `bootstrap/recipes/<name>/package.yaml` |
+| Bootstrap ladder | `bootstrap/bootstrap.yaml` (stages, roots, seed mapping) |
 | Build roots | `profiles/bootstrap.profile.yaml` (toolchain) |
 | Distribution repositories | `profiles/eternal.profile.yaml` |
 | Package repository | GitHub Pages, `https://rsturla.github.io/eternal-os/` |
@@ -47,9 +49,16 @@ The bootstrap root is deliberately contained:
   `$releasever` continues to mean the Eternal release.
 
 Self-hosting means removing the bootstrap repositories and every bootstrap
-dependency. Package names are chosen to match the components they replace
+dependency. Usually a package keeps the name of the component it replaces
 (`bash`, `coreutils`, `glibc`, `filesystem`, `dnf5`), so `eternal-base` does not
-change as ownership moves in-tree.
+change as ownership moves in-tree. When the names differ, the stage's
+`replaces` map says which seed package the Eternal output supersedes, and the
+recipe must provide the seed name so dependencies still resolve.
+
+Bootstrap recipes are a separate definition, not normal recipes with bootstrap
+flags. They can carry a different epoch, release, source timestamp, build root
+and build-tool list. A recipe graduates to `packages/` when the self-hosted
+root can build the rolling package.
 
 ## Release channels
 

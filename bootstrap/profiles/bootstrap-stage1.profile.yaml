@@ -1,0 +1,41 @@
+# The build root for the first self-hosted bootstrap stage.
+#
+# It still starts from Fedora 44 because Eternal does not own glibc, gcc or
+# binutils yet. The bootstrap manifest adds the stage 0 repository on top, so
+# packages built there (make and coreutils today) win over their Fedora
+# counterparts through a higher Eternal release.
+document: rpmx-profile
+version: 1
+name: bootstrap-stage1
+releasever: "44"
+dist-tag: .eternal
+archs: [x86_64, aarch64]
+builder:
+  image: registry.fedoraproject.org/fedora:44
+repositories:
+  - id: fedora
+    metalink: https://mirrors.fedoraproject.org/metalink?repo=fedora-$releasever&arch=$basearch
+  - id: updates
+    metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch
+packages:
+  install:
+    - bash
+    - coreutils
+    - findutils
+    - gcc
+    - make
+    - patch
+    - tar
+    - gzip
+    - sed
+    - grep
+    - gawk
+    - diffutils
+    - pkgconf-pkg-config
+sbom: true
+options:
+  weak_deps: false
+  docs: false
+paths:
+  prefix: /usr
+  libdir: /usr/lib64

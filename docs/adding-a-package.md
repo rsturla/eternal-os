@@ -18,6 +18,11 @@ packages/foo/
   pipelines/        # optional local step definitions
 ```
 
+Do not put bootstrap-only versions of a package in `packages/`. A package that
+is not yet buildable from the self-hosted root belongs in
+`bootstrap/recipes/<name>/package.yaml` and is selected by
+`bootstrap/bootstrap.yaml`. See [`../bootstrap/README.md`](../bootstrap/README.md).
+
 ## Recipe anatomy
 
 ```yaml

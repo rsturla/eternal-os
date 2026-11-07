@@ -4,7 +4,9 @@ Eternal Linux is a greenfield, package-first Linux distribution. It is built
 the way [Wolfi](https://github.com/wolfi-dev) is built, but with RPM packages
 produced by [rpmx](https://github.com/rsturla/rpmx):
 
-- every package is a reviewed, strict YAML recipe in `packages/`;
+- every package is a reviewed, strict YAML recipe in `packages/`; bootstrap-only
+  recipes live in `bootstrap/recipes/` and never leak stage policy into the
+  rolling package graph;
 - a single GitHub Actions run builds, tests, signs and publishes an RPM
   repository;
 - OCI images are composed from that repository rather than hand-written
@@ -18,7 +20,9 @@ produced by [rpmx](https://github.com/rsturla/rpmx):
 > from. The bootstrap root is a build dependency, not the distribution's
 > identity: Eternal owns its release package, repository, package set and
 > images. As packages are brought in-tree they replace their bootstrap
-> counterparts without renaming them, and the bootstrap root shrinks.
+> counterparts. The bootstrap ladder in `bootstrap/bootstrap.yaml` owns the
+> seed-package mapping explicitly, so an Eternal package may keep a different
+> name and still replace its Fedora counterpart.
 
 ## Status
 
@@ -46,8 +50,12 @@ produced by [rpmx](https://github.com/rsturla/rpmx):
 │   ├── adding-a-package.md
 │   ├── architecture.md
 │   └── signing.md
+├── bootstrap/                     # dedicated seed -> self-hosted build definition
+│   ├── bootstrap.yaml              # stage graph, roots, replaces map
+│   ├── recipes/                    # bootstrap-only recipe variants
+│   └── profiles/                   # bootstrap-only stage profiles
 ├── images/base/                   # base image definition and docs
-├── packages/                      # one directory per recipe (source of truth)
+├── packages/                      # one directory per rolling recipe (source of truth)
 ├── profiles/
 │   ├── bootstrap.profile.yaml     # Fedora 44 build root (temporary)
 │   └── eternal.profile.yaml       # the Eternal repository (for consumers)
@@ -198,7 +206,12 @@ build:
 initial package set). It is what an image or a future self-hosting package
 consumes.
 
-To add a package, run:
+Bootstrap recipes are separate on purpose. A bootstrap recipe may pin a
+different epoch, release, build-tool set or source timestamp while the normal
+package is not buildable yet. When it graduates, move it to `packages/<name>/`
+and remove the bootstrap-only variant.
+
+To add a rolling package, run:
 
 ```console
 ./scripts/new-package.sh packages/foo

@@ -1,0 +1,75 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# GNU Make is part of the bootstrap toolchain. The epoch and release mirror the
+# bootstrap package it replaces, but use an Eternal release so a stage can
+# prefer this build over Fedora's copy.
+schema: 1
+
+package:
+  name: make
+  epoch: 1
+  version: "4.4.1"
+  release: 100
+  summary: GNU Make build automation tool
+  description: |
+    GNU Make is a tool which controls the generation of executables and other
+    non-source files of a program from the program's source files.
+  license: GPL-3.0-or-later
+  source-date-epoch: 1713139200
+  upstream: https://www.gnu.org/software/make/
+  maintainers:
+    - name: Eternal Linux maintainers
+      email: maintainers@eternal.sturla.tech
+  cpe:
+    vendor: eternal
+    product: make
+
+sources:
+  - name: make-4.4.1.tar.gz
+    kind: archive
+    digest: "sha512:145260cbd6a8226cef3dfef0c8baba31847beaebc7e6b65d39d02715fd4f4cab9b139b6c3772e550088d4f9ae80c6d3ed20b9a7664c693644dfb96b4cb60e67c"
+    locators:
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/make/make-4.4.1.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils]
+  pipeline:
+    - runs: |
+        ./configure --prefix=/usr --libdir=/usr/lib64
+        make -j"$JOBS"
+        make install DESTDIR="$STAGE"
+        install -D -m 0644 COPYING "$STAGE/usr/share/licenses/make/COPYING"
+    - uses: strip
+
+outputs:
+  - name: make
+    summary: GNU Make build automation tool
+    files:
+      include:
+        - /usr/bin/**
+        - /usr/include/**
+        - /usr/share/info/**
+        - /usr/share/locale/**
+        - /usr/share/man/**
+        - /usr/share/licenses/**
+      license:
+        - /usr/share/licenses/make/COPYING
+
+tests:
+  - name: build
+    stage: build
+    argv:
+      - sh
+      - -c
+      - ./make --version | grep -q 'GNU Make 4.4.1'
+
+  - name: installed
+    stage: installed
+    argv: [make, --version]

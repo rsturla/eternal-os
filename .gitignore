@@ -19,3 +19,6 @@ packages/*/.rpmx/
 .idea/
 .cache/
 __pycache__/
+
+# bootstrap build roots
+bootstrap/.work/
