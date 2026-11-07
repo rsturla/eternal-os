@@ -115,7 +115,7 @@ pipeline.
    Signing is applied when `RPMX_SIGNING_KEY` is set;
 2. the fan-in verifies that every package in the plan produced artifacts, then
    assembles and signs `repodata` in `site/`;
-3. deploys `site/` to GitHub Pages and keeps it as a workflow artifact.
+3. deploys `site/` to GitHub Pages.
 
 Image composition is a separate pipeline. It consumes the published package
 repository; it is not a step in `release.yml`.
