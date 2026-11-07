@@ -14,7 +14,6 @@ package:
     The GNU core utilities are the basic file, shell and text manipulation
     utilities expected on every Unix-like operating system.
   license: GPL-3.0-or-later
-  source-date-epoch: 1740009600
   upstream: https://www.gnu.org/software/coreutils/
   maintainers:
     - name: Eternal Linux maintainers

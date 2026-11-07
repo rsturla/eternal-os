@@ -8,11 +8,16 @@ package name:
 - `bootstrap.yaml` is the ladder. It owns stage order, roots, repositories,
   fixed-point packages, and the seed-package mapping (`replaces`).
 - `recipes/` holds bootstrap build definitions. A bootstrap recipe may pin an
-  epoch, release, source timestamp, build root, or build-tool list that would be
-  wrong for the rolling package of the same output name.
+  epoch, release, build root, or build-tool list that would be wrong for the
+  rolling package of the same output name. The ladder owns the source timestamp.
 - `profiles/` holds profiles used only by a bootstrap stage. The general Fedora
   seed build root remains `../profiles/bootstrap.profile.yaml`, because normal
   packages use it too.
+
+Bootstrap recipes do not set `source-date-epoch`; `bootstrap.yaml` owns the
+timestamp for the whole ladder (a stage may override it). Production recipes in
+`packages/` keep their own value because a normal `rpmx build` has no ladder
+manifest to supply one.
 
 `replaces` is the contract between Eternal output names and seed package names.
 They do not have to match. For example, if Eternal shipped `eternal-foo` while

@@ -15,7 +15,6 @@ package:
     GNU Make is a tool which controls the generation of executables and other
     non-source files of a program from the program's source files.
   license: GPL-3.0-or-later
-  source-date-epoch: 1713139200
   upstream: https://www.gnu.org/software/make/
   maintainers:
     - name: Eternal Linux maintainers
