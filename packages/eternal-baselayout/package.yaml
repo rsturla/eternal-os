@@ -8,6 +8,8 @@ schema: 1
 
 package:
   name: eternal-baselayout
+  # CI appends +build<Unix timestamp> to rebuilt rolling packages; the counter
+  # is supplied at build time and is not part of the recipe or lock.
   version: "1"
   release: 1
   summary: Eternal Linux base directory layout
