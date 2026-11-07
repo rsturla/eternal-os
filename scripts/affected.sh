@@ -126,7 +126,7 @@ global=0
 while IFS= read -r -d '' path; do
   [[ -n $path ]] || continue
   case "$path" in
-    profiles/* | scripts/* | .rpmx-revision)
+    profiles/* | scripts/* | .rpmx-revision | rpmx-defaults.yaml)
       global=1
       break
       ;;

@@ -5,7 +5,7 @@
 #   - every file under packages/<name>/ (recipe, includes, context, lock);
 #   - every profile, because a build-root change can affect any output;
 #   - scripts/, because a change to the build entry points is a build change;
-#   - the pinned rpmx revision;
+#   - the pinned rpmx revision and repository defaults;
 #   - the hashes of its in-tree build dependencies, transitively.
 #
 # It is used both as a local build stamp and as a CI cache key. Two builds with
@@ -73,42 +73,59 @@ for name in "${names[@]}"; do
   }
 done
 
-declare -A memo visiting
+declare -A own memo
 work=$(mktemp -d)
 trap 'rm -rf "$work" ${cleanup_graph:+$graph_file}' EXIT
 
-hash_for() {
-  local name=$1 dep inner
-  if [[ -n ${memo[$name]:-} ]]; then
+own_hash_for() {
+  local name=$1 inner
+  if [[ -n ${own[$name]:-} ]]; then
     return
   fi
-  if [[ -n ${visiting[$name]:-} ]]; then
-    echo "package graph contains a cycle at '$name'" >&2
-    exit 1
-  fi
-  visiting[$name]=1
-
-  inner="$work/$name"
+  inner="$work/own-$name"
   : >"$inner"
-
-  while IFS= read -r dep; do
-    [[ -n $dep ]] || continue
-    hash_for "$dep"
-    printf 'dependency %s %s\n' "$dep" "${memo[$dep]}" >>"$inner"
-  done < <(jq -r --arg n "$name" '.[$n].build[]?' "$graph_file")
-
   while IFS= read -r -d '' path; do
     printf 'input %s\n' "$path" >>"$inner"
     cat "$root/$path" >>"$inner" 2>/dev/null || true
   done < <(git -C "$root" ls-files -z --cached --others --exclude-standard -- \
-    "packages/$name" "profiles" "scripts" ".rpmx-revision" | sort -z)
+    "packages/$name" "profiles" "scripts" ".rpmx-revision" "rpmx-defaults.yaml" | sort -z)
+  own[$name]=$(sha256sum "$inner" | cut -d' ' -f1)
+}
 
-  memo[$name]=$(sha256sum "$inner" | cut -d' ' -f1)
-  unset "visiting[$name]"
+# Hashing a closure rather than recursing through it keeps a dependency cycle
+# (make <-> coreutils during bootstrap) from aborting the build. The closure is
+# every reachable build dependency; each member contributes its own inputs, so
+# a change anywhere in the closure still changes the dependent's hash.
+closure_hash() {
+  local name=$1 current dep inner
+  local -a queue=("$name")
+  declare -A seen=()
+  seen[$name]=1
+  local i=0
+  while ((i < ${#queue[@]})); do
+    current=${queue[$i]}
+    i=$((i + 1))
+    while IFS= read -r dep; do
+      [[ -n $dep ]] || continue
+      if [[ -z ${seen[$dep]:-} ]]; then
+        seen[$dep]=1
+        queue+=("$dep")
+      fi
+    done < <(jq -r --arg n "$current" '.[$n].build[]?' "$graph_file")
+  done
+  inner="$work/closure-$name"
+  : >"$inner"
+  while IFS= read -r dep; do
+    printf 'dependency %s %s\n' "$dep" "${own[$dep]}" >>"$inner"
+  done < <(printf '%s\n' "${!seen[@]}" | sort)
+  sha256sum "$inner" | cut -d' ' -f1
 }
 
 for name in "${names[@]}"; do
-  hash_for "$name"
+  own_hash_for "$name"
+done
+for name in "${names[@]}"; do
+  memo[$name]=$(closure_hash "$name")
 done
 
 for name in "${names[@]}"; do
