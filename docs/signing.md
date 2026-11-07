@@ -50,12 +50,10 @@ Use the same scripts and flags as CI:
   --signing-key ~/eternal-signing-key.asc \
   --public-key ~/eternal-signing-key.asc.pub
 
-make image
-make push
 ```
 
-`make image` composes and loads the image; `make push` pushes
-`$(IMAGE):$(TAG)`. CI does both with `scripts/build-image.sh --push`.
+`make image` composes and loads an image locally; `make push` pushes it. Image
+publishing is a separate pipeline and is not part of `release.yml`.
 
 ## Turn on verification in the image
 

@@ -28,9 +28,9 @@ help:
 	@echo "  make lock            Write package.lock.json for every recipe"
 	@echo "  make lock-check      Fail when a lock is stale (network)"
 	@echo "  make repo            Assemble $(SITE)/$(RELEASE)/<arch>/ from $(OUT)/"
-	@echo "  make image           Compose $(IMAGE):$(TAG) from $(SITE)/"
-	@echo "  make push            Push $(IMAGE):$(TAG)"
-	@echo "  make all             check + build + repo + image"
+	@echo "  make image           Compose $(IMAGE):$(TAG) locally (image publishing is separate)"
+	@echo "  make push            Push a locally composed image"
+	@echo "  make all             check + build + repo"
 	@echo "  make ci              Alias for 'make all'"
 	@echo "  make clean           Remove build and publish output"
 
@@ -89,7 +89,7 @@ image: repo
 push:
 	podman push $(IMAGE):$(TAG)
 
-all: check build repo image
+all: check build repo
 
 ci: all
 

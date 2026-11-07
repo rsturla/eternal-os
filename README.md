@@ -27,7 +27,7 @@ produced by [rpmx](https://github.com/rsturla/rpmx):
 | Package recipes | `eternal-release`, `eternal-baselayout`, `eternal-base` |
 | Release model | Rolling: every push to `main` republishes the `rolling` channel |
 | Repository | Rolling channel at `https://rsturla.github.io/eternal-os/rolling/$basearch` |
-| Images | `ghcr.io/rsturla/eternal-os/base:rolling` (`:latest`, `:sha-<commit>`) |
+| Images | Composed by a separate image pipeline, not by this release workflow |
 | Architectures | `x86_64` and `aarch64` (GitHub-hosted ARM runners) |
 | Signing | Optional in CI and locally; see [`docs/signing.md`](docs/signing.md) |
 
@@ -75,8 +75,8 @@ make doctor        # check podman/bubblewrap/dnf5
 make check         # pre-commit + lint every recipe
 make build         # build only packages whose content hash changed
 make repo          # assemble site/rolling/<arch>/ with repodata
-make image         # compose ghcr.io/rsturla/eternal-os/base:rolling
-make all           # check + build + repo + image
+make all           # check + build + repo
+# image composition is a separate pipeline; `make image` is local-only
 ```
 
 The first build resolves the bootstrap root (network, a few minutes). Later
@@ -130,13 +130,12 @@ There is no CI-only build logic. Every workflow step calls a script in
 | `make check` | `_lint.yml` calls `scripts/lint-all.sh` + `pre-commit` |
 | `make build` / `build-affected` | `_build-packages.yml` calls `scripts/build-all.sh` |
 | `make repo` | `scripts/publish-repo.sh` |
-| `make image` | `scripts/build-image.sh` |
-| `make push` | the same script with `--push` |
 
 The plan comes from `scripts/list-packages.sh`, `scripts/affected.sh`,
-`scripts/package-graph.sh` and `scripts/package-hash.sh`; the image package
-set from `images/base/packages.txt`; the rpmx revision from `.rpmx-revision`.
-A local build and a CI build therefore consume exactly the same inputs.
+`scripts/package-graph.sh` and `scripts/package-hash.sh`; the rpmx revision
+from `.rpmx-revision`. A local build and a CI build therefore consume exactly
+the same inputs. Local image composition additionally reads
+`images/base/packages.txt`; image publishing is separate.
 
 The only difference is secret delivery. CI writes `RPMX_SIGNING_KEY` and
 `RPMX_PUBLIC_KEY` to temporary files; locally, pass the files directly:
@@ -164,14 +163,13 @@ workflow.
    `site/rolling/SRPMS/`. When a key is configured it signs the RPMs and
    `repomd.xml`, and writes `eternal.repo`, `RPM-GPG-KEY-eternal` and
    `.nojekyll` beside it.
-3. deploys `site/` to GitHub Pages;
-4. composes the base image per architecture from the just-built repository and
-   pushes `:rolling`, `:latest` and `:sha-<commit>` manifest lists to GHCR.
+3. deploys `site/` to GitHub Pages.
 
 Eternal is a rolling distribution: every push to `main` republishes the
-`rolling` channel. Packages that actually rebuild get a `+build<run>` release
-suffix so `dnf upgrade` always sees a newer NEVRA; unchanged packages are
-restored from cache.
+`rolling` channel. Packages that actually rebuild get a `+build<Unix timestamp>`
+release suffix so `dnf upgrade` always sees a newer NEVRA; unchanged packages
+are restored from cache. Image composition is a separate pipeline and is not
+part of `release.yml`.
 
 GitHub's matrix job outputs merge cells into a map, but only for statically
 declared output names. A dynamic package matrix cannot name one output per

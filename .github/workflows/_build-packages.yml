@@ -43,6 +43,9 @@ on:
       signed:
         description: "1 when a signing key is available, otherwise 0."
         value: ${{ jobs.prepare.outputs.signed }}
+      build_release:
+        description: UTC Unix timestamp used as the rolling release counter.
+        value: ${{ jobs.prepare.outputs.build_release }}
     secrets:
       RPMX_SIGNING_KEY:
         required: false
@@ -60,6 +63,7 @@ jobs:
       hashes: ${{ steps.plan.outputs.hashes }}
       skip: ${{ steps.plan.outputs.skip }}
       signed: ${{ steps.plan.outputs.signed }}
+      build_release: ${{ steps.plan.outputs.build_release }}
     env:
       RPMX_SIGNING_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
     steps:
@@ -80,8 +84,11 @@ jobs:
           graph=$(mktemp)
           ./scripts/package-graph.sh >"$graph"
           arches=$(./scripts/list-arches.sh)
+          build_release=$(date -u +%s)
           echo "arches=$arches" >>"$GITHUB_OUTPUT"
+          echo "build_release=$build_release" >>"$GITHUB_OUTPUT"
           echo "arches: $arches"
+          echo "build release: $build_release"
 
           if [ "$SELECTION" = "affected" ]; then
             args=(--json --graph "$graph")
@@ -162,10 +169,25 @@ jobs:
       - name: Restore build root cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ~/.cache/rpmx
+          # Cache an archive, not the tree: assembled roots contain mode-000
+          # files such as /etc/shadow, which actions/cache cannot tar as the
+          # unprivileged runner. podman unshare packs and unpacks them with the
+          # right ownership.
+          path: ${{ runner.temp }}/rpmx-cache.tar.gz
           key: rpmx-root-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('profiles/**') }}
           restore-keys: |
             rpmx-root-${{ runner.os }}-${{ matrix.arch }}-
+
+      - name: Unpack build root cache
+        run: |
+          archive="$RUNNER_TEMP/rpmx-cache.tar.gz"
+          if [ ! -f "$archive" ]; then
+            echo "no cached build root"
+            exit 0
+          fi
+          mkdir -p "$HOME/.cache/rpmx"
+          podman unshare tar --numeric-owner --acls --xattrs -xzf "$archive" \
+            -C "$HOME/.cache/rpmx"
 
       - name: Write signing key
         if: ${{ inputs.sign && env.RPMX_SIGNING_KEY != '' }}
@@ -178,7 +200,7 @@ jobs:
 
       - name: Build
         env:
-          BUILD_RELEASE: ${{ inputs.sign && github.run_number || '' }}
+          BUILD_RELEASE: ${{ inputs.sign && needs.prepare.outputs.build_release || '' }}
         run: |
           args=(--package "${{ matrix.package }}" --arch "${{ matrix.arch }}" --output out)
           if [ -f "$RUNNER_TEMP/signing/rpmx.asc" ]; then
@@ -195,3 +217,12 @@ jobs:
           name: rpm-${{ matrix.package }}-${{ matrix.arch }}
           path: out/
           if-no-files-found: error
+
+      - name: Pack build root cache
+        run: |
+          if [ ! -d "$HOME/.cache/rpmx" ]; then
+            echo "no build root cache to pack"
+            exit 0
+          fi
+          podman unshare tar --numeric-owner --acls --xattrs -czf \
+            "$RUNNER_TEMP/rpmx-cache.tar.gz" -C "$HOME/.cache/rpmx" .

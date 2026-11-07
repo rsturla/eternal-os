@@ -11,7 +11,7 @@ package.yaml + profile + sources
    rpmx build  ->  signed RPMs + SRPMs + SBOMs
         |
         v
-  repodata (GitHub Pages)  ->  dnf install --installroot  ->  OCI image (GHCR)
+  repodata (GitHub Pages)  ->  dnf install --installroot  ->  OCI image (separate pipeline)
 ```
 
 ## Building blocks
@@ -22,7 +22,7 @@ package.yaml + profile + sources
 | Build roots | `profiles/bootstrap.profile.yaml` (toolchain) |
 | Distribution repositories | `profiles/eternal.profile.yaml` |
 | Package repository | GitHub Pages, `https://rsturla.github.io/eternal-os/` |
-| Images | GHCR, `ghcr.io/rsturla/eternal-os/base` |
+| Images | A separate image pipeline, outside `release.yml` |
 | CI/CD | `.github/workflows/` |
 
 `rpmx` always produces a native SRPM first. `rpmx rebuild <srpm>` can reproduce
@@ -63,11 +63,11 @@ Eternal is a rolling distribution, so there is one channel: `rolling`.
 `releasever` is literally `rolling`, and every push to `main` replaces the
 repository at that path. There is no stable/updates split yet.
 
-Packages that rebuild in a release run get `+build<run-number>` appended to
-their release, so a dnf client sees a newer NEVRA. Unchanged packages are
-restored from the content-addressed cache and keep their previous NEVRA. The
-image is published as a multi-arch manifest under `:rolling`, `:latest` and an
-immutable `:sha-<commit>` tag.
+Packages that rebuild in a release run get `+build<Unix timestamp>` appended to
+their release, so a dnf client sees a newer NEVRA. One timestamp is computed
+per release run and shared by every package that rebuilds; unchanged packages
+are restored from the content-addressed cache and keep their previous NEVRA.
+Image composition is a separate pipeline and is not part of `release.yml`.
 
 Release identity lives in `packages/eternal-release`:
 
@@ -78,25 +78,27 @@ Release identity lives in `packages/eternal-release`:
 
 ## Images
 
-`scripts/build-image.sh` composes an image instead of building one with a
-Dockerfile:
+The image tools live in this repository, but image publishing is separate from
+the package release. `scripts/build-image.sh` composes an image instead of
+building one with a Dockerfile:
 
 1. create an empty root;
-2. run `dnf5 --installroot` in a bootstrap container against the just-built
+2. run `dnf5 --installroot` in a bootstrap container against a published
    repository (plus the bootstrap repositories still needed);
 3. remove package-manager caches and add the container-only directories;
 4. import the root as an OCI image and tag it.
 
 The package list is `eternal-base`, so the image definition is a recipe review,
-not a Dockerfile review. Every image is a function of the repository that was
-published in the same workflow run.
+not a Dockerfile review. Every image is a function of a specific published
+repository state, not of a branch checkout.
 
 ## Pipeline
 
-CI runs the same scripts a developer runs. `make check`, `make build`,
-`make repo` and `make image` are the interfaces; the workflows add only secret
-materialization, artifact transfer between jobs and the GitHub Pages/GHCR
-credentials.
+CI runs the same scripts a developer runs. `make check`, `make build` and
+`make repo` are the release interfaces; the workflows add only secret
+materialization, artifact transfer between jobs and GitHub Pages credentials.
+`make image` composes an image locally, but image publishing is a separate
+pipeline.
 
 `ci.yml` runs on pull requests and on demand:
 
@@ -113,9 +115,10 @@ credentials.
    Signing is applied when `RPMX_SIGNING_KEY` is set;
 2. the fan-in verifies that every package in the plan produced artifacts, then
    assembles and signs `repodata` in `site/`;
-3. deploys `site/` to GitHub Pages and keeps it as a workflow artifact;
-4. composes the base image per architecture (native x86_64 and aarch64
-   runners) and pushes a multi-arch manifest to GHCR.
+3. deploys `site/` to GitHub Pages and keeps it as a workflow artifact.
+
+Image composition is a separate pipeline. It consumes the published package
+repository; it is not a step in `release.yml`.
 
 ### Incremental model
 
@@ -143,9 +146,10 @@ produced once by `prepare` and exposed as reusable-workflow outputs; the RPMs
 travel as artifacts. A future persistent repository or OCI registry can
 replace the artifact hop without changing the recipe model.
 
-The image package set is `images/base/packages.txt`, shared by `make image`
-and CI. The image is built from the repository produced in the same run, so a
-bad package cannot slip into an image before the repository is published.
+The image package set is `images/base/packages.txt`, used by local image
+composition and by the separate image pipeline. An image is built from a
+published repository, so a bad package cannot slip into an image before the
+repository is published.
 
 ### Why not Buck2 yet?
 

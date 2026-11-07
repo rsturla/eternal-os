@@ -39,10 +39,11 @@ podman run --rm ghcr.io/rsturla/eternal-os/base:rolling \
 
 ## Publish
 
-`release.yml` builds the image from the repository assembled in the same run
-and pushes `:rolling`, `:latest` and `:sha-<commit>` manifest lists to GHCR,
-covering x86_64 and aarch64. The image is not built from a branch checkout; it
-only ever contains packages that were just published.
+`release.yml` publishes the package repository but does **not** build images.
+Image composition is a separate pipeline: it should consume the repository
+published for the same run and push `:rolling`, `:latest` and
+`:sha-<commit>` manifest lists for x86_64 and aarch64. The image is never built
+from a branch checkout; it only contains packages that were published.
 
 ## Design notes
 
