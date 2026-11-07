@@ -9,13 +9,17 @@ IMAGE ?= ghcr.io/rsturla/eternal-os/base
 TAG ?= $(RELEASE)
 PACKAGES ?= $(shell cat images/base/packages.txt)
 BASE ?= origin/HEAD
+BOOTSTRAP ?= bootstrap/bootstrap.yaml
 
-.PHONY: help bootstrap doctor check lint arches affected hash build build-affected build-all lock lock-check repo image push all ci clean
+.PHONY: help bootstrap bootstrap-plan bootstrap-build bootstrap-clean doctor check lint arches affected hash build build-affected build-all lock lock-check repo image push all ci clean
 
 help:
 	@echo "Eternal Linux"
 	@echo
 	@echo "  make bootstrap       Install the pinned rpmx revision (.rpmx-revision)"
+	@echo "  make bootstrap-plan  Print the bootstrap ladder plan"
+	@echo "  make bootstrap-build Run the bootstrap ladder for $(ARCH)"
+	@echo "  make bootstrap-clean Remove bootstrap roots and locks (root-owned files included)"
 	@echo "  make doctor          Check the host toolchain"
 	@echo "  make check           pre-commit + lint every recipe (same as CI)"
 	@echo "  make lint            Validate every recipe"
@@ -36,6 +40,15 @@ help:
 
 bootstrap:
 	./scripts/install-rpmx.sh
+
+bootstrap-plan:
+	$(RPMX) bootstrap plan $(BOOTSTRAP) --arch $(ARCH)
+
+bootstrap-build:
+	$(RPMX) bootstrap build $(BOOTSTRAP) --arch $(ARCH)
+
+bootstrap-clean:
+	podman unshare rm -rf bootstrap/.work 2>/dev/null || rm -rf bootstrap/.work
 
 doctor:
 	$(RPMX) doctor

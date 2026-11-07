@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Validate every recipe in the repository.
+# Validate every recipe in the repository, including bootstrap variants.
 set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -22,7 +22,7 @@ while (($# > 0)); do
 done
 
 found=0
-for recipe in "$root"/packages/*/package.yaml; do
+for recipe in "$root"/packages/*/package.yaml "$root"/bootstrap/recipes/*/package.yaml; do
   [[ -f "$recipe" ]] || continue
   found=1
   echo "==> lint ${recipe#"$root"/}"
@@ -30,6 +30,6 @@ for recipe in "$root"/packages/*/package.yaml; do
 done
 
 if ((found == 0)); then
-  echo "no recipes found under packages/" >&2
+  echo "no recipes found under packages/ or bootstrap/recipes/" >&2
   exit 1
 fi

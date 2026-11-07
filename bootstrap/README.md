@@ -14,10 +14,10 @@ package name:
   seed build root remains `../profiles/bootstrap.profile.yaml`, because normal
   packages use it too.
 
-Bootstrap recipes do not set `source-date-epoch`; `bootstrap.yaml` owns the
-timestamp for the whole ladder (a stage may override it). Production recipes in
-`packages/` keep their own value because a normal `rpmx build` has no ladder
-manifest to supply one.
+Bootstrap recipes set `source-date-epoch` to the ladder's value as a fallback
+for standalone `rpmx lint`/`rpmx build`; `bootstrap.yaml` owns the effective
+timestamp and a stage may override it. Production recipes keep their own value
+because a normal `rpmx build` has no ladder manifest to supply one.
 
 `replaces` is the contract between Eternal output names and seed package names.
 They do not have to match. For example, if Eternal shipped `eternal-foo` while
@@ -42,6 +42,11 @@ is no longer needed, delete it; the production recipe stays.
 Build locally with:
 
 ```console
-rpmx bootstrap plan bootstrap/bootstrap.yaml
-rpmx bootstrap build bootstrap/bootstrap.yaml --arch x86_64
+make bootstrap-plan
+make bootstrap-build
+make bootstrap-build ARCH=aarch64
+make bootstrap-clean
 ```
+
+The equivalent direct commands are `rpmx bootstrap plan bootstrap/bootstrap.yaml`
+and `rpmx bootstrap build bootstrap/bootstrap.yaml --arch <arch>`.

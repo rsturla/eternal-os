@@ -87,6 +87,18 @@ make all           # check + build + repo
 # image composition is a separate pipeline; `make image` is local-only
 ```
 
+The bootstrap ladder is separate from the rolling build:
+
+```console
+make bootstrap-plan                 # print stage order, roots, and seed replacements
+make bootstrap-build                # run the ladder for ARCH (default: x86_64)
+make bootstrap-build ARCH=aarch64   # cross-build the same ladder
+make bootstrap-clean                # remove root-owned bootstrap roots and locks
+```
+
+Bootstrap definitions live in `bootstrap/`; production recipes for the same
+package names stay in `packages/`.
+
 The first build resolves the bootstrap root (network, a few minutes). Later
 builds reuse the cached root. The pinned rpmx revision lives in
 `.rpmx-revision`; Renovate manages it.
