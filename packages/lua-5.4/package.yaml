@@ -1,0 +1,176 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# Lua 5.4 programming language interpreter and library.
+schema: 1
+
+package:
+  name: lua-5.4
+  version: "5.4.9"
+  release: 1
+  summary: Powerful light-weight programming language (version 5.4)
+  description: |
+    Lua is a powerful, light-weight programming language designed for
+    extending applications. This package provides the 5.4 language stream
+    with versioned binaries, headers and libraries so multiple Lua versions
+    can be installed side by side.
+  license: MIT
+  upstream: https://www.lua.org/
+  cpe:
+    vendor: lua
+    product: lua
+
+sources:
+  - name: lua-5.4.9.tar.gz
+    kind: archive
+    digest: "sha512:b112bd3f0d47043568ef52928853ef692554378a5e368d420b589babf606a82ce05fca781f5401c3565171800b39322141ee500e53e813d1a4ccc5d3a05879b1"
+    locators:
+      - kind: https
+        url: https://www.lua.org/ftp/lua-5.4.9.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, sed]
+    tests: [bash-binsh, coreutils, gcc, pkgconf, grep]
+  pipeline:
+    - runs: |
+        make linux MYCFLAGS="-fPIC" MYLDFLAGS="-Wl,-E"
+        cd src
+        objs=$(ls *.o | grep -vE '^(lua|luac)\.o$')
+        gcc -shared -Wl,-soname,liblua5.4.so.5.4 -o liblua5.4.so.5.4 \
+          $objs -lm -ldl
+        ln -s liblua5.4.so.5.4 liblua5.4.so
+    - runs: |
+        install -Dm755 src/lua "$STAGE"/usr/bin/lua5.4
+        install -Dm755 src/luac "$STAGE"/usr/bin/luac5.4
+        install -Dm755 src/liblua5.4.so.5.4 "$STAGE"/usr/lib64/liblua5.4.so.5.4
+        ln -s liblua5.4.so.5.4 "$STAGE"/usr/lib64/liblua5.4.so
+        mkdir -p "$STAGE"/usr/include/lua5.4
+        install -m644 src/lua.h src/lauxlib.h src/lualib.h src/luaconf.h "$STAGE"/usr/include/lua5.4/
+        if [ -f src/lua.hpp ]; then
+          install -m644 src/lua.hpp "$STAGE"/usr/include/lua5.4/
+        fi
+        install -Dm644 doc/lua.1 "$STAGE"/usr/share/man/man1/lua5.4.1
+        install -Dm644 doc/luac.1 "$STAGE"/usr/share/man/man1/luac5.4.1
+        mkdir -p "$STAGE"/usr/lib64/pkgconfig
+        cat > "$STAGE"/usr/lib64/pkgconfig/lua5.4.pc <<'EOF'
+        prefix=/usr
+        libdir=/usr/lib64
+        includedir=/usr/include/lua5.4
+
+        Name: Lua
+        Description: An Extensible Extension Language
+        Version: 5.4.9
+        Requires:
+        Libs: -L/usr/lib64 -llua5.4 -lm -ldl
+        Cflags: -I/usr/include/lua5.4
+        EOF
+    - runs: |
+        ln -s lua5.4 "$STAGE"/usr/bin/lua
+        ln -s luac5.4 "$STAGE"/usr/bin/luac
+        ln -s liblua5.4.so "$STAGE"/usr/lib64/liblua.so
+        ln -s lua5.4.pc "$STAGE"/usr/lib64/pkgconfig/lua.pc
+        for h in lua.h lauxlib.h lualib.h luaconf.h lua.hpp; do
+          if [ -e "$STAGE/usr/include/lua5.4/$h" ]; then
+            ln -s lua5.4/$h "$STAGE"/usr/include/$h
+          fi
+        done
+    - uses: license/copy
+      with:
+        files: [doc/readme.html]
+        outputs: [lua-5.4, lua-5.4-libs, lua-5.4-devel, lua-5.4-doc]
+    - uses: strip
+
+outputs:
+  - name: lua-5.4
+    summary: Standalone Lua 5.4 interpreter
+    files:
+      include:
+        - /usr/bin/lua
+        - /usr/bin/lua5.4
+        - /usr/bin/luac
+        - /usr/bin/luac5.4
+        - /usr/share/licenses/lua-5.4/**
+      license:
+        - /usr/share/licenses/lua-5.4/**
+    dependencies:
+      run:
+        - lua-5.4-libs = ${package.version}-${package.release}
+        - filesystem
+      provides:
+        - lua = ${package.version}-${package.release}
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            lua -e 'print("lua 5.4 ok")' | grep -Fx 'lua 5.4 ok'
+            lua5.4 -e 'print("lua 5.4 ok")' | grep -Fx 'lua 5.4 ok'
+
+  - name: lua-5.4-libs
+    summary: Lua 5.4 runtime library
+    files:
+      include:
+        - /usr/lib*/liblua5.4.so.*
+        - /usr/share/licenses/lua-5.4-libs/**
+      license:
+        - /usr/share/licenses/lua-5.4-libs/**
+    dependencies:
+      run:
+        - filesystem
+      provides:
+        - lua-libs = ${package.version}-${package.release}
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/liblua5.4.so.* /usr/lib/liblua5.4.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: lua-5.4-devel
+    summary: Development files for Lua 5.4
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/lua-5.4-devel/**
+      license:
+        - /usr/share/licenses/lua-5.4-devel/**
+    dependencies:
+      run:
+        - lua-5.4-libs = ${package.version}-${package.release}
+        - filesystem
+      provides:
+        - lua-devel = ${package.version}-${package.release}
+    tests:
+      - name: link
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            printf '#include <lua.h>\nint main(void){return 0;}\n' > /tmp/lua-test.c
+            gcc /tmp/lua-test.c $(pkg-config --cflags --libs lua5.4) -o /tmp/lua-test
+            /tmp/lua-test
+
+  - name: lua-5.4-doc
+    summary: Documentation for Lua 5.4
+    files:
+      include:
+        - "@man"
+        - /usr/share/licenses/lua-5.4-doc/**
+      license:
+        - /usr/share/licenses/lua-5.4-doc/**
+    dependencies:
+      run:
+        - filesystem
