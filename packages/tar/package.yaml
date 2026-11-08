@@ -38,6 +38,9 @@ build:
     tests: [bash-binsh, coreutils]
   pipeline:
     - uses: autotools/configure
+      with:
+        args:
+          - --libexecdir=/usr/libexec/tar
     - uses: autotools/build
     - uses: autotools/install
     - runs: |
@@ -61,6 +64,7 @@ outputs:
           - sh
           - -c
           - |
+            test -x /usr/libexec/tar/rmt
             mkdir -p tree
             printf 'content\n' > tree/file
             tar -cf archive.tar tree
