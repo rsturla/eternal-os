@@ -107,7 +107,7 @@ build:
     - uses: license/copy
       with:
         files: [COPYINGv2, COPYING.LIB]
-        outputs: [glibc-2.44, ld-linux-2.44, libc-bin-2.44, glibc-2.44-iconv, glibc-2.44-locales, nss-db-2.44, glibc-2.44-dev, glibc-2.44-doc]
+        outputs: [glibc-2.44, ld-linux-2.44, libc-bin-2.44, glibc-2.44-iconv, glibc-2.44-locales, nss-db-2.44, glibc-2.44-devel, glibc-2.44-doc]
     - runs: |
         # The loader configuration is owned by ld-linux-2.44, not by the
         # library package.
@@ -228,24 +228,24 @@ outputs:
       provides:
         - nss-db = ${package.version}-${package.release}
 
-  - name: glibc-2.44-dev
+  - name: glibc-2.44-devel
     summary: GNU C Library development headers and libraries
     files:
       include:
         - "@dev"
         - /usr/lib*/*.o
-        - /usr/share/licenses/glibc-2.44-dev/**
+        - /usr/share/licenses/glibc-2.44-devel/**
       exclude:
         - /usr/lib*/libmemusage.so
       license:
-        - /usr/share/licenses/glibc-2.44-dev/COPYINGv2
-        - /usr/share/licenses/glibc-2.44-dev/COPYING.LIB
+        - /usr/share/licenses/glibc-2.44-devel/COPYINGv2
+        - /usr/share/licenses/glibc-2.44-devel/COPYING.LIB
     dependencies:
       run:
         - filesystem
         - glibc-2.44 = ${package.version}-${package.release}
       provides:
-        - glibc-dev = ${package.version}-${package.release}
+        - glibc-devel = ${package.version}-${package.release}
 
   - name: glibc-2.44-doc
     summary: GNU C Library documentation
