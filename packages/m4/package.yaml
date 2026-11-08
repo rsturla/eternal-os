@@ -1,0 +1,77 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# GNU macro processor. Part of the minimal Eternal userland and the
+# bootstrap tool set. The source is the upstream release tarball.
+schema: 1
+
+package:
+  name: m4
+  version: "1.4.21"
+  release: 1
+  summary: GNU macro processor
+  description: |
+    GNU M4 is an implementation of the traditional Unix macro processor.
+  license: GPL-3.0-or-later
+  upstream: https://www.gnu.org/software/m4/
+  cpe:
+    vendor: gnu
+    product: m4
+
+sources:
+  - name: m4-1.4.21.tar.xz
+    kind: archive
+    digest: "sha512:efe5ec212f6431129a79667f098b2efe2e824122112f73a675deccb9c0d8c9b0bc9e3bf50c9cd5c0b894dc0af1b3f02253e5e67893fb9548a6a9d3bed7c829f7"
+    locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/m4/m4-1.4.21.tar.xz
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/m4/m4-1.4.21.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils]
+  pipeline:
+    - uses: autotools/configure
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [m4, m4-doc]
+    - uses: strip
+
+outputs:
+  - name: m4
+    summary: GNU macro processor
+    files:
+      license:
+        - /usr/share/licenses/m4/COPYING
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            test "$(printf 'eval(2+3)\n' | m4)" = 5
+
+  - name: m4-doc
+    summary: GNU macro processor documentation
+    files:
+      include:
+        - "@man"
+        - "@info"
+        - "@doc"
+        - /usr/share/licenses/m4-doc/COPYING
+      license:
+        - /usr/share/licenses/m4-doc/COPYING
+    dependencies:
+      run:
+        - filesystem
