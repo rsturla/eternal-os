@@ -1,0 +1,114 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# Portable foreign function interface library. A dependency for the minimal Eternal build root.
+schema: 1
+
+package:
+  name: libffi
+  version: "3.8.0"
+  release: 1
+  summary: Portable foreign function interface library
+  description: |
+    libffi provides a portable, high level programming interface to various calling conventions.
+  license: MIT
+  upstream: https://github.com/libffi/libffi
+  cpe:
+    vendor: libffi
+    product: libffi
+
+sources:
+  - name: libffi-3.8.0.tar.gz
+    kind: archive
+    digest: "sha512:a259d50f40b5dcde9cb6227bd105761e667290f107553b204a5a6cfdfbf2e6b022ed04be2ea4596da42961d11396125425def3cb67e2844a9eba90b6750c8c39"
+    locators:
+      - kind: https
+        url: https://github.com/libffi/libffi/releases/download/v3.8.0/libffi-3.8.0.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils]
+    tests: [bash-binsh]
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args: [--disable-static]
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+    - uses: license/copy
+      with:
+        files: [LICENSE]
+        outputs: [libffi, libffi-devel, libffi-doc]
+    - uses: strip
+
+outputs:
+  - name: libffi
+    summary: Portable foreign function interface library
+    files:
+      license:
+        - /usr/share/licenses/libffi/LICENSE
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libffi.so.* /usr/lib/libffi.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: libffi-devel
+    summary: libffi development files
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/libffi-devel/LICENSE
+      license:
+        - /usr/share/licenses/libffi-devel/LICENSE
+    dependencies:
+      run:
+        - libffi = ${package.version}-${package.release}
+        - filesystem
+
+  - name: libffi-doc
+    summary: libffi documentation
+    files:
+      include:
+        - "@man"
+        - "@info"
+        - "@doc"
+        - /usr/share/licenses/libffi-doc/LICENSE
+      license:
+        - /usr/share/licenses/libffi-doc/LICENSE
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: link
+    stage: installed
+    environment:
+      contents:
+        packages: [gcc, glibc-devel]
+    argv:
+      - sh
+      - -c
+      - |
+        cat > /tmp/test.c <<'EOF'
+        #include <ffi.h>
+        int main(void) {
+          ffi_cif cif;
+          (void)cif;
+          return 0;
+        }
+        EOF
+        gcc /tmp/test.c -lffi -o /tmp/test
+        /tmp/test
