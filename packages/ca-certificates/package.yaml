@@ -1,0 +1,106 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# Mozilla CA certificate set, taken directly from the NSS certdata.txt. The
+# -bundle subpackage is the concatenated PEM bundle used by OpenSSL, curl and
+# language runtimes, so consumers do not need p11-kit or a trust-store daemon.
+schema: 1
+
+package:
+  name: ca-certificates
+  version: "3.133"
+  release: 1
+  summary: CA certificates from the Mozilla trusted root program
+  description: |
+    The Mozilla CA certificate set from the NSS certdata.txt, installed as
+    individual certificates and as a single PEM bundle. The bundle is
+    regenerated when the package is built, so a container image only needs the
+    ca-certificates-bundle output.
+  license: MPL-2.0
+  upstream: https://hg.mozilla.org/projects/nss
+  cpe:
+    vendor: mozilla
+    product: nss
+
+context: files
+
+sources:
+  - name: certdata.txt
+    kind: archive
+    digest: "sha512:454d3a7b4295b06976a353614dcabf00a278c9e68f86300d21d7a1d359e7c0f81b1bcdb6b0c6e581b0dc592577a2495c38d87e2d7ed38574440aeff002a601bf"
+    locators:
+      - kind: https
+        url: https://hg.mozilla.org/projects/nss/raw-file/NSS_3_133_RTM/lib/ckfw/builtins/certdata.txt
+    extract:
+      format: none
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [python3, bash, coreutils]
+    tests: [bash-binsh, coreutils]
+  pipeline:
+    - runs: |
+        mkdir -p "$STAGE"/usr/share/ca-certificates/mozilla
+        mkdir -p "$STAGE"/etc/ssl/certs "$STAGE"/etc/pki/tls/certs
+        python3 extract-certs.py certdata.txt \
+          "$STAGE"/usr/share/ca-certificates/mozilla \
+          "$STAGE"/etc/ssl/certs/ca-certificates.crt \
+          > "$STAGE"/etc/ca-certificates.conf
+        ln -s certs/ca-certificates.crt "$STAGE"/etc/ssl/cert.pem
+        ln -s ca-certificates.crt "$STAGE"/etc/ssl/certs/ca-bundle.crt
+        ln -s ../../../ssl/certs/ca-certificates.crt "$STAGE"/etc/pki/tls/certs/ca-bundle.crt
+    - uses: license/copy
+      with:
+        files: [certdata.txt]
+        outputs: [ca-certificates, ca-certificates-bundle]
+
+outputs:
+  - name: ca-certificates
+    summary: Individual Mozilla CA certificates
+    files:
+      include:
+        - /usr/share/ca-certificates/**
+        - /usr/share/licenses/ca-certificates/**
+      license:
+        - /usr/share/licenses/ca-certificates/**
+      config:
+        - /etc/ca-certificates.conf
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            test -n "$(find /usr/share/ca-certificates -name '*.crt' -print -quit)"
+            test -s /etc/ca-certificates.conf
+
+  - name: ca-certificates-bundle
+    summary: Concatenated Mozilla CA certificate bundle
+    files:
+      include:
+        - /etc/ssl/certs/ca-certificates.crt
+        - /etc/ssl/certs/ca-bundle.crt
+        - /etc/ssl/cert.pem
+        - /etc/pki/tls/certs/ca-bundle.crt
+        - /usr/share/licenses/ca-certificates-bundle/**
+      license:
+        - /usr/share/licenses/ca-certificates-bundle/**
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            test -s /etc/ssl/certs/ca-certificates.crt
+            test -s /etc/ssl/cert.pem
+            test -s /etc/pki/tls/certs/ca-bundle.crt
+            test "$(head -1 /etc/ssl/certs/ca-certificates.crt)" = "-----BEGIN CERTIFICATE-----"
