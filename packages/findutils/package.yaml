@@ -1,0 +1,110 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# GNU find utilities. Part of the minimal Eternal userland and the
+# bootstrap tool set. The source is the upstream release tarball.
+schema: 1
+
+package:
+  name: findutils
+  version: "4.11.0"
+  release: 1
+  summary: GNU find utilities
+  description: |
+    GNU Findutils provides find, xargs and the locate database tools.
+  license: GPL-3.0-or-later
+  upstream: https://www.gnu.org/software/findutils/
+  cpe:
+    vendor: gnu
+    product: findutils
+
+sources:
+  - name: findutils-4.11.0.tar.xz
+    kind: archive
+    digest: "sha512:1b667c5363b599135ceabab6b4b5388dbee6de4e7fa301f5dfefc854473e442fbfe7dda93a28a70505c026987acd375d13169f76d18da49d29c1fb2e09c83fef"
+    locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/findutils/findutils-4.11.0.tar.xz
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/findutils/findutils-4.11.0.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils]
+  environment:
+    FORCE_UNSAFE_CONFIGURE: "1"
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          - --localstatedir=/var/lib/locatedb
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [findutils, findutils-locate, findutils-doc]
+    - uses: strip
+
+outputs:
+  - name: findutils
+    summary: GNU find utilities
+    files:
+      license:
+        - /usr/share/licenses/findutils/COPYING
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            mkdir -p /tmp/tree/a
+            touch /tmp/tree/a/file
+            test "$(find /tmp/tree -name file)" = /tmp/tree/a/file
+            test "$(printf 'one\ntwo\n' | xargs -n1 printf '%s,')" = one,two,
+
+  - name: findutils-locate
+    summary: findutils locate and updatedb
+    files:
+      include:
+        - /usr/bin/locate
+        - /usr/bin/updatedb
+        - /usr/libexec/frcode
+        - /var/lib/locatedb/**
+        - /usr/share/licenses/findutils-locate/COPYING
+      license:
+        - /usr/share/licenses/findutils-locate/COPYING
+    dependencies:
+      run:
+        - findutils = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            locate --version
+            updatedb --version
+
+  - name: findutils-doc
+    summary: GNU find utilities documentation
+    files:
+      include:
+        - "@man"
+        - "@info"
+        - "@doc"
+        - /usr/share/licenses/findutils-doc/COPYING
+      license:
+        - /usr/share/licenses/findutils-doc/COPYING
+    dependencies:
+      run:
+        - filesystem
