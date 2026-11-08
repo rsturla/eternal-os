@@ -1,0 +1,151 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# Access control list utilities and the libacl runtime. Coreutils links
+# against libacl, and the utilities are the reference implementation for
+# inspecting and editing ACLs.
+schema: 1
+
+package:
+  name: acl
+  version: "2.4.0"
+  release: 1
+  summary: Access control list utilities
+  description: |
+    The acl package contains the getfacl and setfacl utilities and the libacl
+    library used to manipulate POSIX access control lists.
+  license: LGPL-2.1-or-later AND GPL-2.0-or-later
+  upstream: https://savannah.nongnu.org/projects/acl/
+  cpe:
+    vendor: acl_project
+    product: acl
+
+sources:
+  - name: acl-2.4.0.tar.gz
+    kind: archive
+    digest: "sha512:91f82d5620ca35977e917b7f678c86136a48c2500829b31a19aee7f5be8137a7a48a049dc4d51e5f8dc3328be248756bbfee77565eff6c8a4c8fc79cb850ee0c"
+    locators:
+      - kind: https
+        url: https://download.savannah.nongnu.org/releases/acl/acl-2.4.0.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, gettext, libtool]
+    host: [libattr-devel]
+    tests: [bash-binsh, coreutils]
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          - --disable-static
+          - --disable-nls
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        find "$STAGE" -name '*.la' -delete
+    - uses: license/copy
+      with:
+        files: [doc/COPYING, doc/COPYING.LGPL]
+        outputs: [acl, libacl, libacl-devel, acl-doc]
+    - uses: strip
+
+outputs:
+  - name: acl
+    summary: Access control list utilities
+    files:
+      license:
+        - /usr/share/licenses/acl/**
+    dependencies:
+      run:
+        - libacl = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            touch /tmp/acl-test
+            getfacl /tmp/acl-test > /tmp/acl.out
+            case "$(cat /tmp/acl.out)" in
+              *"user::"*) ;;
+              *) exit 1 ;;
+            esac
+            setfacl --version
+
+  - name: libacl
+    summary: Access control list runtime library
+    files:
+      include:
+        - /usr/lib*/libacl.so.*
+        - /usr/share/licenses/libacl/**
+      license:
+        - /usr/share/licenses/libacl/**
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libacl.so.* /usr/lib/libacl.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: libacl-devel
+    summary: Development files for libacl
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/libacl-devel/**
+      license:
+        - /usr/share/licenses/libacl-devel/**
+    dependencies:
+      run:
+        - libacl = ${package.version}-${package.release}
+        - filesystem
+
+  - name: acl-doc
+    summary: Documentation for acl
+    files:
+      include:
+        - "@man"
+        - "@doc"
+        - /usr/share/licenses/acl-doc/**
+      license:
+        - /usr/share/licenses/acl-doc/**
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: link
+    stage: installed
+    environment:
+      contents:
+        packages: [gcc, glibc-devel]
+    argv:
+      - sh
+      - -c
+      - |
+        cat > /tmp/acl-link.c <<'EOF'
+        #include <sys/acl.h>
+        #include <stddef.h>
+        int main(void) {
+          acl_t acl = acl_from_text("u::rwx,g::r-x,o::r-x");
+          if (acl == NULL) return 1;
+          acl_free(acl);
+          return 0;
+        }
+        EOF
+        gcc /tmp/acl-link.c -lacl -o /tmp/acl-link
+        /tmp/acl-link
