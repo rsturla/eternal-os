@@ -36,7 +36,7 @@ build:
   dependencies:
     tools: [gcc, make, bash, coreutils, m4]
     host: [gmp-devel]
-    tests: [bash-binsh, gmp-devel]
+    tests: [bash-binsh]
   pipeline:
     - uses: autotools/configure
       with:

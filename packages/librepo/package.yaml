@@ -35,7 +35,7 @@ build:
   dependencies:
     tools: [cmake, make, gcc, bash, coreutils, pkgconf]
     host: [glib2-devel, libcurl-devel, libxml2-devel, openssl-devel, rpm-devel, zchunk-devel]
-    tests: [bash-binsh, coreutils, gcc, pkgconf, glib2, libcurl, libxml2, openssl-libs, rpm-libs, zchunk-libs, glib2-devel, libcurl-devel, libxml2-devel, openssl-devel, zchunk-devel]
+    tests: [bash-binsh, coreutils, gcc, pkgconf]
   pipeline:
     - uses: cmake/configure
       with:

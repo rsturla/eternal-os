@@ -49,7 +49,7 @@ build:
       - libxslt
       - docbook-style-xsl
       - pam-devel
-    tests: [bash-binsh, coreutils, gcc, audit-libs, libcap, libselinux, libsemanage, libxcrypt, pam]
+    tests: [bash-binsh, coreutils, gcc]
   pipeline:
     - runs: |
         autoreconf -fi

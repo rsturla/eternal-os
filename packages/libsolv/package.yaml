@@ -35,7 +35,7 @@ build:
   dependencies:
     tools: [cmake, make, gcc, bash, coreutils, pkgconf]
     host: [bzip2-devel, expat-devel, xz-devel, zchunk-devel, zlib-devel, libzstd-devel, rpm-devel]
-    tests: [bash-binsh, coreutils, gcc, pkgconf, grep, bzip2-libs, expat, xz-libs, rpm-libs, rpm-devel, zchunk-libs, libzstd]
+    tests: [bash-binsh, coreutils, gcc, pkgconf, grep]
   pipeline:
     - uses: cmake/configure
       with:

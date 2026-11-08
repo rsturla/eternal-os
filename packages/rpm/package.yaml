@@ -50,7 +50,7 @@ build:
       - xz-devel
       - zlib-devel
       - libzstd-devel
-    tests: [bash-binsh, coreutils, gcc, pkgconf, grep, libstdc++, bzip2-libs, bzip2-devel, file-libs, libacl, libacl-devel, libarchive, libcap, libcap-devel, libselinux, libselinux-devel, lua-libs, lua-devel, openssl-libs, popt, popt-devel, sqlite-libs, sqlite-devel, xz-libs, xz-devel, zlib, zlib-devel, libzstd, libzstd-devel]
+    tests: [bash-binsh, coreutils, gcc, pkgconf, grep]
   pipeline:
     - uses: cmake/configure
       with:

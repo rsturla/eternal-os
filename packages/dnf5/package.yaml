@@ -67,7 +67,7 @@ build:
       - zchunk-devel
       - zlib-devel
       - libzstd-devel
-    tests: [bash-binsh, coreutils, libstdc++, fmt, glib2, json-c, libacl, librepo, libsolv, libxml2, openssl-libs, rpm, rpm-libs, sqlite-libs, zchunk-libs, libsmartcols]
+    tests: [bash-binsh, coreutils]
   pipeline:
     - uses: cmake/configure
       with:

@@ -38,7 +38,7 @@ build:
   dependencies:
     tools: [gcc, make, bash, coreutils, pkgconf]
     host: [libselinux-devel, ncurses-devel, pam-devel, zlib-devel]
-    tests: [bash-binsh, coreutils, libxcrypt, zlib, pam]
+    tests: [bash-binsh, coreutils]
   pipeline:
     - uses: autotools/configure
       with:
