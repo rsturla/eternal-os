@@ -85,7 +85,6 @@ make check         # pre-commit + lint every recipe
 make build         # build only packages whose content hash changed
 make repo          # assemble site/rolling/<arch>/ with repodata
 make all           # check + build + repo
-# image composition is a separate pipeline; `make image` is local-only
 ```
 
 The bootstrap ladder is separate from the rolling build:
@@ -164,8 +163,7 @@ There is no CI-only build logic. Every workflow step calls a script in
 The plan comes from `scripts/list-packages.sh`, `scripts/affected.sh`,
 `scripts/package-graph.sh` and `scripts/package-hash.sh`; the rpmx revision
 from `.rpmx-revision`. A local build and a CI build therefore consume exactly
-the same inputs. Local image composition additionally installs the
-`eternal-base` package set; image publishing is separate.
+the same inputs.
 
 The only difference is secret delivery. CI writes `RPMX_SIGNING_KEY` and
 `RPMX_PUBLIC_KEY` to temporary files; locally, pass the files directly:
@@ -245,11 +243,12 @@ and read [`docs/adding-a-package.md`](docs/adding-a-package.md).
 
 ## Images
 
-The distribution's base image is a package set, not a Dockerfile, and the set
-is the `eternal-base` recipe. `scripts/build-image.sh` installs it into a fresh
-root with `dnf5 --installroot`, imports the result as an OCI image and tags it.
-This is the apko-style half of the Wolfi model: the image is a function of a
-published repository state, never of a branch checkout.
+Images are built in a separate repository. The distribution's base image is a
+package set, not a Dockerfile, and the set is the `eternal-base` recipe: the
+image repository installs it from a published package repository, imports the
+root as an OCI image and tags it. This is the apko-style half of the Wolfi
+model, and it makes an image a function of a repository state rather than of a
+branch checkout.
 
 The image currently bootstraps the userspace from Fedora 44 while Eternal
 packages provide the identity and layout. The package list lives in

@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
-# The definition of the Eternal base system. This is the package that an image
-# composes (see scripts/build-image.sh), and it is the checklist for
+# The definition of the Eternal base system. This is the package an image
+# composes, and it is the checklist for
 # self-hosting: every dependency that still resolves from the bootstrap
 # repositories is a package Eternal does not own yet.
 #

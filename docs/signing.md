@@ -52,9 +52,6 @@ Use the same scripts and flags as CI:
 
 ```
 
-`make image` composes and loads an image locally; `make push` pushes it. Image
-publishing is a separate pipeline and is not part of `release.yml`.
-
 ## Turn on verification in the image
 
 Once the key is published, `packages/eternal-release/files/eternal.repo` must
