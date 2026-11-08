@@ -101,6 +101,15 @@ The package list is `eternal-base`, so the image definition is a recipe review,
 not a Dockerfile review. Every image is a function of a specific published
 repository state, not of a branch checkout.
 
+The composed root has no extra layers and no bootstrap base image: it is the
+package set. `dnf5` stays in it because the base image is also the entry point
+for building and extending an Eternal system; a future `eternal-minimal` image
+can drop it. Container-only directories (`/tmp`, `/var/tmp`, `/run`, `/root`)
+are created explicitly until `eternal-baselayout` owns the full FHS layout, and
+composition removes its caches and logs so the image depends on the repository,
+not on the build host. A published image should carry `:rolling`, `:latest` and
+`:sha-<commit>` manifest lists for x86_64 and aarch64.
+
 ## Pipeline
 
 CI runs the same scripts a developer runs. `make check`, `make build` and
@@ -157,7 +166,7 @@ produced once by `prepare` and exposed as reusable-workflow outputs; the RPMs
 travel as artifacts. A future persistent repository or OCI registry can
 replace the artifact hop without changing the recipe model.
 
-The image package set is `images/base/packages.txt`, used by local image
+The image package set is the `eternal-base` recipe, used by local image
 composition and by the separate image pipeline. An image is built from a
 published repository, so a bad package cannot slip into an image before the
 repository is published.
