@@ -1,0 +1,125 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# GLib core application support library. libdnf5 links against glib-2.0 and
+# gobject-2.0, so the container build keeps the core libraries and development
+# files but disables documentation, tests, introspection and optional system
+# integrations.
+schema: 1
+
+package:
+  name: glib2
+  version: "2.90.1"
+  release: 1
+  summary: A library of handy utility functions
+  description: |
+    GLib is the low-level core library that forms the basis for projects such
+    as GTK and GNOME. It provides data structure handling for C, portability
+    wrappers and interfaces for runtime functionality such as event loops,
+    threads and dynamic loading.
+  license: LGPL-2.1-or-later
+  upstream: https://gitlab.gnome.org/GNOME/glib
+  cpe:
+    vendor: gnome
+    product: glib
+
+sources:
+  - name: glib-2.90.1.tar.xz
+    kind: archive
+    digest: "sha512:d2d76deaad64e307034b09635c64a60537b0d625d1695b314bc33e9e3c9b20284270d2105333474eb1fbe5afcaa814d4c52ded3a1c2a46b4b2652f7b66a211c3"
+    locators:
+      - kind: https
+        url: https://download.gnome.org/sources/glib/2.90/glib-2.90.1.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [meson, ninja, gcc, bash, coreutils, pkgconf, python3]
+    host: [libffi-devel, libmount-devel, pcre2-devel, zlib-devel]
+    tests: [bash-binsh, coreutils, gcc, pkgconf, libffi, libmount, pcre2, zlib, libffi-devel, libmount-devel, pcre2-devel, zlib-devel]
+  pipeline:
+    - uses: meson/setup
+      with:
+        args:
+          - -Dtests=false
+          - -Dinstalled_tests=false
+          - -Ddocumentation=false
+          - -Dman=false
+          - -Dgtk_doc=false
+          - -Dintrospection=disabled
+          - -Dselinux=disabled
+          - -Dlibmount=enabled
+          - -Dsystemtap=disabled
+          - -Ddtrace=disabled
+          - -Dglib_debug=disabled
+          - -Dnls=disabled
+          - -Dlibexecdir=/usr/libexec/glib2
+    - uses: meson/compile
+    - uses: meson/install
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [glib2, glib2-devel]
+    - uses: strip
+
+outputs:
+  - name: glib2
+    summary: GLib core libraries and tools
+    files:
+      include:
+        - /usr/bin/gdbus
+        - /usr/bin/glib-compile-schemas
+        - /usr/bin/glib-compile-resources
+        - /usr/lib*/libglib-2.0.so.*
+        - /usr/lib*/libgobject-2.0.so.*
+        - /usr/lib*/libgmodule-2.0.so.*
+        - /usr/lib*/libgio-2.0.so.*
+        - /usr/share/licenses/glib2/**
+      license:
+        - /usr/share/licenses/glib2/**
+    dependencies:
+      run:
+        - libffi
+        - libmount
+        - pcre2
+        - zlib
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            gdbus --help >/dev/null
+            glib-compile-schemas --help >/dev/null
+            for lib in /usr/lib64/libglib-2.0.so.* /usr/lib/libglib-2.0.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: glib2-devel
+    summary: Development files for GLib
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/glib2-devel/**
+      license:
+        - /usr/share/licenses/glib2-devel/**
+    dependencies:
+      run:
+        - glib2 = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: link
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            printf '#include <glib.h>\nint main(void){return 0;}\n' > /tmp/glib.c
+            gcc /tmp/glib.c $(pkg-config --cflags --libs glib-2.0) -o /tmp/glib-test
+            /tmp/glib-test
