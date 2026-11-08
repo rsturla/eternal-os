@@ -12,13 +12,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  commits:
+    name: Commits
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The check walks every commit the pull request adds, so it needs the
+          # full branch history and the base commit to find the merge base.
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Check commit conventions
+        run: ./scripts/check-commits.sh --base "${{ github.event.pull_request.base.sha }}"
+
   lint:
     name: Lint
     uses: ./.github/workflows/_lint.yml
 
   packages:
     name: Packages
-    needs: lint
+    needs: [lint, commits]
     uses: ./.github/workflows/_build-packages.yml
     with:
       selection: affected
