@@ -146,7 +146,7 @@ outputs:
       run:
         - binutils
         - filesystem
-        - glibc-2.44-devel = 2.44-1
+        - glibc-2.44-devel
         - libstdc++-14 = ${package.version}-${package.release}
       provides:
         - gcc-14 = ${package.version}-${package.release}
@@ -200,7 +200,7 @@ outputs:
     dependencies:
       run:
         - filesystem
-        - glibc-2.44 = 2.44-1
+        - glibc-2.44
       provides:
         - libstdc++ = ${package.version}-${package.release}
         - libstdc++-14 = ${package.version}-${package.release}
@@ -226,7 +226,7 @@ outputs:
     dependencies:
       run:
         - libstdc++-14 = ${package.version}-${package.release}
-        - glibc-2.44-devel = 2.44-1
+        - glibc-2.44-devel
         - filesystem
       provides:
         - libstdc++-devel = ${package.version}-${package.release}
@@ -264,7 +264,7 @@ outputs:
     dependencies:
       run:
         - filesystem
-        - glibc-2.44 = 2.44-1
+        - glibc-2.44
       provides:
         - libatomic = ${package.version}-${package.release}
 
