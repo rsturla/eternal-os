@@ -69,11 +69,10 @@ build:
       - zlib-ng-compat-devel
       - kernel-headers
       - glibc-devel
-  flags:
-    exclude:
-      # GCC's own diagnostics should not become build failures while the
-      # target compiler is still being assembled.
-      - -Werror=format-security
+  environment:
+    # Build this compiler with the policy it will itself apply, but keep its
+    # own diagnostics non-fatal. The wrapper applies the arch baseline too.
+    GCC_SPEC_FILE: openssf-soft-format-13.spec
   pipeline:
     - runs: |
         mkdir build
