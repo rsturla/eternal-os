@@ -55,6 +55,7 @@ outputs:
     dependencies:
       provides:
         - pkg-config = ${package.version}-${package.release}
+        - pkgconfig = ${package.version}-${package.release}
         - pkgconf-pkg-config = ${package.version}-${package.release}
     tests:
       - name: installed
