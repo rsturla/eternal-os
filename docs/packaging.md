@@ -255,6 +255,10 @@ Use these rules:
 - Linker plugin archives under `/usr/lib*/bfd-plugins/` (`libdep.a`) stay in
   the matching `-devel` output. They are loaded by the linker at build time;
   they are not user-linkable static libraries.
+- glibc link-time helper archives (`libc_nonshared.a` and the empty `libanl.a`,
+  `libdl.a`, `libpthread.a`, `librt.a`, `libutil.a` stubs) stay in
+  `glibc-*-devel` because the `libc.so` linker script and compatibility `-l`
+  flags need them. They are not user static libraries.
 
 These are the only outputs that may carry a static archive outside `-static`.
 Each one declares the exception explicitly:
@@ -632,8 +636,8 @@ job can rebuild GCC with itself.
 
 ## 9. Versioned ABI example: glibc
 
-glibc is the reference for a versioned ABI stream. Keep both supported streams
-as separate recipes:
+glibc is the reference for an atomic runtime plus version-streamed build
+inputs. Keep both supported streams as separate recipes:
 
 ```text
 packages/glibc-2.43/package.yaml
@@ -643,6 +647,12 @@ packages/glibc-2.44/package.yaml
 Both streams provide the unversioned `glibc` capability, and their runtime
 packages conflict with each other. The versioned names are the implementation;
 the unversioned name is only a provide.
+
+Only one runtime can be installed, because only one package can own the ELF
+interpreter. The development packages are different: `glibc-2.44-devel` can be
+installed on a 2.44 or newer runtime, and `glibc-2.43-devel` can be installed
+on a 2.43 or newer runtime. That is what decouples build-time header upgrades
+from the atomic runtime upgrade.
 
 Each stream owns its own subpackages:
 
@@ -679,10 +689,13 @@ The split is by function, not one output per file:
   actually making per-language packages.
 - `nss-db-2.44` owns the NSS database module, which is optional.
 - `glibc-2.44-devel` owns headers, `crt*.o`, the unversioned `.so` linker
-  links, and the static-link metadata. It provides `glibc-devel`.
-- `glibc-2.44-static` owns the static archives (`libc.a`, `libm.a`,
-  `libpthread.a`, ...). It depends on `glibc-2.44-devel` and provides
-  `glibc-static`. Static archives never live in `-devel`.
+  inputs, the pinned linker scripts, and the glibc link-time helper archives.
+  It provides `glibc-devel` and requires `glibc >= 2.44`, not the exact 2.44
+  runtime package.
+- `glibc-2.44-static` owns the user static archives (`libc.a`, `libm.a`,
+  `libmvec.a`, `libresolv.a`, `libBrokenLocale.a`, `libmcheck.a`, `libg.a`).
+  It depends on `glibc-2.44-devel` and provides `glibc-static`. The helper
+  archives listed above are excluded from this output.
 - `glibc-2.44-doc` owns the man, info and documentation payload.
 
 The main output has no `files.include`; it collects the runtime remainder. The
@@ -700,18 +713,38 @@ other outputs use narrow selectors:
       include:
         - "@dev"
         - /usr/lib*/*.o
+        - /usr/lib*/libc.so-*
+        - /usr/lib*/libm.so-*
+        - /usr/lib*/libc_nonshared.a
+        - /usr/lib*/libanl.a
+        - /usr/lib*/libdl.a
+        - /usr/lib*/libpthread.a
+        - /usr/lib*/librt.a
+        - /usr/lib*/libutil.a
         - /usr/share/licenses/glibc-2.44-devel/**
       exclude:
         - /usr/lib*/libmemusage.so
     lint:
       allow:
         - static-archive
+    generators:
+      elf: false
+    dependencies:
+      run:
+        - glibc >= ${package.version}
 
   - name: glibc-2.44-static
     files:
       include:
         - "@static"
         - /usr/share/licenses/glibc-2.44-static/**
+      exclude:
+        - /usr/lib*/libc_nonshared.a
+        - /usr/lib*/libanl.a
+        - /usr/lib*/libdl.a
+        - /usr/lib*/libpthread.a
+        - /usr/lib*/librt.a
+        - /usr/lib*/libutil.a
     dependencies:
       run:
         - glibc-2.44-devel = ${package.version}-${package.release}
@@ -719,6 +752,19 @@ other outputs use narrow selectors:
       provides:
         - glibc-static = ${package.version}-${package.release}
 ```
+
+The `-devel` pipeline pins the link-time inputs to its own stream. It replaces
+the unversioned `.so` symlinks with copies of that stream's real shared objects,
+copies `libc.so.6` and `libm.so.6` to `libc.so-2.44` and `libm.so-2.44`, and
+rewrites the `libc.so` and `libm.so` linker scripts to use those copies. A
+program built against 2.44 headers therefore records 2.44 symbol versions even
+when the installed runtime is 2.45. At run time the executable's `DT_NEEDED`
+entries stay as ordinary SONAMEs such as `libc.so.6`, so the newer runtime
+loads them.
+
+The pinned copies carry the runtime SONAMEs. `generators.elf: false` prevents
+the development output from advertising those SONAMEs as provides; the runtime
+package owns them.
 
 Keep the unversioned capability on the runtime package:
 
@@ -734,6 +780,10 @@ Packages that must link against a specific stream depend on the versioned
 development package (`glibc-2.44-devel`), not only on `glibc`. The package
 name selects the stream; do not pin a release such as `= 2.44-1`. A release
 bump within the same stream must not force every consumer to rebuild.
+
+Compiler packages depend on the unversioned `glibc-devel` capability, so a
+build root can pair a compiler stream with an older header stream. A recipe
+that needs a particular header stream lists `glibc-2.44-devel` explicitly.
 
 Use an exact `= version-release` requirement only between outputs of the same
 source package, where the compiler and its runtime libraries must match. For
