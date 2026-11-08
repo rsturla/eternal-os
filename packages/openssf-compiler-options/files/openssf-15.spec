@@ -2,6 +2,13 @@
 # zero-initialised as well as automatic variables.
 *self_spec:
 + %{!O:%{!O1:%{!O2:%{!O3:%{!O0:%{!Os:%{!Ofast:%{!Og:%{!Oz:-O2}}}}}}}}} \
+  %{!g:%{!g0:%{!g1:%{!g2:%{!g3:-g}}}}} \
+  -pipe \
+  %{!Wall:%{!Wno-all:-Wall}} \
+  -Werror=format-security \
+  %{!fno-exceptions:-fexceptions} \
+  %{!fno-asynchronous-unwind-tables:-fasynchronous-unwind-tables} \
+  %{!gno-record-gcc-switches:-grecord-gcc-switches} \
   -U_FORTIFY_SOURCE \
   -D_FORTIFY_SOURCE=3 \
   -D_GLIBCXX_ASSERTIONS \
