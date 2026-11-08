@@ -1,0 +1,278 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# The GNU C Library, versioned the same way Wolfi versions glibc. The package
+# name carries the ABI stream; `glibc` is provided as an unversioned capability
+# so packages can depend on the stable name without pinning a recipe path.
+#
+# The loader, binaries, iconv modules and development files are separate
+# outputs. `glibc-2.44` is the runtime library set; `ld-linux-2.44` owns the
+# ELF interpreter and loader configuration; `libc-bin-2.44` owns the utilities.
+schema: 1
+
+package:
+  name: glibc-2.44
+  version: "2.44"
+  release: 1
+  summary: The GNU C Library
+  description: |
+    The GNU C Library provides the C runtime, dynamic loader interfaces,
+    name-service switch modules and the POSIX C library used by the rest of
+    Eternal Linux.
+  license: LGPL-2.1-or-later
+  upstream: https://www.gnu.org/software/libc/
+  cpe:
+    vendor: gnu
+    product: glibc
+
+sources:
+  # Upstream publishes 2.MINOR releases, not patch-level tarballs. Pin
+  # release/2.44/master so post-release fixes are part of the source, and
+  # update the commit deliberately instead of tracking the branch.
+  - name: glibc-2.44
+    kind: git
+    digest: "sha512:271d1326ad9ac9fcc02ea3ca77abd5f499d3a6ef73dd20be4dcccd78f8cca02daa1f49ecd6273a92738ad07bfda1cb788a838d8e8b5b4da43b854d532fea64c5"
+    locators:
+      - kind: git
+        url: https://sourceware.org/git/glibc.git
+        commit: c5c6fc6f449dbc95e3a68cacd61852dc0a48e57c
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools:
+      - gcc
+      - make
+      - bash
+      - coreutils
+      - bison
+      - flex
+      - gawk
+      - sed
+      - grep
+      - diffutils
+      - findutils
+      - gettext
+      - python3
+      - texinfo
+      - patch
+      - tar
+      - gzip
+    host:
+      - kernel-headers
+  pipeline:
+    - runs: |
+        mkdir build
+        cat > build/configparms <<EOF
+        slibdir=$LIBDIR
+        libdir=$LIBDIR
+        rtlddir=$LIBDIR
+        rootsbindir=/usr/bin
+        user-defined-trusted-dirs=/usr/local/lib:/usr/local/lib64:/usr/lib:/usr/lib64:/lib:/lib64
+        EOF
+    - uses: autotools/configure
+      with:
+        dir: build
+        configure: ../configure
+        args:
+          - --datadir=/usr/share
+          - --includedir=/usr/include
+          - --sbindir=/usr/bin
+          - --enable-bind-now
+          - --enable-fortify-source
+          - --enable-stackguard-randomization
+          - --enable-stack-protector=strong
+          - --enable-cet
+          - '--with-pkgversion="Eternal glibc-2.44-1"'
+          - --disable-werror
+          - --disable-crypt
+          - --enable-kernel=4.9
+    - uses: autotools/build
+      with:
+        dir: build
+    - uses: autotools/install
+      with:
+        dir: build
+    - runs: |
+        # ld.so.cache is host state, not package payload.
+        rm -f "$STAGE/etc/ld.so.cache"
+
+    - uses: license/copy
+      with:
+        files: [COPYINGv2, COPYING.LIB]
+        outputs: [glibc-2.44, ld-linux-2.44, libc-bin-2.44, glibc-2.44-iconv, glibc-2.44-locales, nss-db-2.44, glibc-2.44-dev, glibc-2.44-doc]
+    - runs: |
+        # The loader configuration is owned by ld-linux-2.44, not by the
+        # library package.
+        install -d "$STAGE/etc/ld.so.conf.d"
+        printf '%s\n' \
+          'include ld.so.conf.d/*.conf' \
+          '/usr/local/lib' \
+          '/usr/local/lib64' \
+          '/usr/lib' \
+          '/usr/lib64' \
+          > "$STAGE/etc/ld.so.conf"
+    - uses: strip
+
+outputs:
+  - name: glibc-2.44
+    summary: The GNU C Library runtime
+    # Main package: runtime libraries, /etc/rpc and the license.
+    files:
+      license:
+        - /usr/share/licenses/glibc-2.44/COPYINGv2
+        - /usr/share/licenses/glibc-2.44/COPYING.LIB
+    dependencies:
+      run:
+        - filesystem
+        - ld-linux-2.44 = ${package.version}-${package.release}
+      conflicts:
+        - glibc-2.43
+      provides:
+        - glibc = ${package.version}-${package.release}
+        - glibc-2.44 = ${package.version}-${package.release}
+
+  - name: ld-linux-2.44
+    summary: The GNU C Library ELF interpreter
+    files:
+      include:
+        - /usr/lib*/ld-linux*
+        - /etc/ld.so.conf
+        - /etc/ld.so.conf.d/**
+        - /usr/share/licenses/ld-linux-2.44/**
+      license:
+        - /usr/share/licenses/ld-linux-2.44/COPYINGv2
+        - /usr/share/licenses/ld-linux-2.44/COPYING.LIB
+    dependencies:
+      run:
+        - filesystem
+        - glibc-2.44 = ${package.version}-${package.release}
+      provides:
+        - ld-linux = ${package.version}-${package.release}
+
+  - name: libc-bin-2.44
+    summary: GNU C Library binaries
+    files:
+      include:
+        - /usr/bin/**
+        - /usr/libexec/**
+        - /usr/lib*/audit/**
+        - /usr/share/licenses/libc-bin-2.44/**
+      exclude:
+        - /usr/bin/iconv
+        - /usr/bin/iconvconfig
+        - /usr/lib*/gconv/**
+      license:
+        - /usr/share/licenses/libc-bin-2.44/COPYINGv2
+        - /usr/share/licenses/libc-bin-2.44/COPYING.LIB
+    dependencies:
+      run:
+        - filesystem
+        - glibc-2.44 = ${package.version}-${package.release}
+      provides:
+        - libc-bin = ${package.version}-${package.release}
+
+  - name: glibc-2.44-iconv
+    summary: GNU C Library iconv modules
+    files:
+      include:
+        - /usr/bin/iconv
+        - /usr/bin/iconvconfig
+        - /usr/lib*/gconv/**
+        - /usr/share/licenses/glibc-2.44-iconv/**
+      license:
+        - /usr/share/licenses/glibc-2.44-iconv/COPYINGv2
+        - /usr/share/licenses/glibc-2.44-iconv/COPYING.LIB
+    dependencies:
+      run:
+        - filesystem
+        - glibc-2.44 = ${package.version}-${package.release}
+      provides:
+        - glibc-iconv = ${package.version}-${package.release}
+
+  - name: glibc-2.44-locales
+    summary: GNU C Library locale data and translations
+    files:
+      include:
+        - "@locales"
+        - /usr/share/licenses/glibc-2.44-locales/**
+      license:
+        - /usr/share/licenses/glibc-2.44-locales/COPYINGv2
+        - /usr/share/licenses/glibc-2.44-locales/COPYING.LIB
+    dependencies:
+      run:
+        - filesystem
+      provides:
+        - glibc-locales = ${package.version}-${package.release}
+
+  - name: nss-db-2.44
+    summary: GNU C Library NSS database support
+    files:
+      include:
+        - /var/db/**
+        - /usr/share/licenses/nss-db-2.44/**
+      license:
+        - /usr/share/licenses/nss-db-2.44/COPYINGv2
+        - /usr/share/licenses/nss-db-2.44/COPYING.LIB
+    dependencies:
+      run:
+        - filesystem
+        - glibc-2.44 = ${package.version}-${package.release}
+      provides:
+        - nss-db = ${package.version}-${package.release}
+
+  - name: glibc-2.44-dev
+    summary: GNU C Library development headers and libraries
+    files:
+      include:
+        - "@dev"
+        - /usr/lib*/*.o
+        - /usr/share/licenses/glibc-2.44-dev/**
+      exclude:
+        - /usr/lib*/libmemusage.so
+      license:
+        - /usr/share/licenses/glibc-2.44-dev/COPYINGv2
+        - /usr/share/licenses/glibc-2.44-dev/COPYING.LIB
+    dependencies:
+      run:
+        - filesystem
+        - glibc-2.44 = ${package.version}-${package.release}
+      provides:
+        - glibc-dev = ${package.version}-${package.release}
+
+  - name: glibc-2.44-doc
+    summary: GNU C Library documentation
+    files:
+      include:
+        - "@doc"
+        - "@info"
+        - "@man"
+        - /usr/share/licenses/glibc-2.44-doc/**
+      license:
+        - /usr/share/licenses/glibc-2.44-doc/COPYINGv2
+        - /usr/share/licenses/glibc-2.44-doc/COPYING.LIB
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: build
+    stage: build
+    argv:
+      - sh
+      - -c
+      - |
+        case "${arch}" in
+          x86_64) loader="$STAGE/usr/lib64/ld-linux-x86-64.so.2" ;;
+          aarch64) loader="$STAGE/usr/lib/ld-linux-aarch64.so.1" ;;
+          *) echo "unsupported arch"; exit 1 ;;
+        esac
+        test -x "$loader"
+        test -f "$STAGE/usr/lib64/libc.so.6" || test -f "$STAGE/usr/lib/libc.so.6"
+        test -f "$STAGE/etc/ld.so.conf"
+        test -f "$STAGE/etc/rpc"
+        test -f "$STAGE/usr/share/i18n/locales/C"
+        test -f "$STAGE/var/db/Makefile"
