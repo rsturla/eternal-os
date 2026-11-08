@@ -1,0 +1,118 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# XML parsing and toolkit library.
+schema: 1
+
+package:
+  name: libxml2
+  version: "2.15.4"
+  release: 1
+  summary: Library providing XML and HTML support
+  description: |
+    libxml2 is a library for parsing XML and HTML documents. It includes
+    xmllint and xmlcatalog as well as the development headers and pkg-config
+    metadata needed to build applications against it.
+  license: MIT
+  upstream: https://gitlab.gnome.org/GNOME/libxml2
+  cpe:
+    vendor: gnome
+    product: libxml2
+
+sources:
+  - name: libxml2-2.15.4.tar.xz
+    kind: archive
+    digest: "sha512:e162ed16ad6fb6c6ef1c40c6bed66a5f76db177fc24410cc261c9ddc6b19e9b003315db67f67cbcadaf08e546f0672de87bf6f297014af50fe544a781647f584"
+    locators:
+      - kind: https
+        url: https://download.gnome.org/sources/libxml2/2.15/libxml2-2.15.4.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, pkgconf]
+    host: [zlib-devel]
+    tests: [bash-binsh, coreutils, gcc, pkgconf, grep, xz-libs, zlib, zlib-devel]
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          - --disable-static
+          - --with-legacy
+          - --with-http
+          - --with-zlib
+          - --without-python
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        find "$STAGE" -name '*.la' -delete
+    - uses: license/copy
+      with:
+        files: [Copyright]
+        outputs: [libxml2, libxml2-devel, libxml2-doc]
+    - uses: strip
+
+outputs:
+  - name: libxml2
+    summary: XML and HTML parsing library
+    files:
+      include:
+        - /usr/bin/xmlcatalog
+        - /usr/bin/xmllint
+        - /usr/lib*/libxml2.so.*
+        - /usr/share/licenses/libxml2/**
+      license:
+        - /usr/share/licenses/libxml2/**
+    dependencies:
+      run:
+        - xz-libs
+        - zlib
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            printf '<root><item>ok</item></root>\n' > /tmp/libxml2-test.xml
+            xmllint --xpath 'string(/root/item)' /tmp/libxml2-test.xml | grep -Fx ok
+
+  - name: libxml2-devel
+    summary: Development files for libxml2
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/libxml2-devel/**
+      license:
+        - /usr/share/licenses/libxml2-devel/**
+    dependencies:
+      run:
+        - libxml2 = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: link
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            printf '#include <libxml/parser.h>\nint main(void){return 0;}\n' > /tmp/xml.c
+            gcc /tmp/xml.c $(pkg-config --cflags --libs libxml-2.0) -o /tmp/xml-test
+            /tmp/xml-test
+
+  - name: libxml2-doc
+    summary: Documentation for libxml2
+    files:
+      include:
+        - "@man"
+        - "@doc"
+        - /usr/share/licenses/libxml2-doc/**
+      license:
+        - /usr/share/licenses/libxml2-doc/**
+    dependencies:
+      run:
+        - filesystem
