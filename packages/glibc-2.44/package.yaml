@@ -107,7 +107,7 @@ build:
     - uses: license/copy
       with:
         files: [COPYINGv2, COPYING.LIB]
-        outputs: [glibc-2.44, ld-linux-2.44, libc-bin-2.44, glibc-2.44-iconv, glibc-2.44-locales, nss-db-2.44, glibc-2.44-devel, glibc-2.44-doc]
+        outputs: [glibc-2.44, ld-linux-2.44, libc-bin-2.44, glibc-2.44-iconv, glibc-2.44-locales, nss-db-2.44, glibc-2.44-devel, glibc-2.44-static, glibc-2.44-doc]
     - runs: |
         # The loader configuration is owned by ld-linux-2.44, not by the
         # library package.
@@ -246,6 +246,22 @@ outputs:
         - glibc-2.44 = ${package.version}-${package.release}
       provides:
         - glibc-devel = ${package.version}-${package.release}
+
+  - name: glibc-2.44-static
+    summary: GNU C Library static libraries
+    files:
+      include:
+        - "@static"
+        - /usr/share/licenses/glibc-2.44-static/**
+      license:
+        - /usr/share/licenses/glibc-2.44-static/COPYINGv2
+        - /usr/share/licenses/glibc-2.44-static/COPYING.LIB
+    dependencies:
+      run:
+        - glibc-2.44-devel = ${package.version}-${package.release}
+        - filesystem
+      provides:
+        - glibc-static = ${package.version}-${package.release}
 
   - name: glibc-2.44-doc
     summary: GNU C Library documentation
