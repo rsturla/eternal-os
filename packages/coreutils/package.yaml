@@ -93,3 +93,8 @@ tests:
   - name: installed
     stage: installed
     argv: [ls, --version]
+
+  - name: hardening
+    stage: build
+    pipeline:
+      - uses: test/hardening-check
