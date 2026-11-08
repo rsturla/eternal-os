@@ -17,8 +17,11 @@ repositories:
     metalink: https://mirrors.fedoraproject.org/metalink?repo=fedora-$releasever&arch=$basearch
   - id: updates
     metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch
+  - id: eternal-toolchain
+    baseurl: file://../.work/toolchain-repo
 packages:
   install:
+    - openssf-compiler-options
     - bash
     - coreutils
     - findutils
@@ -39,3 +42,41 @@ options:
 paths:
   prefix: /usr
   libdir: /usr/lib64
+
+# Distribution policy that is not compiler hardening: optimisation, warnings,
+# unwind tables, and the target ISA baseline. The OpenSSF hardening controls
+# live in openssf-compiler-options. Its wrapper in /usr/local/bin applies the
+# matching GCC spec, so a recipe opts out with
+# GCC_SPEC_FILE=no-hardening.spec only when it cannot use the policy.
+flags:
+  cflags:
+    - -O2
+    - -g
+    - -pipe
+    - -Wall
+    - -Werror=format-security
+    - -fexceptions
+    - -fasynchronous-unwind-tables
+    - -grecord-gcc-switches
+  cxxflags:
+    - -O2
+    - -g
+    - -pipe
+    - -Wall
+    - -Werror=format-security
+    - -fexceptions
+    - -fasynchronous-unwind-tables
+    - -grecord-gcc-switches
+  arch:
+    x86_64:
+      cflags:
+        - -march=x86-64-v2
+        - -fcf-protection=full
+      cxxflags:
+        - -march=x86-64-v2
+        - -fcf-protection=full
+    aarch64:
+      cflags:
+        - -mbranch-protection=standard
+      cxxflags:
+        - -mbranch-protection=standard

@@ -112,6 +112,40 @@ if [[ -n $package && $selection == affected ]]; then
   exit 2
 fi
 
+# The bootstrap profiles install openssf-compiler-options from this local
+# repository. Build it first with bootstrap-toolchain.profile.yaml, which is the
+# one profile that does not install the package it is building.
+toolchain_repo="$root/.work/toolchain-repo"
+toolchain_out="$root/.work/toolchain-out"
+toolchain_rpms="$root/.work/toolchain-rpms"
+
+ensure_toolchain_repo() {
+  local hash stamp
+  hash=$("$root/scripts/package-hash.sh" openssf-compiler-options | awk '{print $2}')
+  stamp="$toolchain_repo/.stamp"
+  if [[ -f $stamp && -f $toolchain_repo/repodata/repomd.xml ]] &&
+     [[ $(<"$stamp") == "$hash" ]]; then
+    return 0
+  fi
+
+  rm -rf "$toolchain_out" "$toolchain_rpms" "$toolchain_repo"
+  mkdir -p "$toolchain_out" "$toolchain_rpms"
+  echo "==> build toolchain package openssf-compiler-options (${hash:0:12})"
+  local -a args=("$rpmx" build "$root/packages/openssf-compiler-options/package.yaml"     --output "$toolchain_out")
+  [[ -n $arch ]] && args+=(--arch "$arch")
+  [[ -n $jobs ]] && args+=(--jobs "$jobs")
+  ((no_tests)) && args+=(--no-tests)
+  "${args[@]}"
+
+  find "$toolchain_out" -type f -name '*.rpm' -exec cp -t "$toolchain_rpms" {} +
+  "$rpmx" repo --rpms "$toolchain_rpms" --output "$toolchain_repo"
+  printf '%s\n' "$hash" >"$stamp"
+}
+
+if [[ $package != openssf-compiler-options ]]; then
+  ensure_toolchain_repo
+fi
+
 recipes=()
 graph_file=$(mktemp)
 trap 'rm -f "$graph_file"' EXIT

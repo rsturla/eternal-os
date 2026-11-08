@@ -143,6 +143,11 @@ while IFS= read -r -d '' path; do
       global=1
       break
       ;;
+    packages/openssf-compiler-options/*)
+      # Every C/C++ build installs this package through the bootstrap profile.
+      global=1
+      break
+      ;;
     packages/*/*)
       rest=${path#packages/}
       name=${rest%%/*}

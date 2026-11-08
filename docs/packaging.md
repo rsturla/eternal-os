@@ -327,6 +327,32 @@ it. If a sequence is repeated and no built-in fits, add a reusable step rather
 than copying the shell block. Generic build-system steps belong in rpmx;
 Eternal-specific policy does not.
 
+### Compiler hardening
+
+Hardening policy is a package, not a per-profile flag list. The bootstrap
+profile installs `openssf-compiler-options`, which puts a `gcc` wrapper in
+`/usr/local/bin` and versioned GCC specs under `/usr/lib/eternal/gcc/`. The
+wrapper shadows the real compiler for every C and C++ build, so recipes do not
+repeat the policy and a hardening change is a package change.
+
+The wrapper also has the only correct place for `-pie`: GCC specs can add it
+to executable links while leaving `-shared` links alone. Do not put `-pie` in
+`LDFLAGS`; a shared library built after it will fail or become a broken
+executable.
+
+A package that cannot use the policy opts out explicitly:
+
+```yaml
+build:
+  environment:
+    GCC_SPEC_FILE: no-hardening.spec
+```
+
+Use the absolute `/usr/lib/eternal/gcc/openssf-<major>.spec` path only when a
+test needs to exercise one compiler stream directly. Packages that ship ELF
+files assert the result with `test/hardening-check`; compiler-options packages
+use `test/compiler-hardening-check`.
+
 ## 5. Source, identity and metadata
 
 ```yaml

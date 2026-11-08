@@ -88,7 +88,8 @@ own_hash_for() {
     printf 'input %s\n' "$path" >>"$inner"
     cat "$root/$path" >>"$inner" 2>/dev/null || true
   done < <(git -C "$root" ls-files -z --cached --others --exclude-standard -- \
-    "packages/$name" "profiles" "scripts" ".rpmx-revision" "rpmx-defaults.yaml" | sort -z)
+    "packages/$name" "packages/openssf-compiler-options" \
+    "profiles" "scripts" ".rpmx-revision" "rpmx-defaults.yaml" | sort -z)
   own[$name]=$(sha256sum "$inner" | cut -d' ' -f1)
 }
 
