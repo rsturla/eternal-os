@@ -240,6 +240,9 @@ outputs:
       license:
         - /usr/share/licenses/glibc-2.43-devel/COPYINGv2
         - /usr/share/licenses/glibc-2.43-devel/COPYING.LIB
+    lint:
+      allow:
+        - static-archive
     dependencies:
       run:
         - filesystem
