@@ -15,7 +15,7 @@ builder:
   image: registry.fedoraproject.org/fedora:44
 repositories:
   - id: eternal
-    baseurl: https://rsturla.github.io/eternal-os/$releasever/$basearch
+    baseurl: https://packages.eternal.sturla.tech/$releasever/$basearch
   # Bootstrap repositories. Delete when self-hosting.
   - id: bootstrap
     metalink: https://mirrors.fedoraproject.org/metalink?repo=fedora-44&arch=$basearch
