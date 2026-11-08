@@ -1,0 +1,75 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# IANA timezone data. The zoneinfo tree is compiled at build time with the zic
+# shipped by the same release, so the package does not depend on a host zic.
+schema: 1
+
+package:
+  name: tzdata
+  version: "2026f"
+  release: 1
+  summary: Timezone data provided by IANA
+  description: |
+    The IANA time zone database, compiled into /usr/share/zoneinfo. Both the
+    standard and leap-second-aware trees are installed.
+  license: CC-PDDC
+  upstream: https://www.iana.org/time-zones
+  cpe:
+    vendor: iana
+    product: tzdata
+
+sources:
+  - name: tz-2026f.tar.gz
+    kind: archive
+    digest: "sha512:127fa59c8188781fcc4fc2b387b94ced9c1983c3e56f3614292bebd460a6c1029af1d5745320dfae934b9bc200f1863f2cfb1224c8c90ad4749441a6661eaa6c"
+    locators:
+      - kind: https
+        url: https://github.com/eggert/tz/archive/refs/tags/2026f.tar.gz
+      - kind: https
+        url: https://data.iana.org/time-zones/releases/tzdata2026f.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, gawk]
+    tests: [bash-binsh, coreutils]
+  pipeline:
+    - runs: |
+        make -j"$(nproc)" zic leapseconds
+    - runs: |
+        mkdir -p "$STAGE"/usr/share/zoneinfo
+        zones="africa antarctica asia australasia europe northamerica southamerica etcetera backward factory"
+        ./zic -b fat -d "$STAGE"/usr/share/zoneinfo $zones
+        ./zic -b fat -d "$STAGE"/usr/share/zoneinfo/right -L leapseconds $zones
+        ./zic -b fat -d "$STAGE"/usr/share/zoneinfo -p America/New_York
+        install -m 0444 -t "$STAGE"/usr/share/zoneinfo iso3166.tab zone1970.tab zone.tab
+        install -m 0644 leap-seconds.list leapseconds "$STAGE"/usr/share/zoneinfo/
+    - uses: license/copy
+      with:
+        files: [LICENSE]
+        outputs: [tzdata]
+    - uses: strip
+
+outputs:
+  - name: tzdata
+    summary: Timezone data provided by IANA
+    files:
+      license:
+        - /usr/share/licenses/tzdata/**
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            test -f /usr/share/zoneinfo/UTC
+            test -f /usr/share/zoneinfo/right/UTC
+            test "$(TZ=America/New_York date +%Z)" = EST
