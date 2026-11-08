@@ -1,0 +1,224 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# RPM package manager. Built with the sqlite rpmdb, Sequoia OpenPGP backend and
+# the compression libraries needed to read rpm-md repositories.
+schema: 1
+
+package:
+  name: rpm
+  version: "6.1.0"
+  release: 1
+  summary: The RPM package manager
+  description: |
+    RPM is a powerful command line driven package management system capable of
+    installing, uninstalling, verifying, querying and updating software
+    packages. This build provides the runtime libraries and tools used by
+    dnf5 and libdnf5.
+  license: GPL-2.0-or-later AND LGPL-2.1-or-later
+  upstream: https://rpm.org/
+  cpe:
+    vendor: rpm
+    product: rpm
+
+sources:
+  - name: rpm-6.1.0.tar.gz
+    kind: archive
+    digest: "sha512:988f57c3bcfb4b33e271d00dc4992e0cf0867b775f72864256f02e2996d00456d8aaa15c94428517e29b297e93fb68d173e3f7068dba7653d8eb226857868c09"
+    locators:
+      - kind: https
+        url: https://github.com/rpm-software-management/rpm/archive/refs/tags/rpm-6.1.0-release.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [cmake, make, gcc, gcc-c++, bash, coreutils, pkgconf, python3, scdoc]
+    host:
+      - bzip2-devel
+      - file-devel
+      - libacl-devel
+      - libarchive-devel
+      - libcap-devel
+      - libselinux-devel
+      - lua-devel
+      - openssl-devel
+      - popt-devel
+      - sqlite-devel
+      - xz-devel
+      - zlib-devel
+      - libzstd-devel
+    tests: [bash-binsh, coreutils, gcc, pkgconf, grep, libstdc++, bzip2-libs, bzip2-devel, file-libs, libacl, libacl-devel, libarchive, libcap, libcap-devel, libselinux, libselinux-devel, lua-libs, lua-devel, openssl-libs, popt, popt-devel, sqlite-libs, sqlite-devel, xz-libs, xz-devel, zlib, zlib-devel, libzstd, libzstd-devel]
+  pipeline:
+    - uses: cmake/configure
+      with:
+        args:
+          - -DENABLE_NLS=OFF
+          - -DENABLE_OPENMP=OFF
+          - -DENABLE_PYTHON=OFF
+          - -DENABLE_PLUGINS=OFF
+          - -DENABLE_SQLITE=ON
+          - -DENABLE_NDB=OFF
+          - -DENABLE_BDB_RO=OFF
+          - -DENABLE_TESTSUITE=OFF
+          - -DWITH_CAP=ON
+          - -DWITH_ACL=ON
+          - -DWITH_SELINUX=ON
+          - -DWITH_DBUS=OFF
+          - -DWITH_AUDIT=OFF
+          - -DWITH_FSVERITY=OFF
+          - -DWITH_IMAEVM=OFF
+          - -DWITH_FAPOLICYD=OFF
+          - -DWITH_SEQUOIA=OFF
+          - -DWITH_OPENSSL=ON
+          - -DWITH_READLINE=OFF
+          - -DWITH_BZIP2=ON
+          - -DWITH_ICONV=ON
+          - -DWITH_ZSTD=ON
+          - -DWITH_LIBDW=OFF
+          - -DWITH_LIBELF=OFF
+          - -DWITH_LIBLZMA=ON
+    - uses: cmake/build
+    - uses: cmake/install
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [rpm, rpm-libs, rpm-build-libs, rpm-devel, rpm-doc]
+    - uses: strip
+
+outputs:
+  - name: rpm
+    summary: RPM package manager tools
+    files:
+      include:
+        - /usr/bin/*
+        - /usr/lib/rpm/**
+        - /usr/share/licenses/rpm/**
+      license:
+        - /usr/share/licenses/rpm/**
+    dependencies:
+      run:
+        - rpm-libs = ${package.version}-${package.release}
+        - rpm-build-libs = ${package.version}-${package.release}
+        - popt
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            rpm --version
+            rpmbuild --version
+            rpm --eval '%{_libdir}' | grep -Fx /usr/lib64
+
+  - name: rpm-libs
+    summary: Libraries for manipulating RPM packages
+    files:
+      include:
+        - /usr/lib*/librpm.so.*
+        - /usr/lib*/librpmio.so.*
+        - /usr/lib*/librpmsign.so.*
+        - /usr/share/licenses/rpm-libs/**
+      license:
+        - /usr/share/licenses/rpm-libs/**
+    dependencies:
+      run:
+        - bzip2-libs
+        - file-libs
+        - libacl
+        - libarchive
+        - libcap
+        - libselinux
+        - openssl-libs
+        - popt
+        - sqlite-libs
+        - xz-libs
+        - zlib
+        - libzstd
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/librpm.so.* /usr/lib/librpm.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: rpm-build-libs
+    summary: Libraries for building RPM packages
+    files:
+      include:
+        - /usr/lib*/librpmbuild.so.*
+        - /usr/share/licenses/rpm-build-libs/**
+      license:
+        - /usr/share/licenses/rpm-build-libs/**
+    dependencies:
+      run:
+        - rpm-libs = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/librpmbuild.so.* /usr/lib/librpmbuild.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: rpm-devel
+    summary: Development files for RPM
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/rpm-devel/**
+      license:
+        - /usr/share/licenses/rpm-devel/**
+    dependencies:
+      run:
+        - rpm-libs = ${package.version}-${package.release}
+        - rpm-build-libs = ${package.version}-${package.release}
+        - bzip2-devel
+        - libacl-devel
+        - libcap-devel
+        - libselinux-devel
+        - lua-devel
+        - popt-devel
+        - sqlite-devel
+        - xz-devel
+        - zlib-devel
+        - libzstd-devel
+        - filesystem
+    tests:
+      - name: link
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            printf '#include <rpm/rpmlib.h>\nint main(void){return 0;}\n' > /tmp/rpm.c
+            gcc /tmp/rpm.c $(pkg-config --cflags --libs rpm) -o /tmp/rpm-test
+            /tmp/rpm-test
+
+  - name: rpm-doc
+    summary: Documentation for RPM
+    files:
+      include:
+        - "@man"
+        - "@doc"
+        - /usr/share/licenses/rpm-doc/**
+      license:
+        - /usr/share/licenses/rpm-doc/**
+    dependencies:
+      run:
+        - filesystem
