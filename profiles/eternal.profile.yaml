@@ -19,8 +19,10 @@ repositories:
   # Bootstrap repositories. Delete when self-hosting.
   - id: bootstrap
     metalink: https://mirrors.fedoraproject.org/metalink?repo=fedora-44&arch=$basearch
+    exclude: [zlib, zlib-devel, zlib-static, zlib-ng-compat, zlib-ng-compat-devel, zlib-ng-compat-static]
   - id: bootstrap-updates
     metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f44&arch=$basearch
+    exclude: [zlib, zlib-devel, zlib-static, zlib-ng-compat, zlib-ng-compat-devel, zlib-ng-compat-static]
 packages:
   install:
     - eternal-base
