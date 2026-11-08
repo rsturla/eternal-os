@@ -1,0 +1,150 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# GNU binutils provides the assembler, linker and binary utilities used by the
+# rest of the bootstrap. Gold and gprofng are disabled for the first pass; the
+# default BFD linker is enough to build glibc and GCC.
+#
+# The runtime package contains only the tools and linker scripts. Headers,
+# static libraries and man pages are separate subpackages, so a minimal image
+# does not pull development files just to get `ld` or `as`.
+#
+# The bootstrap variant lives in bootstrap/recipes/binutils/package.yaml.
+schema: 1
+
+package:
+  name: binutils
+  version: "2.46.1"
+  release: 1
+  summary: A GNU collection of binary utilities
+  description: |
+    The GNU binutils are a collection of binary tools: the linker, assembler,
+    archiver, symbol table tools and related utilities.
+  license: GPL-3.0-or-later
+  upstream: https://www.gnu.org/software/binutils/
+  cpe:
+    vendor: gnu
+    product: binutils
+
+sources:
+  - name: binutils-2.46.1.tar.xz
+    kind: archive
+    digest: "sha512:a5c65e56e400ed3fb8906a995dbb93eb5bea54b16344244653d7f44ef29ceb60270da263b19d25302c37759784e14fcb4b9421b29e0e2c7f450bd99f6bb4595c"
+    locators:
+      - kind: https
+        url: https://sourceware.org/pub/binutils/releases/binutils-2.46.1.tar.xz
+      - kind: https
+        url: https://ftp.gnu.org/gnu/binutils/binutils-2.46.1.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools:
+      - gcc
+      - make
+      - bash
+      - coreutils
+      - texinfo
+      - bison
+      - flex
+      - zlib-ng-compat-devel
+      - gawk
+      - sed
+      - grep
+      - diffutils
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          - --with-sysroot=/
+          - --disable-werror
+          - --disable-gold
+          - --disable-gprofng
+          - --disable-nls
+          - --disable-shared
+    - uses: autotools/build
+      with:
+        args: [tooldir=/usr]
+    - uses: autotools/install
+      with:
+        args: [tooldir=/usr]
+    - runs: |
+        # Like Wolfi and Fedora, drop libtool archives. They embed build paths
+        # and are not needed at runtime or link time.
+        find "$STAGE" -name '*.la' -delete
+    - uses: license/copy
+      with:
+        files: [COPYING3, COPYING3.LIB]
+        outputs: [binutils, binutils-dev, binutils-doc]
+    - uses: strip
+
+outputs:
+  - name: binutils
+    summary: A GNU collection of binary utilities
+    # Main package: linker scripts, binaries and runtime data.
+    files:
+      license:
+        - /usr/share/licenses/binutils/COPYING3
+        - /usr/share/licenses/binutils/COPYING3.LIB
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            ld --version | grep -q 'GNU ld'
+            as --version | grep -q 'GNU assembler'
+            objdump --version | grep -q 'GNU objdump'
+
+  - name: binutils-dev
+    summary: Binutils development headers and libraries
+    files:
+      include:
+        - "@dev"
+        - /usr/lib*/bfd-plugins/**
+        - /usr/share/licenses/binutils-dev/**
+      license:
+        - /usr/share/licenses/binutils-dev/COPYING3
+        - /usr/share/licenses/binutils-dev/COPYING3.LIB
+    dependencies:
+      run:
+        - binutils = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            test -f /usr/include/bfd.h
+            test -f /usr/lib64/libbfd.a
+
+  - name: binutils-doc
+    summary: Binutils documentation
+    files:
+      include:
+        - "@info"
+        - "@man"
+        - /usr/share/licenses/binutils-doc/**
+      license:
+        - /usr/share/licenses/binutils-doc/COPYING3
+        - /usr/share/licenses/binutils-doc/COPYING3.LIB
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: build
+    stage: build
+    argv:
+      - sh
+      - -c
+      - ./binutils/objdump --version | grep -q 'GNU objdump'
