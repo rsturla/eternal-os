@@ -8,8 +8,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -35,9 +33,13 @@ jobs:
     runs-on: ubuntu-26.04
     permissions:
       contents: read
-      pages: write
-      id-token: write
     env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.PACKAGES_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.PACKAGES_S3_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ vars.PACKAGES_S3_REGION || 'auto' }}
+      PACKAGES_S3_BUCKET: ${{ vars.PACKAGES_S3_BUCKET }}
+      PACKAGES_S3_ENDPOINT: ${{ vars.PACKAGES_S3_ENDPOINT }}
+      PACKAGES_BASE_URL: ${{ vars.PACKAGES_BASE_URL || 'https://packages.eternal.sturla.tech' }}
       RPMX_SIGNING_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
       RPMX_PUBLIC_KEY: ${{ secrets.RPMX_PUBLIC_KEY }}
       PACKAGES: ${{ needs.packages.outputs.packages }}
@@ -87,39 +89,19 @@ jobs:
             chmod 0644 "$RUNNER_TEMP/signing/rpmx.asc.pub"
           fi
 
-      - name: Assemble repository
+      - name: Publish repository
         run: |
-          args=(--packages out --output site --release rolling
-            --base-url "https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}")
+          args=(--packages out --output site --release rolling --archive archive
+            --bucket "$PACKAGES_S3_BUCKET"
+            --region "$AWS_DEFAULT_REGION"
+            --base-url "$PACKAGES_BASE_URL")
+          if [ -n "$PACKAGES_S3_ENDPOINT" ]; then
+            args+=(--endpoint-url "$PACKAGES_S3_ENDPOINT")
+          fi
           if [ -f "$RUNNER_TEMP/signing/rpmx.asc" ]; then
             args+=(--signing-key "$RUNNER_TEMP/signing/rpmx.asc")
           fi
           if [ -f "$RUNNER_TEMP/signing/rpmx.asc.pub" ]; then
             args+=(--public-key "$RUNNER_TEMP/signing/rpmx.asc.pub")
           fi
-          ./scripts/publish-repo.sh "${args[@]}"
-
-      - name: Configure Pages
-        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-        with:
-          enablement: true
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: site
-
-  deploy:
-    name: Deploy repository
-    needs: repository
-    runs-on: ubuntu-26.04
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+          ./scripts/publish-bucket.sh "${args[@]}"

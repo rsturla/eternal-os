@@ -30,7 +30,7 @@ produced by [rpmx](https://github.com/rsturla/rpmx):
 | --- | --- |
 | Package recipes | `eternal-release`, `eternal-baselayout`, `eternal-base` |
 | Release model | Rolling: every push to `main` republishes the `rolling` channel |
-| Repository | Rolling channel at `https://rsturla.github.io/eternal-os/rolling/$basearch` |
+| Repository | Rolling channel at `https://packages.eternal.sturla.tech/rolling/$basearch`; disabled archive at `/archive/$basearch` |
 | Images | Composed by a separate image pipeline, not by this release workflow |
 | Architectures | `x86_64` and `aarch64` (GitHub-hosted ARM runners) |
 | Signing | Optional in CI and locally; see [`docs/signing.md`](docs/signing.md) |
@@ -159,6 +159,7 @@ There is no CI-only build logic. Every workflow step calls a script in
 | `make check` | `_lint.yml` calls `scripts/lint-all.sh` + `pre-commit` |
 | `make build` / `build-affected` | `_build-packages.yml` calls `scripts/build-all.sh` |
 | `make repo` | `scripts/publish-repo.sh` |
+| — | `scripts/publish-bucket.sh` uploads `rolling` and `archive` |
 
 The plan comes from `scripts/list-packages.sh`, `scripts/affected.sh`,
 `scripts/package-graph.sh` and `scripts/package-hash.sh`; the rpmx revision
@@ -166,7 +167,9 @@ from `.rpmx-revision`. A local build and a CI build therefore consume exactly
 the same inputs.
 
 The only difference is secret delivery. CI writes `RPMX_SIGNING_KEY` and
-`RPMX_PUBLIC_KEY` to temporary files; locally, pass the files directly:
+`RPMX_PUBLIC_KEY` to temporary files, and reads the `PACKAGES_S3_*`
+credentials and variables needed by `scripts/publish-bucket.sh`; locally, pass
+the files and environment directly:
 
 ```console
 ./scripts/build-all.sh --signing-key ~/eternal-signing-key.asc
@@ -192,13 +195,15 @@ workflow, and the commits are checked against the
    `site/rolling/SRPMS/`. When a key is configured it signs the RPMs and
    `repomd.xml`, and writes `eternal.repo`, `RPM-GPG-KEY-eternal` and
    `.nojekyll` beside it.
-3. deploys `site/` to GitHub Pages.
+3. uploads the result to S3-compatible object storage. `rolling` is replaced;
+   `archive` is append-only and keeps every historical EVR.
 
 Eternal is a rolling distribution: every push to `main` republishes the
-`rolling` channel. Packages that actually rebuild get a `+build<Unix timestamp>`
-release suffix so `dnf upgrade` always sees a newer NEVRA; unchanged packages
-are restored from cache. Image composition is a separate pipeline and is not
-part of `release.yml`.
+`rolling` channel and appends to the disabled-by-default `archive` channel.
+Packages that actually rebuild get a `+build<Unix timestamp>` release suffix so
+`dnf upgrade` always sees a newer NEVRA; unchanged packages are restored from
+cache. Image composition is a separate pipeline and is not part of
+`release.yml`.
 
 GitHub's matrix job outputs merge cells into a map, but only for statically
 declared output names. A dynamic package matrix cannot name one output per
