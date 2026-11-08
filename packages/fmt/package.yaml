@@ -1,0 +1,124 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# A modern C++ formatting library.
+schema: 1
+
+package:
+  name: fmt
+  version: "12.2.1"
+  release: 1
+  summary: A modern formatting library for C++
+  description: |
+    fmt is an open-source formatting library for C++. It can be used as a
+    safe alternative to printf and provides a fast, header-only or compiled
+    formatting API.
+  license: MIT
+  upstream: https://github.com/fmtlib/fmt
+  cpe:
+    vendor: fmtlib
+    product: fmt
+
+sources:
+  - name: fmt-12.2.1.tar.gz
+    kind: archive
+    digest: "sha512:d00479330c8b8c6a61a9420ac86c855964c3b611c0989158921a1ff7d1cac09f91cdec56219aebfbca0c47a3bdea98139620d45edaf14641b73288dcb3a6cc1c"
+    locators:
+      - kind: https
+        url: https://github.com/fmtlib/fmt/archive/refs/tags/12.2.1.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [cmake, make, gcc, gcc-c++, bash, coreutils]
+    tests: [bash-binsh, coreutils, gcc-c++, grep]
+  pipeline:
+    - uses: cmake/configure
+      with:
+        args:
+          - -DBUILD_SHARED_LIBS=ON
+          - -DFMT_TEST=OFF
+          - -DFMT_DOC=OFF
+    - uses: cmake/build
+    - uses: cmake/install
+    - uses: license/copy
+      with:
+        files: [LICENSE]
+        outputs: [fmt, fmt-devel, fmt-static]
+    - uses: strip
+
+outputs:
+  - name: fmt
+    summary: Shared library for fmt
+    files:
+      include:
+        - /usr/lib*/libfmt.so.*
+        - /usr/share/licenses/fmt/**
+      exclude:
+        - /usr/lib*/lib*.a
+      license:
+        - /usr/share/licenses/fmt/**
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libfmt.so.* /usr/lib/libfmt.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: fmt-static
+    summary: Static library for fmt
+    files:
+      include:
+        - "@static"
+        - /usr/share/licenses/fmt-static/**
+      license:
+        - /usr/share/licenses/fmt-static/**
+    dependencies:
+      run:
+        - fmt-devel = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libfmt*.a /usr/lib/libfmt*.a; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: fmt-devel
+    summary: Development files for fmt
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/fmt-devel/**
+      license:
+        - /usr/share/licenses/fmt-devel/**
+    dependencies:
+      run:
+        - fmt = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: link
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            printf '#include <fmt/core.h>\nint main(){fmt::print("ok\\n");}\n' > /tmp/fmt.cc
+            g++ /tmp/fmt.cc -lfmt -o /tmp/fmt-test
+            /tmp/fmt-test | grep -Fx ok
