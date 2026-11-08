@@ -17,3 +17,14 @@ repos:
     hooks:
       - id: shellcheck
         args: [--severity=warning]
+  - repo: local
+    hooks:
+      # The message half of the commit rules, so a wrong subject is caught
+      # before it is written. The package half needs the commit's diff and
+      # runs in CI (scripts/check-commits.sh).
+      - id: commit-message
+        name: commit message
+        entry: scripts/check-commits.sh --message-file
+        language: script
+        stages: [commit-msg]
+        always_run: true
