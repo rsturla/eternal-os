@@ -68,6 +68,7 @@ build:
       - sed
       - grep
       - diffutils
+    tests: [grep]
   pipeline:
     - uses: autotools/configure
       with:
