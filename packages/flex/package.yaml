@@ -1,0 +1,175 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# Flex lexical analyser. The toolchain wave needs it for binutils, GCC and
+# glibc: each ships a `.l` file that is regenerated when the release tarball
+# timestamps say the generated scanner is stale.
+#
+# Flex regenerates its own scanner, so `flex` is also a build tool of this
+# recipe. That is the same self-hosting edge Fedora and Wolfi carry, and it
+# resolves from the seed until the Eternal copy is published.
+#
+# The release tarball ships `doc/flex.1`, but dates it before `configure.ac`,
+# so `make` would regenerate the man page with help2man. The shipped page is
+# the 2.6.4 page; it is touched to keep it, which avoids carrying help2man and
+# a full Perl tool chain just for one roff file.
+schema: 1
+
+package:
+  name: flex
+  version: "2.6.4"
+  release: 1
+  summary: A fast lexical analyser generator
+  description: |
+    Flex is a tool for generating scanners: programs that recognise lexical
+    patterns in text. It is a rewrite of lex and provides the libfl runtime
+    library and the FlexLexer C++ header.
+  license: BSD-2-Clause AND LGPL-2.0-or-later
+  upstream: https://github.com/westes/flex
+  cpe:
+    vendor: flex_project
+    product: flex
+
+sources:
+  - name: flex-2.6.4.tar.gz
+    kind: archive
+    digest: "sha512:e9785f3d620a204b7d20222888917dc065c2036cae28667065bf7862dfa1b25235095a12fd04efdbd09bfd17d3452e6b9ef953a8c1137862ff671c97132a082e"
+    locators:
+      - kind: https
+        url: https://github.com/westes/flex/releases/download/v2.6.4/flex-2.6.4.tar.gz
+      - kind: https
+        url: https://downloads.sourceforge.net/project/flex/flex-2.6.4.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, m4, bison, flex, sed, grep, diffutils]
+    tests: [bash-binsh, coreutils, gcc, gcc-c++, grep, m4]
+  pipeline:
+    - runs: |
+        set -eu
+        touch doc/flex.1
+    - uses: autotools/configure
+      with:
+        args:
+          - --disable-nls
+          # libfl is a scanner runtime, not a general purpose library; keep
+          # the shared object and drop the static archive.
+          - --disable-static
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        set -eu
+        rm -f "$STAGE/usr/share/info/dir"
+        ln -sf flex "$STAGE/usr/bin/lex"
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [flex, flex-libs, flex-devel, flex-doc]
+    - uses: strip
+
+outputs:
+  - name: flex
+    summary: A fast lexical analyser generator
+    files:
+      license:
+        - /usr/share/licenses/flex/COPYING
+    dependencies:
+      run:
+        - flex-libs = ${package.version}-${package.release}
+        - m4
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            set -eu
+            flex --version | head -1 | grep -q '2.6.4'
+            cat > scan.l <<'EOF'
+            %%
+            [0-9]+  { printf("NUMBER:%s\n", yytext); }
+            .       { }
+            %%
+            int yywrap(void) { return 1; }
+            int main(void) { yylex(); return 0; }
+            EOF
+            flex -o scan.c scan.l
+            cc -o scanner scan.c
+            printf '42' | ./scanner | grep -Fx 'NUMBER:42'
+            lex -o lex.c scan.l
+            test -s lex.c
+
+  - name: flex-libs
+    summary: The flex scanner runtime library
+    files:
+      include:
+        - /usr/lib*/libfl.so.*
+        - /usr/share/licenses/flex-libs/COPYING
+      license:
+        - /usr/share/licenses/flex-libs/COPYING
+    dependencies:
+      run:
+        - filesystem
+
+  - name: flex-devel
+    summary: Development files for flex
+    files:
+      include:
+        - "@dev"
+        - /usr/include/FlexLexer.h
+        - /usr/share/licenses/flex-devel/COPYING
+      license:
+        - /usr/share/licenses/flex-devel/COPYING
+    dependencies:
+      run:
+        - flex-libs = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: link
+        stage: installed
+        environment:
+          contents:
+            packages: [gcc, gcc-c++, glibc-devel]
+        argv:
+          - sh
+          - -c
+          - |
+            set -eu
+            cat > /tmp/flexlexer.cc <<'EOF'
+            #include <FlexLexer.h>
+            extern "C" int yylex() { return 0; }
+            int main(void) { return 0; }
+            EOF
+            g++ /tmp/flexlexer.cc -lfl -o /tmp/flexlexer
+            /tmp/flexlexer
+
+  - name: flex-doc
+    summary: flex documentation
+    files:
+      include:
+        - "@man"
+        - "@info"
+        - "@doc"
+        - /usr/share/licenses/flex-doc/COPYING
+      license:
+        - /usr/share/licenses/flex-doc/COPYING
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: hardening
+    stage: build
+    pipeline:
+      # libfl is a few hundred bytes of wrapper code with no stack buffers and
+      # no libc string calls, so the stack-protector and fortify probes have
+      # nothing to find. The generator itself is checked.
+      - uses: test/hardening-check
+        with:
+          paths: [/usr/bin/flex]
