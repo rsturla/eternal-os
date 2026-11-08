@@ -1,0 +1,222 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# dnf5 package manager and the libdnf5 libraries. The build keeps the core
+# package manager, the CLI library and libdnf5, and disables the daemon,
+# modulemd, comps, systemd, Python/Perl/Ruby bindings, plugins, tests and docs.
+schema: 1
+
+package:
+  name: dnf5
+  version: "5.4.7.0"
+  release: 1
+  summary: Package manager based on libdnf5 and libsolv
+  description: |
+    dnf5 is the next generation of the DNF package manager. It uses libdnf5
+    for package management and libsolv for dependency resolution. This build
+    provides the dnf5 command, libdnf5 and libdnf5-cli without the daemon,
+    module streams, comps groups or language bindings.
+  license: GPL-2.0-or-later
+  upstream: https://github.com/rpm-software-management/dnf5
+  cpe:
+    vendor: rpm-software-management
+    product: dnf5
+
+sources:
+  - name: dnf5-5.4.7.0.tar.gz
+    kind: archive
+    digest: "sha512:6b06c9a0de52c9781ce20aaccc44ff46fe06203634f957400aeada60525f5eadba6b296db1e8d6ea8272835e9abdcc3a62f12380a36e0c4f6e2787237ffe8b75"
+    locators:
+      - kind: https
+        url: https://github.com/rpm-software-management/dnf5/archive/refs/tags/5.4.7.0.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+patches:
+  - file: patches/offline-plymouth-unused.patch
+    strip: 1
+    reason: "avoid -Werror=unused-parameter with -DWITH_SYSTEMD=OFF"
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [cmake, make, gcc, gcc-c++, bash, coreutils, pkgconf, python3]
+    host:
+      - bzip2-devel
+      - file-devel
+      - fmt-devel
+      - glib2-devel
+      - json-c-devel
+      - libacl-devel
+      - libarchive-devel
+      - libcap-devel
+      - libcurl-devel
+      - librepo-devel
+      - libselinux-devel
+      - libsolv-devel
+      - libxml2-devel
+      - lua-devel
+      - openssl-devel
+      - popt-devel
+      - rpm-devel
+      - sqlite-devel
+      - toml11-devel
+      - libsmartcols-devel
+      - xz-devel
+      - zchunk-devel
+      - zlib-devel
+      - libzstd-devel
+    tests: [bash-binsh, coreutils, libstdc++, fmt, glib2, json-c, libacl, librepo, libsolv, libxml2, openssl-libs, rpm, rpm-libs, sqlite-libs, zchunk-libs, libsmartcols]
+  pipeline:
+    - uses: cmake/configure
+      with:
+        args:
+          - -DWITH_DNF5DAEMON_CLIENT=OFF
+          - -DWITH_DNF5DAEMON_SERVER=OFF
+          - -DWITH_DNF5_PLUGINS=OFF
+          - -DWITH_PLUGIN_ACTIONS=OFF
+          - -DWITH_PLUGIN_APPSTREAM=OFF
+          - -DWITH_PLUGIN_EXPIRED_PGP_KEYS=OFF
+          - -DWITH_PLUGIN_RHSM_CONTAINER=OFF
+          - -DWITH_PLUGIN_MANIFEST=OFF
+          - -DWITH_PYTHON_PLUGINS_LOADER=OFF
+          - -DWITH_PLUGIN_LOCAL=OFF
+          - -DWITH_PLUGIN_SYSTEMD_INHIBIT=OFF
+          - -DWITH_COMPS=ON
+          - -DWITH_MODULEMD=OFF
+          - -DWITH_SYSTEMD=OFF
+          - -DWITH_HTML=OFF
+          - -DWITH_MAN=OFF
+          - -DWITH_TESTS=OFF
+          - -DWITH_TRANSLATIONS=OFF
+          - -DWITH_PERL5=OFF
+          - -DWITH_PYTHON3=OFF
+          - -DWITH_RUBY=OFF
+          - -DWITH_GO=OFF
+    - uses: cmake/build
+    - uses: cmake/install
+    - uses: license/copy
+      with:
+        files: [COPYING.md]
+        outputs: [dnf5, libdnf5, libdnf5-cli, libdnf5-devel, libdnf5-cli-devel]
+    - uses: strip
+
+outputs:
+  - name: dnf5
+    summary: dnf5 package manager
+    files:
+      include:
+        - /usr/bin/*
+        - /etc/**
+        - /usr/share/bash-completion/completions/*
+        - /usr/share/licenses/dnf5/**
+      license:
+        - /usr/share/licenses/dnf5/**
+    dependencies:
+      run:
+        - libdnf5 = ${package.version}-${package.release}
+        - libdnf5-cli = ${package.version}-${package.release}
+        - rpm
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            dnf5 --version
+            dnf5 --help >/dev/null
+
+  - name: libdnf5
+    summary: Core library for dnf5
+    files:
+      include:
+        - /usr/lib*/libdnf5.so.*
+        - /usr/share/licenses/libdnf5/**
+      license:
+        - /usr/share/licenses/libdnf5/**
+    dependencies:
+      run:
+        - fmt
+        - glib2
+        - json-c
+        - libacl
+        - librepo
+        - libsolv
+        - libxml2
+        - openssl-libs
+        - rpm-libs
+        - sqlite-libs
+        - zchunk-libs
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libdnf5.so.* /usr/lib/libdnf5.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: libdnf5-devel
+    summary: Development files for libdnf5
+    files:
+      include:
+        - /usr/include/libdnf5/**
+        - /usr/lib*/libdnf5.so
+        - /usr/lib*/pkgconfig/libdnf5.pc
+        - /usr/share/licenses/libdnf5-devel/**
+      license:
+        - /usr/share/licenses/libdnf5-devel/**
+    dependencies:
+      run:
+        - libdnf5 = ${package.version}-${package.release}
+        - filesystem
+
+  - name: libdnf5-cli
+    summary: Command line interface library for dnf5
+    files:
+      include:
+        - /usr/lib*/libdnf5-cli.so.*
+        - /usr/share/licenses/libdnf5-cli/**
+      license:
+        - /usr/share/licenses/libdnf5-cli/**
+    dependencies:
+      run:
+        - libdnf5 = ${package.version}-${package.release}
+        - fmt
+        - json-c
+        - libsmartcols
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libdnf5-cli.so.* /usr/lib/libdnf5-cli.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: libdnf5-cli-devel
+    summary: Development files for libdnf5-cli
+    files:
+      include:
+        - /usr/include/libdnf5-cli/**
+        - /usr/lib*/libdnf5-cli.so
+        - /usr/lib*/pkgconfig/libdnf5-cli.pc
+        - /usr/share/licenses/libdnf5-cli-devel/**
+      license:
+        - /usr/share/licenses/libdnf5-cli-devel/**
+    dependencies:
+      run:
+        - libdnf5-cli = ${package.version}-${package.release}
+        - libdnf5-devel = ${package.version}-${package.release}
+        - filesystem

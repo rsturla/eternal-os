@@ -1,0 +1,16 @@
+Mark the plymouth argument as used when systemd support is disabled
+
+dnf5's offline reboot helper only uses the plymouth output object inside a
+WITH_SYSTEMD block.  Building with -DWITH_SYSTEMD=OFF therefore trips
+-Wunused-parameter (promoted to an error in the project's build flags).
+
+--- a/dnf5/commands/offline/offline.cpp
++++ b/dnf5/commands/offline/offline.cpp
+@@ -276,6 +276,7 @@
+ }
+ 
+ void reboot(bool poweroff = false, PlymouthOutput * plymouth = nullptr) {
++    (void)plymouth;
+     if (std::getenv("DNF_SYSTEM_UPGRADE_NO_REBOOT")) {
+         if (poweroff) {
+             std::cerr << "DNF_SYSTEM_UPGRADE_NO_REBOOT is set, not powering off." << std::endl;
