@@ -1,0 +1,38 @@
+# The build root for the compiler-options package itself.
+#
+# This profile deliberately does not install `openssf-compiler-options` or use
+# its specs: the package is built before it exists in the toolchain repository.
+# Everything else matches the bootstrap root so the package is assembled with
+# the same shell and coreutils as the rest of the first bootstrap stage.
+document: rpmx-profile
+version: 1
+name: bootstrap-toolchain
+releasever: "44"
+dist-tag: .eternal
+archs: [x86_64, aarch64]
+builder:
+  image: registry.fedoraproject.org/fedora:44
+repositories:
+  - id: fedora
+    metalink: https://mirrors.fedoraproject.org/metalink?repo=fedora-$releasever&arch=$basearch
+  - id: updates
+    metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch
+packages:
+  install:
+    - bash
+    - coreutils
+    - gcc
+    - make
+sbom: true
+options:
+  weak_deps: false
+  docs: false
+paths:
+  prefix: /usr
+  libdir: /usr/lib64
+
+# The package only installs files. Keep the bootstrap compiler's defaults out
+# of the way so the package is not coupled to the hardening policy it ships.
+flags:
+  cflags: [-O2, -g]
+  cxxflags: [-O2, -g]
