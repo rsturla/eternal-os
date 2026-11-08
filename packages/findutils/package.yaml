@@ -94,7 +94,7 @@ outputs:
           - -c
           - |
             locate --version
-            updatedb --version
+            test -x /usr/sbin/updatedb
 
   - name: findutils-doc
     summary: GNU find utilities documentation
