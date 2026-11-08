@@ -38,7 +38,6 @@ package:
   release: 1
   summary: One line about foo
   license: MIT
-  source-date-epoch: 1704067200
   # Maintainers come from ../../rpmx-defaults.yaml.
   # cpe: only when the upstream project has one, for example:
   #   vendor: gnu
@@ -82,8 +81,8 @@ Rules that matter:
 - `package.name` is the RPM name. Do not rename a component when Eternal takes
   ownership of it; keep the upstream/bootstrap name so `eternal-base` and
   consumers do not change.
-- `source-date-epoch` is required for reproducible builds. Bump it when the
-  packaged content changes.
+- `source-date-epoch` is derived from the source archive or pinned git commit.
+  Set it only when that value is wrong or when the package has no source.
 - `maintainers` is repository metadata: it lives in `rpmx-defaults.yaml`, not
   in every recipe. Override it only when a package genuinely has a different
   owner.
@@ -174,6 +173,8 @@ When `foo` gains users, `scripts/package-graph.sh` picks up build edges from
 
 ## Pull request checklist
 
+- [ ] The recipe changes are one commit, scoped `<name>:`, and touch no other
+      `packages/` directory ([`git-workflow.md`](git-workflow.md)).
 - [ ] `rpmx lint` is clean (warnings explained).
 - [ ] The package builds with `./scripts/build-all.sh --package NAME`.
 - [ ] `make affected` includes the package and anything that builds against it.

@@ -183,7 +183,8 @@ The only difference is secret delivery. CI writes `RPMX_SIGNING_KEY` and
 `ci.yml` runs on pull requests and on demand. A `prepare` job computes the
 package plan and hashes, then a matrix builds only the affected packages in
 parallel and uploads each package's artifacts. Lint runs first as a reusable
-workflow.
+workflow, and the commits are checked against the
+[git workflow](docs/git-workflow.md) before anything is built.
 
 `release.yml` runs on `main`, on `v*` tags and on demand:
 
