@@ -4,6 +4,11 @@ site/
 .rpmx/
 *.rpm
 
+# Local package locks. The bootstrap root still follows live Fedora, so its
+# closure moves independently of a recipe; commit locks only after the root is
+# pinned and CI builds with --locked.
+package.lock.json
+
 # Nested defaults written by `rpmx init`; the repository has its own
 packages/*/packages/
 packages/*/.rpmx/
