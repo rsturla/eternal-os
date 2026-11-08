@@ -1,0 +1,171 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# XZ and LZMA compression tools and library. A dependency for the minimal Eternal build root.
+schema: 1
+
+package:
+  name: xz
+  version: "5.8.4"
+  release: 1
+  summary: XZ and LZMA compression tools and library
+  description: |
+    XZ Utils provide the xz and lzma command line tools and the liblzma compression library.
+  license: 0BSD AND LGPL-2.1-or-later AND GPL-2.0-or-later
+  upstream: https://tukaani.org/xz/
+  cpe:
+    vendor: tukaani
+    product: xz
+
+sources:
+  - name: xz-5.8.4.tar.xz
+    kind: archive
+    digest: "sha512:6ade85c1bcff651cdb9543d0b9e7d932c50c9a45e362ada3ef5edf173cd6fb18786f24bc73058db37440f3d92d2178a4e24448f725f4f22146c9a63ed15be432"
+    locators:
+      - kind: https
+        url: https://github.com/tukaani-project/xz/releases/download/v5.8.4/xz-5.8.4.tar.xz
+      - kind: https
+        url: https://downloads.sourceforge.net/project/lzmautils/xz-5.8.4.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils]
+    tests: [bash-binsh, coreutils]
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          - --disable-static
+          - --disable-nls
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+    - uses: license/copy
+      with:
+        files: [COPYING, COPYING.0BSD, COPYING.GPLv2, COPYING.LGPLv2.1]
+        outputs: [xz, xz-libs, xz-devel, xz-doc]
+    - uses: strip
+
+outputs:
+  - name: xz
+    summary: XZ and LZMA compression tools
+    files:
+      include:
+        - /usr/bin/*
+        - /usr/share/licenses/xz/COPYING
+        - /usr/share/licenses/xz/COPYING.0BSD
+        - /usr/share/licenses/xz/COPYING.GPLv2
+        - /usr/share/licenses/xz/COPYING.LGPLv2.1
+      license:
+        - /usr/share/licenses/xz/COPYING
+        - /usr/share/licenses/xz/COPYING.0BSD
+        - /usr/share/licenses/xz/COPYING.GPLv2
+        - /usr/share/licenses/xz/COPYING.LGPLv2.1
+    dependencies:
+      run:
+        - xz-libs = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            printf 'hello\n' > /tmp/file
+            xz /tmp/file
+            test -f /tmp/file.xz
+            unxz /tmp/file.xz
+            test "$(cat /tmp/file)" = hello
+
+  - name: xz-libs
+    summary: XZ runtime library
+    files:
+      include:
+        - /usr/lib*/liblzma.so.*
+        - /usr/share/licenses/xz-libs/COPYING
+        - /usr/share/licenses/xz-libs/COPYING.0BSD
+        - /usr/share/licenses/xz-libs/COPYING.GPLv2
+        - /usr/share/licenses/xz-libs/COPYING.LGPLv2.1
+      license:
+        - /usr/share/licenses/xz-libs/COPYING
+        - /usr/share/licenses/xz-libs/COPYING.0BSD
+        - /usr/share/licenses/xz-libs/COPYING.GPLv2
+        - /usr/share/licenses/xz-libs/COPYING.LGPLv2.1
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/liblzma.so.* /usr/lib/liblzma.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: xz-devel
+    summary: XZ development files
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/xz-devel/COPYING
+        - /usr/share/licenses/xz-devel/COPYING.0BSD
+        - /usr/share/licenses/xz-devel/COPYING.GPLv2
+        - /usr/share/licenses/xz-devel/COPYING.LGPLv2.1
+      license:
+        - /usr/share/licenses/xz-devel/COPYING
+        - /usr/share/licenses/xz-devel/COPYING.0BSD
+        - /usr/share/licenses/xz-devel/COPYING.GPLv2
+        - /usr/share/licenses/xz-devel/COPYING.LGPLv2.1
+    dependencies:
+      run:
+        - xz-libs = ${package.version}-${package.release}
+        - filesystem
+
+  - name: xz-doc
+    summary: XZ documentation
+    files:
+      include:
+        - "@man"
+        - "@info"
+        - "@doc"
+        - /usr/share/licenses/xz-doc/COPYING
+        - /usr/share/licenses/xz-doc/COPYING.0BSD
+        - /usr/share/licenses/xz-doc/COPYING.GPLv2
+        - /usr/share/licenses/xz-doc/COPYING.LGPLv2.1
+      license:
+        - /usr/share/licenses/xz-doc/COPYING
+        - /usr/share/licenses/xz-doc/COPYING.0BSD
+        - /usr/share/licenses/xz-doc/COPYING.GPLv2
+        - /usr/share/licenses/xz-doc/COPYING.LGPLv2.1
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: link
+    stage: installed
+    environment:
+      contents:
+        packages: [gcc, glibc-devel]
+    argv:
+      - sh
+      - -c
+      - |
+        cat > /tmp/test.c <<'EOF'
+        #include <lzma.h>
+        int main(void) {
+          return lzma_version_number() != LZMA_VERSION;
+        }
+        EOF
+        gcc /tmp/test.c -llzma -o /tmp/test
+        /tmp/test
