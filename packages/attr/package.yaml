@@ -1,0 +1,142 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# Extended attribute utilities and the libattr runtime. Coreutils and tar use
+# libattr when copying extended attributes.
+schema: 1
+
+package:
+  name: attr
+  version: "2.6.0"
+  release: 1
+  summary: Utilities for managing filesystem extended attributes
+  description: |
+    The attr package contains the getfattr and setfattr utilities and the
+    libattr library used to manipulate filesystem extended attributes.
+  license: GPL-2.0-or-later AND LGPL-2.1-or-later
+  upstream: https://savannah.nongnu.org/projects/attr/
+  cpe:
+    vendor: attr_project
+    product: attr
+
+sources:
+  - name: attr-2.6.0.tar.gz
+    kind: archive
+    digest: "sha512:ad1f8a11bc7e9f119b213e62c35beb0d2f0a114c9fad9833158bd3ccafe223277f9e69502e72a9e20b10ef04fd1b74153ae75e2979bcb452981ae567fff6795b"
+    locators:
+      - kind: https
+        url: https://download.savannah.nongnu.org/releases/attr/attr-2.6.0.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, gettext, libtool]
+    tests: [bash-binsh, coreutils]
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          - --disable-static
+          - --disable-nls
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        find "$STAGE" -name '*.la' -delete
+    - uses: license/copy
+      with:
+        files: [doc/COPYING, doc/COPYING.LGPL]
+        outputs: [attr, libattr, libattr-devel, attr-doc]
+    - uses: strip
+
+outputs:
+  - name: attr
+    summary: Extended attribute utilities
+    files:
+      license:
+        - /usr/share/licenses/attr/**
+    dependencies:
+      run:
+        - libattr = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            echo test > /tmp/attr-test
+            setfattr -n user.eternal -v test /tmp/attr-test
+            test "$(getfattr -n user.eternal --only-values /tmp/attr-test)" = test
+            setfattr -x user.eternal /tmp/attr-test
+
+  - name: libattr
+    summary: Extended attribute runtime library
+    files:
+      include:
+        - /usr/lib*/libattr.so.*
+        - /usr/share/licenses/libattr/**
+      license:
+        - /usr/share/licenses/libattr/**
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libattr.so.* /usr/lib/libattr.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: libattr-devel
+    summary: Development files for libattr
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/libattr-devel/**
+      license:
+        - /usr/share/licenses/libattr-devel/**
+    dependencies:
+      run:
+        - libattr = ${package.version}-${package.release}
+        - filesystem
+
+  - name: attr-doc
+    summary: Documentation for attr
+    files:
+      include:
+        - "@man"
+        - "@doc"
+        - /usr/share/licenses/attr-doc/**
+      license:
+        - /usr/share/licenses/attr-doc/**
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: link
+    stage: installed
+    environment:
+      contents:
+        packages: [gcc, glibc-devel]
+    argv:
+      - sh
+      - -c
+      - |
+        cat > /tmp/attr-link.c <<'EOF'
+        #include <sys/xattr.h>
+        int main(void) {
+          return setxattr("/tmp/attr-link", "user.eternal", "1", 1, 0) != 0;
+        }
+        EOF
+        gcc /tmp/attr-link.c -lattr -o /tmp/attr-link
+        /tmp/attr-link
