@@ -11,3 +11,8 @@ package:
   maintainers:
     - name: Eternal Linux maintainers
       email: maintainers@eternal.sturla.tech
+build:
+  environment:
+    # The compiler policy package installs its wrappers under /usr/libexec.
+    # Put that directory before /usr/bin so every build sees the policy.
+    PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
