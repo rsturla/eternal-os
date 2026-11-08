@@ -36,6 +36,7 @@ build:
   dependencies:
     tools: [gcc, make, bash, coreutils, pkgconf-pkg-config]
     host: [pcre2-devel]
+    tests: [bash-binsh, coreutils]
   pipeline:
     - uses: autotools/configure
     - uses: autotools/build
