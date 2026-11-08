@@ -1,0 +1,144 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# A library implementing the zlib compression algorithms. A dependency for the minimal Eternal build root.
+schema: 1
+
+package:
+  name: zlib
+  version: "1.4"
+  release: 1
+  summary: A library implementing the zlib compression algorithms
+  description: |
+    zlib is a massively spiffy yet delicately unobtrusive compression library.
+  license: Zlib
+  upstream: https://zlib.net/
+  cpe:
+    vendor: zlib
+    product: zlib
+
+sources:
+  - name: zlib-1.4.tar.xz
+    kind: archive
+    digest: "sha512:c6701ef216f2ea451056466794c520df62af0a7ddf57c907c3263678dc625f3d6466e0187106dec0d7721ad6fc6cf105e0f93a4cac82fbcc2ba919eebd29c0b0"
+    locators:
+      - kind: https
+        url: https://zlib.net/zlib-1.4.tar.xz
+      - kind: https
+        url: https://github.com/madler/zlib/releases/download/v1.4/zlib-1.4.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils]
+    tests: [bash-binsh]
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args: [--shared]
+    - uses: make/build
+    - uses: make/install
+    - uses: license/copy
+      with:
+        files: [LICENSE]
+        outputs: [zlib, zlib-devel, zlib-static, zlib-doc]
+    - uses: strip
+
+outputs:
+  - name: zlib
+    summary: A library implementing the zlib compression algorithms
+    files:
+      license:
+        - /usr/share/licenses/zlib/LICENSE
+    dependencies:
+      provides:
+        - zlib-ng-compat = ${package.version}-${package.release}
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libz.so.* /usr/lib/libz.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: zlib-devel
+    summary: zlib development files
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/zlib-devel/LICENSE
+      exclude:
+        - /usr/lib*/lib*.a
+      license:
+        - /usr/share/licenses/zlib-devel/LICENSE
+    dependencies:
+      run:
+        - zlib = ${package.version}-${package.release}
+        - filesystem
+      provides:
+        - zlib-ng-compat-devel = ${package.version}-${package.release}
+
+  - name: zlib-static
+    summary: zlib static library
+    files:
+      include:
+        - "@static"
+        - /usr/share/licenses/zlib-static/LICENSE
+      license:
+        - /usr/share/licenses/zlib-static/LICENSE
+    dependencies:
+      run:
+        - zlib-devel = ${package.version}-${package.release}
+        - filesystem
+      provides:
+        - zlib-ng-compat-static = ${package.version}-${package.release}
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libz.a /usr/lib/libz.a; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: zlib-doc
+    summary: zlib documentation
+    files:
+      include:
+        - "@man"
+        - "@doc"
+        - /usr/share/licenses/zlib-doc/LICENSE
+      license:
+        - /usr/share/licenses/zlib-doc/LICENSE
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: link
+    stage: installed
+    environment:
+      contents:
+        packages: [gcc, glibc-devel]
+    argv:
+      - sh
+      - -c
+      - |
+        cat > /tmp/test.c <<'EOF'
+        #include <zlib.h>
+        int main(void) {
+          return zlibVersion() == 0;
+        }
+        EOF
+        gcc /tmp/test.c -lz -o /tmp/test
+        /tmp/test
