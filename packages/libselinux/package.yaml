@@ -1,0 +1,174 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# SELinux userspace library. rpm, libdnf5 and the base userland link against
+# libselinux; the utilities are split so the library can be installed without
+# the policy management tools.
+schema: 1
+
+package:
+  name: libselinux
+  version: "3.11"
+  release: 1
+  summary: SELinux library and utilities
+  description: |
+    libselinux provides the userspace API for SELinux policy enforcement,
+    labelling and context management, plus the standard command-line tools.
+  license: libselinux-1.0
+  upstream: https://github.com/SELinuxProject/selinux
+  cpe:
+    vendor: selinuxproject
+    product: libselinux
+
+sources:
+  - name: libselinux-3.11.tar.gz
+    kind: archive
+    digest: "sha512:49eb0b180b77b4b61505117ecd98ab9fdd79a36801b6d2216813ea370a02ba4f58a0f87a18e92a2d4eeffc11d9df67e4692d2d8f5d3ee77a2abd3f606196aaad"
+    locators:
+      - kind: https
+        url: https://github.com/SELinuxProject/selinux/releases/download/3.11/libselinux-3.11.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, pkgconf, python3]
+    host: [libsepol-devel, pcre2-devel]
+    tests: [bash-binsh, coreutils]
+  pipeline:
+    - runs: |
+        make -j"$(nproc)" \
+          PREFIX=/usr LIBDIR=/usr/lib64 SHLIBDIR=/usr/lib64 \
+          SBINDIR=/usr/bin USE_PCRE2=y
+    - runs: |
+        make \
+          PREFIX=/usr LIBDIR=/usr/lib64 SHLIBDIR=/usr/lib64 \
+          SBINDIR=/usr/bin USE_PCRE2=y \
+          DESTDIR="$STAGE" install
+    - uses: license/copy
+      with:
+        files: [LICENSE]
+        outputs: [libselinux, libselinux-utils, libselinux-devel, libselinux-static, libselinux-doc]
+    - uses: strip
+
+outputs:
+  - name: libselinux
+    summary: SELinux runtime library
+    files:
+      include:
+        - /usr/lib*/libselinux.so.*
+        - /usr/share/licenses/libselinux/**
+      license:
+        - /usr/share/licenses/libselinux/**
+    dependencies:
+      run:
+        - filesystem
+        - libsepol
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libselinux.so.* /usr/lib/libselinux.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: libselinux-utils
+    summary: SELinux command-line utilities
+    files:
+      include:
+        - /usr/bin/avcstat
+        - /usr/bin/compute_av
+        - /usr/bin/compute_create
+        - /usr/bin/compute_member
+        - /usr/bin/compute_relabel
+        - /usr/bin/getconlist
+        - /usr/bin/getdefaultcon
+        - /usr/bin/getenforce
+        - /usr/bin/getfilecon
+        - /usr/bin/getpidcon
+        - /usr/bin/getpidprevcon
+        - /usr/bin/getpolicyload
+        - /usr/bin/getsebool
+        - /usr/bin/getseuser
+        - /usr/bin/matchpathcon
+        - /usr/bin/policyvers
+        - /usr/bin/sefcontext_compile
+        - /usr/bin/selabel_compare
+        - /usr/bin/selabel_digest
+        - /usr/bin/selabel_get_digests_all_partial_matches
+        - /usr/bin/selabel_lookup
+        - /usr/bin/selabel_lookup_best_match
+        - /usr/bin/selabel_partial_match
+        - /usr/bin/selinux_check_access
+        - /usr/bin/selinux_check_securetty_context
+        - /usr/bin/selinuxenabled
+        - /usr/bin/selinuxexeccon
+        - /usr/bin/setenforce
+        - /usr/bin/setfilecon
+        - /usr/bin/togglesebool
+        - /usr/bin/validatetrans
+        - /usr/share/licenses/libselinux-utils/**
+      license:
+        - /usr/share/licenses/libselinux-utils/**
+    dependencies:
+      run:
+        - libselinux = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            getenforce || true
+            selinuxenabled || true
+            test -x /usr/bin/matchpathcon
+            test -x /usr/bin/setenforce
+
+  - name: libselinux-devel
+    summary: Development files for libselinux
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/libselinux-devel/**
+      license:
+        - /usr/share/licenses/libselinux-devel/**
+    dependencies:
+      run:
+        - libselinux = ${package.version}-${package.release}
+        - libsepol-devel
+        - pcre2-devel
+        - filesystem
+
+  - name: libselinux-static
+    summary: Static library for libselinux
+    files:
+      include:
+        - "@static"
+        - /usr/share/licenses/libselinux-static/**
+      license:
+        - /usr/share/licenses/libselinux-static/**
+    dependencies:
+      run:
+        - libselinux-devel = ${package.version}-${package.release}
+        - filesystem
+
+  - name: libselinux-doc
+    summary: Documentation for libselinux
+    files:
+      include:
+        - "@man"
+        - "@doc"
+        - /usr/share/licenses/libselinux-doc/**
+      license:
+        - /usr/share/licenses/libselinux-doc/**
+    dependencies:
+      run:
+        - filesystem
