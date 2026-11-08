@@ -1,0 +1,163 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# bzip2 compression library and tools.
+schema: 1
+
+package:
+  name: bzip2
+  version: "1.0.8"
+  release: 1
+  summary: A file compression utility
+  description: |
+    bzip2 is a freely available, patent free, high-quality data compressor.
+    It typically compresses files to within 10% to 15% of the best available
+    techniques, while being around twice as fast at compression and six times
+    faster at decompression.
+  license: MPL-2.0 AND MIT
+  upstream: https://sourceware.org/bzip2/
+  cpe:
+    vendor: bzip2
+    product: bzip2
+
+sources:
+  - name: bzip2-1.0.8.tar.gz
+    kind: archive
+    digest: "sha512:083f5e675d73f3233c7930ebe20425a533feedeaaa9d8cc86831312a6581cefbe6ed0d08d2fa89be81082f2a5abdabca8b3c080bf97218a1bd59dc118a30b9f3"
+    locators:
+      - kind: https
+        url: https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, sed]
+    tests: [bash-binsh, coreutils, gcc, grep]
+  pipeline:
+    - runs: |
+        sed -i \
+          -e 's:\$(PREFIX)/man:\$(PREFIX)/share/man:g' \
+          -e 's:ln -s -f $(PREFIX)/bin/:ln -s :' \
+          Makefile
+        make -f Makefile-libbz2_so
+        make
+    - runs: |
+        make PREFIX="$STAGE/usr" install
+        install -Dm755 libbz2.so.1.0.8 "$STAGE"/usr/lib64/libbz2.so.1.0.8
+        ln -s libbz2.so.1.0.8 "$STAGE"/usr/lib64/libbz2.so.1
+        ln -s libbz2.so.1 "$STAGE"/usr/lib64/libbz2.so.1.0
+        ln -s libbz2.so.1 "$STAGE"/usr/lib64/libbz2.so
+        install -Dm755 bzip2-shared "$STAGE"/usr/bin/bzip2
+        ln -sf bzip2 "$STAGE"/usr/bin/bunzip2
+        ln -sf bzip2 "$STAGE"/usr/bin/bzcat
+    - uses: license/copy
+      with:
+        files: [LICENSE]
+        outputs: [bzip2, bzip2-libs, bzip2-devel, bzip2-static, bzip2-doc]
+    - uses: strip
+
+outputs:
+  - name: bzip2
+    summary: bzip2 compression tools
+    files:
+      include:
+        - /usr/bin/bzcat
+        - /usr/bin/bzip2
+        - /usr/bin/bzip2recover
+        - /usr/bin/bunzip2
+        - /usr/share/licenses/bzip2/**
+      license:
+        - /usr/share/licenses/bzip2/**
+    dependencies:
+      run:
+        - bzip2-libs = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            printf 'eternal bzip2 test\n' > /tmp/bzip2-test
+            bzip2 -k /tmp/bzip2-test
+            test -f /tmp/bzip2-test.bz2
+            rm /tmp/bzip2-test
+            bunzip2 /tmp/bzip2-test.bz2
+            test "$(cat /tmp/bzip2-test)" = "eternal bzip2 test"
+            bzip2 -c /tmp/bzip2-test | bzcat | grep -F 'eternal bzip2 test'
+
+  - name: bzip2-libs
+    summary: Libraries for applications using bzip2
+    files:
+      include:
+        - /usr/lib*/libbz2.so.*
+        - /usr/share/licenses/bzip2-libs/**
+      license:
+        - /usr/share/licenses/bzip2-libs/**
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libbz2.so.* /usr/lib/libbz2.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: bzip2-devel
+    summary: Development files for bzip2
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/bzip2-devel/**
+      license:
+        - /usr/share/licenses/bzip2-devel/**
+    dependencies:
+      run:
+        - bzip2-libs = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: link
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            printf '#include <bzlib.h>\nint main(void){return BZ_OK;}\n' > /tmp/bz.c
+            gcc /tmp/bz.c -lbz2 -o /tmp/bz
+            /tmp/bz
+
+  - name: bzip2-static
+    summary: Static bzip2 library
+    files:
+      include:
+        - /usr/lib*/libbz2.a
+        - /usr/share/licenses/bzip2-static/**
+      license:
+        - /usr/share/licenses/bzip2-static/**
+    dependencies:
+      run:
+        - bzip2-devel = ${package.version}-${package.release}
+        - filesystem
+
+  - name: bzip2-doc
+    summary: Documentation for bzip2
+    files:
+      include:
+        - "@man"
+        - "@doc"
+        - /usr/share/licenses/bzip2-doc/**
+      license:
+        - /usr/share/licenses/bzip2-doc/**
+    dependencies:
+      run:
+        - filesystem
