@@ -11,7 +11,7 @@ package.yaml + profile + sources
    rpmx build  ->  signed RPMs + SRPMs + SBOMs
         |
         v
-  repodata (GitHub Pages)  ->  dnf install --installroot  ->  OCI image (separate pipeline)
+  repodata (object storage) ->  dnf install --installroot  ->  OCI image (separate pipeline)
 ```
 
 ## Building blocks
@@ -23,7 +23,7 @@ package.yaml + profile + sources
 | Bootstrap ladder | `bootstrap/bootstrap.yaml` (stages, roots, seed mapping) |
 | Build roots | `profiles/bootstrap.profile.yaml` (toolchain) |
 | Distribution repositories | `profiles/eternal.profile.yaml` |
-| Package repository | GitHub Pages, `https://rsturla.github.io/eternal-os/` |
+| Package repository | S3-compatible object storage, `https://packages.eternal.sturla.tech/` |
 | Images | A separate image pipeline, outside `release.yml` |
 | CI/CD | `.github/workflows/` |
 
@@ -62,15 +62,23 @@ root can build the rolling package.
 
 ## Release channels
 
-The repository is laid out as `<releasever>/<basearch>`:
+The rolling repository is laid out as `<releasever>/<basearch>`, with a
+parallel archive at `archive/<basearch>`:
 
 ```text
-https://rsturla.github.io/eternal-os/rolling/x86_64/
+https://packages.eternal.sturla.tech/rolling/x86_64/
+https://packages.eternal.sturla.tech/archive/x86_64/
 ```
 
-Eternal is a rolling distribution, so there is one channel: `rolling`.
-`releasever` is literally `rolling`, and every push to `main` replaces the
-repository at that path. There is no stable/updates split yet.
+Eternal is a rolling distribution, so `releasever` is literally `rolling`.
+Every push to `main` replaces the `rolling` repository at that path. A second,
+disabled-by-default `archive` repository keeps every historical EVR so users can
+pin or downgrade without losing the package set that was current at the time:
+
+```console
+dnf --enablerepo=eternal-archive install foo-<version>
+dnf --enablerepo=eternal-archive downgrade foo
+```
 
 Packages that rebuild in a release run get `+build<Unix timestamp>` appended to
 their release, so a dnf client sees a newer NEVRA. One timestamp is computed
@@ -102,7 +110,7 @@ manifest lists are not part of `make` or of `release.yml`, so nothing here needs
 
 CI runs the same scripts a developer runs. `make check`, `make build` and
 `make repo` are the release interfaces; the workflows add only secret
-materialization, artifact transfer between jobs and GitHub Pages credentials.
+materialization, artifact transfer between jobs and object-storage credentials.
 
 `ci.yml` runs on pull requests and on demand:
 
@@ -121,7 +129,8 @@ materialization, artifact transfer between jobs and GitHub Pages credentials.
    Signing is applied when `RPMX_SIGNING_KEY` is set;
 2. the fan-in verifies that every package in the plan produced artifacts, then
    assembles and signs `repodata` in `site/`;
-3. deploys `site/` to GitHub Pages.
+3. uploads `rolling` and appends the new RPMs to `archive` in S3-compatible
+   object storage.
 
 Image composition is a separate pipeline. It consumes the published package
 repository; it is not a step in `release.yml`.
@@ -143,8 +152,9 @@ git diff  ->  affected.sh  ->  matrix JSON  ->  build-all.sh
 The hash covers the recipe bundle, profiles, build scripts, pinned rpmx and
 the transitive hashes of in-tree build dependencies. Two builds with the same
 hash are interchangeable. A missing cache is safe: it only causes a rebuild.
-There is no mutable "latest repository" state; the published repository is
-assembled from the artifacts of the current run.
+The `rolling` repository is the mutable latest view; `archive` is append-only
+and preserves historical EVRs. Each release is still reproducible from the
+artifacts and the `+build<timestamp>` release counter.
 
 GitHub's matrix job outputs merge cells into a map, but only for statically
 declared output names. With a dynamic package matrix, the plan and hashes are

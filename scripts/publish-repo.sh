@@ -6,6 +6,10 @@
 # gathered by architecture into a staging directory before repodata is written,
 # so a test or build never sees unrelated packages.
 #
+# The rolling repository is the enabled channel. An optional archive repository
+# holds every historical EVR and is disabled by default; DNF can enable it when
+# a user needs to pin or downgrade to an older release.
+#
 # Layout:
 #   OUTPUT/
 #     .nojekyll
@@ -13,29 +17,36 @@
 #     eternal.repo
 #     RPM-GPG-KEY-eternal        (when --public-key is given)
 #     RELEASE/<arch>/            RPMs + repodata
+#     RELEASE/SRPMS/             source RPMs + repodata
+#     ARCHIVE/<arch>/            historical RPMs + repodata (when requested)
+#     ARCHIVE/SRPMS/             historical source RPMs + repodata
 set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 rpmx=${RPMX:-rpmx}
 
 packages=
+archive_packages=
 output=site
 release=rolling
+archive_release=
 signing_key=
 public_key=
-base_url=https://rsturla.github.io/eternal-os
+base_url=https://packages.eternal.sturla.tech
 
 usage() {
   cat <<'EOF'
 usage: publish-repo.sh --packages DIR [options]
 
-  --packages DIR     Artifacts root produced by build-all.sh
-  --output DIR       Repository mirror to write (default: site)
-  --release VER      Release directory under the mirror (default: rolling)
-  --signing-key FILE Sign repodata with this OpenPGP secret key
-  --public-key FILE  Copy this public key to RPM-GPG-KEY-eternal
-  --base-url URL     Consumer-facing repository base URL
-  -h, --help         Show this help
+  --packages DIR           Current artifacts root produced by build-all.sh
+  --archive-packages DIR   Historical artifacts root; adds the archive repository
+  --output DIR             Repository mirror to write (default: site)
+  --release VER            Current release directory (default: rolling)
+  --archive-release VER    Historical release directory (default: archive)
+  --signing-key FILE       Sign repodata with this OpenPGP secret key
+  --public-key FILE        Copy this public key to RPM-GPG-KEY-eternal
+  --base-url URL           Consumer-facing repository base URL
+  -h, --help               Show this help
 EOF
 }
 
@@ -45,12 +56,20 @@ while (($# > 0)); do
       packages=${2:?--packages needs a directory}
       shift 2
       ;;
+    --archive-packages)
+      archive_packages=${2:?--archive-packages needs a directory}
+      shift 2
+      ;;
     --output)
       output=${2:?--output needs a directory}
       shift 2
       ;;
     --release)
       release=${2:?--release needs a version}
+      shift 2
+      ;;
+    --archive-release)
+      archive_release=${2:?--archive-release needs a version}
       shift 2
       ;;
     --signing-key)
@@ -85,64 +104,89 @@ done
   echo "artifacts directory not found: $packages" >&2
   exit 1
 }
-
-stage=$(mktemp -d)
-trap 'rm -rf "$stage"' EXIT
-mkdir -p "$output/$release"
-
-# Group every binary RPM by its parent directory's name (the architecture).
-# Depth 2 covers out/<arch>/*.rpm; depth 3 covers out/<package>/<arch>/*.rpm.
-# Source RPMs live one level deeper under src/; they are collected separately
-# below and published under <release>/SRPMS.
-declare -A seen
-found=0
-while IFS= read -r -d '' rpm; do
-  arch=$(basename "$(dirname "$rpm")")
-  [[ $arch == src ]] && continue
-  mkdir -p "$stage/$arch"
-  cp -f "$rpm" "$stage/$arch/"
-  seen[$arch]=1
-  found=$((found + 1))
-done < <(find "$packages" -mindepth 2 -maxdepth 3 -type f -name '*.rpm' -print0)
-
-if ((found == 0)); then
-  echo "no RPMs found under $packages" >&2
+if [[ -n $archive_release && -z $archive_packages ]]; then
+  echo "--archive-release needs --archive-packages" >&2
+  exit 2
+fi
+if [[ -n $archive_packages && -z $archive_release ]]; then
+  echo "--archive-packages needs --archive-release" >&2
+  exit 2
+fi
+if [[ -n $archive_packages && ! -d $archive_packages ]]; then
+  echo "archive artifacts directory not found: $archive_packages" >&2
   exit 1
 fi
 
-# Collect source RPMs separately. They are built under
-# out/<package>/<arch>/src/ and are architecture-independent, so the same
-# filename from two arches collapses to one copy in the source repository.
-source_stage="$stage/SRPMS"
-source_found=0
-while IFS= read -r -d '' rpm; do
-  mkdir -p "$source_stage"
-  cp -f "$rpm" "$source_stage/"
-  source_found=$((source_found + 1))
-done < <(find "$packages" -type f -name '*.src.rpm' -print0)
+stage_root=$(mktemp -d)
+trap 'rm -rf "$stage_root"' EXIT
+mkdir -p "$output"
 
-for arch in "${!seen[@]}"; do
-  dest="$output/$release/$arch"
-  rm -rf "$dest"
-  mkdir -p "$dest"
+assemble_repo() {
+  local packages_root=$1 repo_release=$2
+  local stage="$stage_root/$repo_release"
+  local source_stage="$stage/SRPMS"
+  local found=0 source_found=0
+  local rpm arch
+  local -A seen=()
+  local -a cmd
 
-  cmd=("$rpmx" repo --rpms "$stage/$arch" --output "$dest")
-  [[ -n $signing_key ]] && cmd+=(--signing-key "$signing_key")
-  echo "==> repo $arch -> ${dest#"$root"/}"
-  "${cmd[@]}"
-done
+  mkdir -p "$stage"
 
-if ((source_found > 0)); then
-  dest="$output/$release/SRPMS"
-  rm -rf "$dest"
-  mkdir -p "$dest"
-  cmd=("$rpmx" repo --rpms "$source_stage" --output "$dest")
-  [[ -n $signing_key ]] && cmd+=(--signing-key "$signing_key")
-  echo "==> repo SRPMS -> ${dest#"$root"/}"
-  "${cmd[@]}"
+  # Group every binary RPM by its parent directory's name (the architecture).
+  # Depth 2 covers out/<arch>/*.rpm; depth 3 covers out/<package>/<arch>/*.rpm.
+  # Source RPMs live one level deeper under src/; they are collected separately
+  # below and published under <release>/SRPMS.
+  while IFS= read -r -d '' rpm; do
+    arch=$(basename "$(dirname "$rpm")")
+    [[ $arch == src ]] && continue
+    mkdir -p "$stage/$arch"
+    cp -f "$rpm" "$stage/$arch/"
+    seen[$arch]=1
+    found=$((found + 1))
+  done < <(find "$packages_root" -mindepth 2 -maxdepth 3 -type f -name '*.rpm' ! -name '*.src.rpm' -print0)
+
+  if ((found == 0)); then
+    echo "no binary RPMs found under $packages_root" >&2
+    exit 1
+  fi
+
+  # Source RPMs are architecture-independent, so the same filename from two
+  # arches collapses to one copy in the source repository.
+  while IFS= read -r -d '' rpm; do
+    mkdir -p "$source_stage"
+    cp -f "$rpm" "$source_stage/"
+    source_found=$((source_found + 1))
+  done < <(find "$packages_root" -type f -name '*.src.rpm' -print0)
+
+  for arch in "${!seen[@]}"; do
+    local dest="$output/$repo_release/$arch"
+    rm -rf "$dest"
+    mkdir -p "$dest"
+
+    cmd=("$rpmx" repo --rpms "$stage/$arch" --output "$dest")
+    [[ -n $signing_key ]] && cmd+=(--signing-key "$signing_key")
+    echo "==> repo $repo_release/$arch -> ${dest#"$root"/}"
+    "${cmd[@]}"
+  done
+
+  if ((source_found > 0)); then
+    local dest="$output/$repo_release/SRPMS"
+    rm -rf "$dest"
+    mkdir -p "$dest"
+    cmd=("$rpmx" repo --rpms "$source_stage" --output "$dest")
+    [[ -n $signing_key ]] && cmd+=(--signing-key "$signing_key")
+    echo "==> repo $repo_release/SRPMS -> ${dest#"$root"/}"
+    "${cmd[@]}"
+  fi
+}
+
+assemble_repo "$packages" "$release"
+if [[ -n $archive_release ]]; then
+  assemble_repo "$archive_packages" "$archive_release"
 fi
 
-# GitHub Pages serves the tree as static files.
+# Keep the marker so a local mirror can also be served by GitHub Pages or any
+# other static host.
 touch "$output/.nojekyll"
 
 cat >"$output/index.html" <<'HTML'
@@ -165,15 +209,22 @@ cat >"$output/index.html" <<'HTML'
       <li><a href="eternal.repo">eternal.repo</a></li>
       <li><a href="RPM-GPG-KEY-eternal">RPM-GPG-KEY-eternal</a></li>
       <li><a href="__RELEASE__/SRPMS/">__RELEASE__/SRPMS</a></li>
+      <li><a href="__ARCHIVE__/SRPMS/">__ARCHIVE__/SRPMS</a></li>
     </ul>
   </body>
 </html>
 HTML
 
-if ((source_found == 0)); then
+if [[ ! -d "$output/$release/SRPMS/repodata" ]]; then
   sed -i '\|__RELEASE__/SRPMS|d' "$output/index.html"
 fi
+if [[ -z $archive_release || ! -d "$output/$archive_release/SRPMS/repodata" ]]; then
+  sed -i '\|__ARCHIVE__/SRPMS|d' "$output/index.html"
+fi
 sed -i "s|__RELEASE__|$release|g" "$output/index.html"
+if [[ -n $archive_release ]]; then
+  sed -i "s|__ARCHIVE__|$archive_release|g" "$output/index.html"
+fi
 
 gpgcheck=0
 if [[ -n $public_key ]]; then
@@ -192,7 +243,7 @@ metadata_expire=6h
 countme=0
 EOF
 
-if ((source_found > 0)); then
+if [[ -d "$output/$release/SRPMS/repodata" ]]; then
   cat >>"$output/eternal.repo" <<EOF
 
 [eternal-source]
@@ -204,6 +255,34 @@ gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-eternal
 metadata_expire=6h
 countme=0
 EOF
+fi
+
+if [[ -n $archive_release ]]; then
+  cat >>"$output/eternal.repo" <<EOF
+
+[eternal-archive]
+name=Eternal Linux \$releasever - \$basearch - Archive
+baseurl=${base_url}/${archive_release}/\$basearch
+enabled=0
+gpgcheck=${gpgcheck}
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-eternal
+metadata_expire=7d
+countme=0
+EOF
+
+  if [[ -d "$output/$archive_release/SRPMS/repodata" ]]; then
+    cat >>"$output/eternal.repo" <<EOF
+
+[eternal-archive-source]
+name=Eternal Linux \$releasever - Source - Archive
+baseurl=${base_url}/${archive_release}/SRPMS
+enabled=0
+gpgcheck=${gpgcheck}
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-eternal
+metadata_expire=7d
+countme=0
+EOF
+  fi
 fi
 
 echo "repository written to ${output#"$root"/}/$release"

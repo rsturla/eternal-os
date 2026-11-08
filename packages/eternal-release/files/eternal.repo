@@ -1,6 +1,6 @@
 [eternal]
 name=Eternal Linux $releasever - $basearch
-baseurl=https://rsturla.github.io/eternal-os/$releasever/$basearch
+baseurl=https://packages.eternal.sturla.tech/$releasever/$basearch
 enabled=1
 # Signing is wired up by docs/signing.md. Flip this to 1 once the eternal-keys
 # package ships /etc/pki/rpm-gpg/RPM-GPG-KEY-eternal and CI has a key.
@@ -10,9 +10,29 @@ countme=0
 
 [eternal-source]
 name=Eternal Linux $releasever - Source
-baseurl=https://rsturla.github.io/eternal-os/$releasever/SRPMS
+baseurl=https://packages.eternal.sturla.tech/$releasever/SRPMS
 enabled=0
 gpgcheck=0
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-eternal
 metadata_expire=6h
+countme=0
+
+[eternal-archive]
+# Historical EVRs, including older releases that are no longer in rolling.
+# Enable this repository when pinning or downgrading to an older package.
+name=Eternal Linux $releasever - $basearch - Archive
+baseurl=https://packages.eternal.sturla.tech/archive/$basearch
+enabled=0
+gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-eternal
+metadata_expire=7d
+countme=0
+
+[eternal-archive-source]
+name=Eternal Linux $releasever - Source - Archive
+baseurl=https://packages.eternal.sturla.tech/archive/SRPMS
+enabled=0
+gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-eternal
+metadata_expire=7d
 countme=0
