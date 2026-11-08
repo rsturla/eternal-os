@@ -1,9 +1,9 @@
 # The build root for the first self-hosted bootstrap stage.
 #
-# It still starts from Fedora 44 because Eternal does not own glibc, gcc or
-# binutils yet. The bootstrap manifest adds the stage 0 repository on top, so
-# packages built there (make and coreutils today) win over their Fedora
-# counterparts through a higher Eternal release.
+# It still starts from Fedora 44 for glibc and the seed compiler, but consumes
+# Eternal bash, binutils, coreutils and make from the published rolling
+# repository. The bootstrap manifest adds the stage 0 repository on top so
+# packages built there win over their Fedora counterparts.
 document: rpmx-profile
 version: 1
 name: bootstrap-stage1
@@ -55,41 +55,3 @@ options:
 paths:
   prefix: /usr
   libdir: /usr/lib64
-
-# Distribution policy that is not compiler hardening: optimisation, warnings,
-# unwind tables, and the target ISA baseline. The OpenSSF hardening controls
-# live in openssf-compiler-options. Its wrapper in /usr/local/bin applies the
-# matching GCC spec, so a recipe opts out with
-# GCC_SPEC_FILE=no-hardening.spec only when it cannot use the policy.
-flags:
-  cflags:
-    - -O2
-    - -g
-    - -pipe
-    - -Wall
-    - -Werror=format-security
-    - -fexceptions
-    - -fasynchronous-unwind-tables
-    - -grecord-gcc-switches
-  cxxflags:
-    - -O2
-    - -g
-    - -pipe
-    - -Wall
-    - -Werror=format-security
-    - -fexceptions
-    - -fasynchronous-unwind-tables
-    - -grecord-gcc-switches
-  arch:
-    x86_64:
-      cflags:
-        - -march=x86-64-v2
-        - -fcf-protection=full
-      cxxflags:
-        - -march=x86-64-v2
-        - -fcf-protection=full
-    aarch64:
-      cflags:
-        - -mbranch-protection=standard
-      cxxflags:
-        - -mbranch-protection=standard
