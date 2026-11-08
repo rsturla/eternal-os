@@ -29,10 +29,10 @@ repositories:
     # These package names are already produced by Eternal. Hiding the Fedora
     # copies is what makes the build root consume the published Eternal
     # repository instead of only using it for metadata.
-    exclude: [bash, bash-binsh, binutils, coreutils, coreutils-single, make]
+    exclude: [bash, bash-binsh, binutils, coreutils, coreutils-single, make, pkgconf, pkgconf-m4, pkgconf-pkg-config, libpkgconf]
   - id: updates
     metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch
-    exclude: [bash, bash-binsh, binutils, coreutils, coreutils-single, make]
+    exclude: [bash, bash-binsh, binutils, coreutils, coreutils-single, make, pkgconf, pkgconf-m4, pkgconf-pkg-config, libpkgconf]
   - id: eternal-toolchain
     baseurl: file://../.work/toolchain-repo
 packages:
@@ -52,7 +52,7 @@ packages:
     - grep
     - gawk
     - diffutils
-    - pkgconf-pkg-config
+    - pkgconf
 sbom: true
 options:
   weak_deps: false
