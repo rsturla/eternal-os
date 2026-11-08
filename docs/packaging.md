@@ -250,6 +250,9 @@ Use these rules:
 - Compiler runtime archives (`libgcc.a`, `libgcc_eh.a`, `libgcov.a`) stay in
   the compiler's main output. They are required for ordinary linking, not an
   optional static build.
+- Linker plugin archives under `/usr/lib*/bfd-plugins/` (`libdep.a`) stay in
+  the matching `-devel` output. They are loaded by the linker at build time;
+  they are not user-linkable static libraries.
 
 `@dev` and `@static` are disjoint. Static archives are selected only by
 `@static`, so a `-devel` output cannot accidentally claim a `-static` file.
