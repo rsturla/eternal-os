@@ -1,0 +1,169 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# PAM login and account management utilities. This is the provider of
+# useradd/groupadd/passwd and the /etc/login.defs defaults.
+schema: 1
+
+package:
+  name: shadow-utils
+  version: "4.20.3"
+  release: 1
+  summary: Utilities for managing user and group accounts
+  description: |
+    shadow-utils provides the standard tools for creating and maintaining
+    user and group accounts, passwords, shadow files and subordinate ID
+    ranges.
+  license: BSD-3-Clause
+  upstream: https://github.com/shadow-maint/shadow
+  cpe:
+    vendor: shadow_project
+    product: shadow
+
+sources:
+  - name: shadow-4.20.3.tar.gz
+    kind: archive
+    digest: "sha512:bac8358064019ae8dea4a66e739dc39d4d5dff245a3df979d526d183e0889854587534ad91b70cbd905fa30260930f903a1ecd4eb8380570c1d94b0b88780c66"
+    locators:
+      - kind: https
+        url: https://github.com/shadow-maint/shadow/archive/refs/tags/4.20.3.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+patches:
+  - file: patches/fix-nscd-flush-cache-signature.patch
+    strip: 1
+    reason: "fix the nscd_flush_cache stub signature when nscd support is disabled"
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, pkgconf, pkgconf-devel, autoconf, automake, gettext, gettext-devel, libtool]
+    host:
+      - audit-libs-devel
+      - libcap-devel
+      - libselinux-devel
+      - libsemanage-devel
+      - libxcrypt-devel
+      - libxslt
+      - docbook-style-xsl
+      - pam-devel
+    tests: [bash-binsh, coreutils, gcc, audit-libs, libcap, libselinux, libsemanage, libxcrypt, pam]
+  pipeline:
+    - runs: |
+        autoreconf -fi
+    - uses: autotools/configure
+      with:
+        args:
+          - --disable-static
+          - --disable-account-tools-setuid
+          - --disable-nls
+          - --disable-logind
+          - --enable-lastlog
+          - --enable-man
+          - --with-audit
+          - --with-libpam
+          - --with-selinux
+          - --with-yescrypt
+          - --without-fcaps
+          - --without-su
+          - --without-acl
+          - --without-attr
+          - --without-libbsd
+          - --without-tcb
+          - --without-nscd
+          - --without-group-name-max-length
+          - --bindir=/usr/bin
+          - --sbindir=/usr/bin
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        find "$STAGE" -name '*.la' -delete
+        # rpmx does not permit setuid/setgid payloads in packages.  Account
+        # tools are expected to rely on PAM and file capabilities instead.
+        find "$STAGE" -type f -perm /6000 -exec chmod 0755 {} +
+        # Fedora and Wolfi put login, su, chfn and chsh in util-linux.
+        for f in login sulogin chfn chsh; do
+          rm -f "$STAGE/usr/bin/$f"
+        done
+        rm -f "$STAGE"/usr/share/man/man1/{login,sulogin,chfn,chsh}.1*
+        rm -f "$STAGE"/etc/pam.d/{login,su,chfn,chsh}
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [shadow-utils, shadow-utils-devel, shadow-utils-doc]
+    - uses: strip
+
+outputs:
+  - name: shadow-utils
+    summary: Utilities for managing user and group accounts
+    files:
+      exclude:
+        - /usr/include/**
+        - /usr/lib*/libsubid.so
+      license:
+        - /usr/share/licenses/shadow-utils/**
+      config:
+        - /etc/login.defs
+        - /etc/default/useradd
+        - /etc/pam.d/chpasswd
+        - /etc/pam.d/newusers
+        - /etc/pam.d/passwd
+    dependencies:
+      run:
+        - audit-libs
+        - libcap
+        - libselinux
+        - libsemanage
+        - libxcrypt
+        - pam
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            useradd --help
+            groupadd --help
+            passwd --help
+            chage --help
+            test -n "$(useradd -D)"
+
+  - name: shadow-utils-devel
+    summary: Development files for shadow-utils
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/shadow-utils-devel/**
+      license:
+        - /usr/share/licenses/shadow-utils-devel/**
+    dependencies:
+      run:
+        - shadow-utils = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: link
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            printf '#include <shadow/subid.h>\nint main(void){return 0;}\n' > /tmp/subid.c
+            gcc /tmp/subid.c -lsubid -o /tmp/subid-test
+            /tmp/subid-test
+
+  - name: shadow-utils-doc
+    summary: Documentation for shadow-utils
+    files:
+      include:
+        - "@man"
+        - "@doc"
+        - /usr/share/licenses/shadow-utils-doc/**
+      license:
+        - /usr/share/licenses/shadow-utils-doc/**
+    dependencies:
+      run:
+        - filesystem
