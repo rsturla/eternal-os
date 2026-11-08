@@ -27,14 +27,26 @@ commit it.
 | --- | --- |
 | `RPMX_SIGNING_KEY` | ASCII-armored private key (`eternal-signing-key.asc`) |
 | `RPMX_PUBLIC_KEY` | ASCII-armored public key (`eternal-signing-key.asc.pub`) |
+| `PACKAGES_S3_ACCESS_KEY_ID` | S3-compatible access key ID (R2 access key) |
+| `PACKAGES_S3_SECRET_ACCESS_KEY` | S3-compatible secret access key |
 
 Add them under **Settings → Secrets and variables → Actions**. The release
 workflow:
 
 1. writes `RPMX_SIGNING_KEY` to a mode-0600 temporary file;
 2. passes it to `rpmx build --signing-key` and `rpmx repo --signing-key`;
-3. copies `RPMX_PUBLIC_KEY` to `site/RPM-GPG-KEY-eternal`;
-4. writes `gpgcheck=1` into the published `eternal.repo`.
+3. publishes `RPMX_PUBLIC_KEY` as `RPM-GPG-KEY-eternal`;
+4. writes `gpgcheck=1` into the published `eternal.repo`;
+5. uploads `rolling` and the append-only `archive` repository to the bucket.
+
+The bucket, endpoint and public URL are repository **variables**, not secrets:
+
+| Variable | Value |
+| --- | --- |
+| `PACKAGES_S3_BUCKET` | Bucket name, for example `eternal-packages` |
+| `PACKAGES_S3_ENDPOINT` | R2 endpoint, for example `https://<account>.r2.cloudflarestorage.com`; leave empty for AWS S3 |
+| `PACKAGES_S3_REGION` | `auto` for R2, or the AWS region |
+| `PACKAGES_BASE_URL` | Public repository base URL, for example `https://packages.eternal.sturla.tech` |
 
 CI keys must not have a passphrase. Keep the passphrase-protected copy for
 manual releases, or use `--signing-passphrase-env` locally.
@@ -50,6 +62,18 @@ Use the same scripts and flags as CI:
   --signing-key ~/eternal-signing-key.asc \
   --public-key ~/eternal-signing-key.asc.pub
 
+```
+
+To publish both channels locally, export `AWS_ACCESS_KEY_ID` and
+`AWS_SECRET_ACCESS_KEY` first (use `--endpoint-url` for R2):
+
+```console
+./scripts/publish-bucket.sh --packages out --output site \
+  --bucket eternal-packages \
+  --endpoint-url https://<account>.r2.cloudflarestorage.com \
+  --base-url https://packages.eternal.sturla.tech \
+  --signing-key ~/eternal-signing-key.asc \
+  --public-key ~/eternal-signing-key.asc.pub
 ```
 
 ## Turn on verification in the image

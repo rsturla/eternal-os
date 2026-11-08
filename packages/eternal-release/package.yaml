@@ -81,7 +81,9 @@ tests:
         grep -q '^PRETTY_NAME="Eternal Linux Rolling"$' os-release
         test -f system-release
         test -f redhat-release
-        grep -q 'baseurl=https://rsturla.github.io/eternal-os/' eternal.repo
+        grep -q 'baseurl=https://packages.eternal.sturla.tech/' eternal.repo
+        grep -q '^\[eternal-archive\]$' eternal.repo
+        grep -q 'baseurl=https://packages.eternal.sturla.tech/archive/' eternal.repo
 
   - name: installed
     stage: installed
