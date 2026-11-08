@@ -111,6 +111,8 @@ pipeline.
 
 `ci.yml` runs on pull requests and on demand:
 
+- check the commits against the conventions in
+  [`git-workflow.md`](git-workflow.md) (`scripts/check-commits.sh`);
 - lint every recipe with `rpmx lint` (`make check` also runs pre-commit);
 - `prepare` computes the affected package list and content hashes from the
   recipe graph (`scripts/affected.sh`, `scripts/package-graph.sh`);

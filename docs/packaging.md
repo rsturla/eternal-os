@@ -333,16 +333,16 @@ Eternal-specific policy does not.
 package:
   summary: The GNU Bourne Again SHell
   license: GPL-3.0-or-later
-  source-date-epoch: 1704067200
   upstream: https://www.gnu.org/software/bash/
   cpe:
     vendor: gnu
     product: bash
 ```
 
-- `source-date-epoch` is required for reproducible package metadata. Use the
-  upstream release date when it is meaningful; bootstrap recipes may carry a
-  fallback and let the ladder provide the effective value.
+- `source-date-epoch` is optional. rpmx derives it from the newest source
+  archive mtime or the pinned git commit time. Set the field only to override
+  that value. Packages with no upstream source use the repository fallback in
+  `rpmx-defaults.yaml`; a bootstrap stage may override the effective value.
 - `cpe` identifies the **upstream** project, not Eternal. Use `gnu:make`, never
   `eternal:make`.
 - Do not put maintainers in every recipe. They live in `rpmx-defaults.yaml`.
@@ -570,10 +570,13 @@ bootstrap variant; the production recipe stays.
 - [ ] Every user-facing output has a test, or the package-level test covers it.
       Doc, locale and metapackage outputs are exempt.
 - [ ] Build dependencies are package names; test-only packages are on tests.
-- [ ] `source-date-epoch` is set; `cpe` names the upstream project.
+- [ ] `source-date-epoch` is explicit, derivable from the source, or covered
+      by the repository fallback; `cpe` names the upstream project.
 - [ ] The source is the upstream release artifact, or a pinned git commit with
       a documented reason.
 - [ ] No maintainers, local paths, secrets or bootstrap stage logic.
+- [ ] The commit changes this package only, and its `scope:` names it; see
+      [`git-workflow.md`](git-workflow.md).
 - [ ] `rpmx lint` is clean.
 - [ ] No tracked `package.lock.json` is added while the bootstrap root floats.
 - [ ] The package builds on both x86_64 and aarch64 in CI.
