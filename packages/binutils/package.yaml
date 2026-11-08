@@ -116,6 +116,9 @@ outputs:
       license:
         - /usr/share/licenses/binutils-devel/COPYING3
         - /usr/share/licenses/binutils-devel/COPYING3.LIB
+    lint:
+      allow:
+        - static-archive
     dependencies:
       run:
         - binutils = ${package.version}-${package.release}
