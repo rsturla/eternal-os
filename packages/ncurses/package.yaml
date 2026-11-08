@@ -1,0 +1,296 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# Terminal display library and terminfo tools. Bash links against libtinfo and
+# the base image needs a terminfo database for tput/infocmp.
+schema: 1
+
+package:
+  name: ncurses
+  version: "6.6"
+  release: 1
+  summary: Console display library and terminal database
+  description: |
+    ncurses provides the terminal-independent screen handling library, the
+    wide-character variant, the terminfo database and the standard terminal
+    utilities such as tic, infocmp and tput.
+  license: MIT
+  upstream: https://invisible-island.net/ncurses/
+  cpe:
+    vendor: ncurses
+    product: ncurses
+
+sources:
+  - name: ncurses-6.6.tar.gz
+    kind: archive
+    digest: "sha512:02647baae53abc844fbadee5b0a2187ad073125c4e8950df6d1c4feb781cb74ba64fb838cedfee2c246c39932187f6775b1df124f18b99a4233f0d98c72191de"
+    locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/ncurses/ncurses-6.6.tar.gz
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/ncurses/ncurses-6.6.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, pkgconf]
+    tests: [bash-binsh, coreutils]
+  pipeline:
+    - runs: |
+        mkdir -p build-narrow build-wide
+    - uses: autotools/configure
+      with:
+        dir: build-narrow
+        configure: ../configure
+        args:
+          - --disable-widec
+          - --with-progs
+          - --without-ada
+          - --without-cxx-binding
+          - --without-normal
+          - --without-debug
+          - --disable-termcap
+          - --disable-rpath-hack
+          - --disable-stripping
+          - --with-shared
+          - --with-termlib=tinfo
+          - --with-pkg-config-libdir=/usr/lib64/pkgconfig
+          - --with-terminfo-dirs=/etc/terminfo:/usr/share/terminfo:/lib/terminfo:/usr/lib/terminfo
+          - --enable-pc-files
+    - uses: make/build
+      with:
+        dir: build-narrow
+    - uses: make/install
+      with:
+        dir: build-narrow
+    - uses: autotools/configure
+      with:
+        dir: build-wide
+        configure: ../configure
+        args:
+          - --enable-widec
+          - --with-ticlib=tic
+          - --without-ada
+          - --without-cxx-binding
+          - --without-normal
+          - --without-debug
+          - --disable-termcap
+          - --disable-rpath-hack
+          - --disable-stripping
+          - --with-shared
+          - --with-termlib=tinfo
+          - --with-pkg-config-libdir=/usr/lib64/pkgconfig
+          - --with-terminfo-dirs=/etc/terminfo:/usr/share/terminfo:/lib/terminfo:/usr/lib/terminfo
+          - --enable-pc-files
+    - uses: make/build
+      with:
+        dir: build-wide
+    - uses: make/install
+      with:
+        dir: build-wide
+    - runs: |
+        ln -sf libncursesw.so "$STAGE/usr/lib64/libcursesw.so"
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [ncurses, ncurses-base, ncurses-term, ncurses-libs, ncurses-devel, ncurses-doc]
+    - uses: strip
+
+outputs:
+  - name: ncurses
+    summary: Terminal handling utilities
+    files:
+      exclude:
+        - /usr/share/terminfo/**
+      license:
+        - /usr/share/licenses/ncurses/**
+    dependencies:
+      run:
+        - ncurses-base = ${package.version}-${package.release}
+        - ncurses-libs = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            tput --version
+            infocmp --version
+            tic --version
+            TERM=xterm tput cols
+
+
+  - name: ncurses-base
+    summary: Descriptions of common terminals
+    files:
+      include:
+        - /usr/share/terminfo/E/Eterm*
+        - /usr/share/terminfo/a/alacritty
+        - /usr/share/terminfo/a/ansi
+        - /usr/share/terminfo/a/aterm
+        - /usr/share/terminfo/b/bterm
+        - /usr/share/terminfo/c/cons25
+        - /usr/share/terminfo/c/cygwin
+        - /usr/share/terminfo/d/dumb
+        - /usr/share/terminfo/e/eterm*
+        - /usr/share/terminfo/f/foot*
+        - /usr/share/terminfo/g/gnome*
+        - /usr/share/terminfo/h/hurd
+        - /usr/share/terminfo/j/jfbterm
+        - /usr/share/terminfo/k/kitty
+        - /usr/share/terminfo/k/konsole*
+        - /usr/share/terminfo/l/linux
+        - /usr/share/terminfo/m/mach*
+        - /usr/share/terminfo/m/mlterm
+        - /usr/share/terminfo/m/mrxvt
+        - /usr/share/terminfo/n/nsterm
+        - /usr/share/terminfo/p/pcansi
+        - /usr/share/terminfo/p/putty*
+        - /usr/share/terminfo/r/rxvt*
+        - /usr/share/terminfo/s/screen*
+        - /usr/share/terminfo/s/st*
+        - /usr/share/terminfo/s/sun
+        - /usr/share/terminfo/t/teraterm*
+        - /usr/share/terminfo/t/tmux*
+        - /usr/share/terminfo/v/vt100*
+        - /usr/share/terminfo/v/vt102
+        - /usr/share/terminfo/v/vt220
+        - /usr/share/terminfo/v/vt52
+        - /usr/share/terminfo/v/vte*
+        - /usr/share/terminfo/v/vwmterm
+        - /usr/share/terminfo/w/wsvt25*
+        - /usr/share/terminfo/x/xfce
+        - /usr/share/terminfo/x/xterm*
+        - /usr/share/licenses/ncurses-base/**
+      license:
+        - /usr/share/licenses/ncurses-base/**
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            test -f /usr/share/terminfo/x/xterm
+            test -f /usr/share/terminfo/l/linux
+
+  - name: ncurses-term
+    summary: Additional terminal descriptions
+    files:
+      include:
+        - /usr/share/terminfo/**
+        - /usr/share/licenses/ncurses-term/**
+      exclude:
+        - /usr/share/terminfo/E/Eterm*
+        - /usr/share/terminfo/a/alacritty
+        - /usr/share/terminfo/a/ansi
+        - /usr/share/terminfo/a/aterm
+        - /usr/share/terminfo/b/bterm
+        - /usr/share/terminfo/c/cons25
+        - /usr/share/terminfo/c/cygwin
+        - /usr/share/terminfo/d/dumb
+        - /usr/share/terminfo/e/eterm*
+        - /usr/share/terminfo/f/foot*
+        - /usr/share/terminfo/g/gnome*
+        - /usr/share/terminfo/h/hurd
+        - /usr/share/terminfo/j/jfbterm
+        - /usr/share/terminfo/k/kitty
+        - /usr/share/terminfo/k/konsole*
+        - /usr/share/terminfo/l/linux
+        - /usr/share/terminfo/m/mach*
+        - /usr/share/terminfo/m/mlterm
+        - /usr/share/terminfo/m/mrxvt
+        - /usr/share/terminfo/n/nsterm
+        - /usr/share/terminfo/p/pcansi
+        - /usr/share/terminfo/p/putty*
+        - /usr/share/terminfo/r/rxvt*
+        - /usr/share/terminfo/s/screen*
+        - /usr/share/terminfo/s/st*
+        - /usr/share/terminfo/s/sun
+        - /usr/share/terminfo/t/teraterm*
+        - /usr/share/terminfo/t/tmux*
+        - /usr/share/terminfo/v/vt100*
+        - /usr/share/terminfo/v/vt102
+        - /usr/share/terminfo/v/vt220
+        - /usr/share/terminfo/v/vt52
+        - /usr/share/terminfo/v/vte*
+        - /usr/share/terminfo/v/vwmterm
+        - /usr/share/terminfo/w/wsvt25*
+        - /usr/share/terminfo/x/xfce
+        - /usr/share/terminfo/x/xterm*
+      license:
+        - /usr/share/licenses/ncurses-term/**
+    dependencies:
+      run:
+        - ncurses-base = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            test -f /usr/share/terminfo/a/ansi80x25
+
+  - name: ncurses-libs
+    summary: Terminal handling runtime libraries
+    files:
+      include:
+        - /usr/lib*/libncurses.so.*
+        - /usr/lib*/libncursesw.so.*
+        - /usr/lib*/libtinfo.so.*
+        - /usr/lib*/libtinfow.so.*
+        - /usr/share/licenses/ncurses-libs/**
+      license:
+        - /usr/share/licenses/ncurses-libs/**
+    dependencies:
+      run:
+        - ncurses-base = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libncurses.so.* /usr/lib/libncurses.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: ncurses-devel
+    summary: Development files for ncurses
+    files:
+      include:
+        - "@dev"
+        - /usr/bin/ncurses*-config
+        - /usr/share/licenses/ncurses-devel/**
+      license:
+        - /usr/share/licenses/ncurses-devel/**
+    dependencies:
+      run:
+        - ncurses-libs = ${package.version}-${package.release}
+        - filesystem
+
+  - name: ncurses-doc
+    summary: Documentation for ncurses
+    files:
+      include:
+        - "@man"
+        - "@doc"
+        - /usr/share/licenses/ncurses-doc/**
+      license:
+        - /usr/share/licenses/ncurses-doc/**
+    dependencies:
+      run:
+        - filesystem
