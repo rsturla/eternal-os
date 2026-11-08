@@ -1,0 +1,111 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# Integer set library for the polyhedral model. A build dependency for the GNU toolchain and the
+# rest of the minimal Eternal userland.
+schema: 1
+
+package:
+  name: isl
+  version: "0.28"
+  release: 1
+  summary: Integer set library for the polyhedral model
+  description: |
+    isl is a library for manipulating sets and relations of integer points bounded by linear constraints.
+  license: MIT
+  upstream: https://libisl.sourceforge.net/
+  cpe:
+    vendor: isl_project
+    product: isl
+
+sources:
+  - name: isl-0.28.tar.xz
+    kind: archive
+    digest: "sha512:fa43fe01d62b5a0c4962ec07b06b51143c5781b615de58d76e00e829a8cb35201130db5b1d467773be49e9ecf8f87a8641646c32a852ac6ce53f5add76e4d11a"
+    locators:
+      - kind: https
+        url: https://libisl.sourceforge.net/isl-0.28.tar.xz
+      - kind: https
+        url: https://downloads.sourceforge.net/project/libisl/isl-0.28.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, gawk]
+    host: [gmp-devel]
+    tests: [bash-binsh, gmp-devel]
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          - --enable-shared
+          - --disable-static
+          - --without-gcc-arch
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+    - uses: license/copy
+      with:
+        files: [LICENSE]
+        outputs: [isl, isl-devel]
+    - uses: strip
+
+outputs:
+  - name: isl
+    summary: Integer set library for the polyhedral model
+    files:
+      license:
+        - /usr/share/licenses/isl/LICENSE
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libisl.so.* /usr/lib/libisl.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: isl-devel
+    summary: ISL development files
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/isl-devel/LICENSE
+      license:
+        - /usr/share/licenses/isl-devel/LICENSE
+    dependencies:
+      run:
+        - isl = ${package.version}-${package.release}
+        - gmp-devel
+        - filesystem
+
+tests:
+  - name: link
+    stage: installed
+    environment:
+      contents:
+        packages: [gcc, glibc-devel]
+    argv:
+      - sh
+      - -c
+      - |
+        cat > /tmp/test.c <<'EOF'
+        #include <isl/ctx.h>
+        int main(void) {
+          isl_ctx *context = isl_ctx_alloc();
+          if (context == 0) {
+            return 1;
+          }
+          isl_ctx_free(context);
+          return 0;
+        }
+        EOF
+        gcc /tmp/test.c -lisl -o /tmp/test
+        /tmp/test
