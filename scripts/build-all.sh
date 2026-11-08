@@ -137,7 +137,8 @@ ensure_toolchain_repo() {
   ((no_tests)) && args+=(--no-tests)
   "${args[@]}"
 
-  find "$toolchain_out" -type f -name '*.rpm' -exec cp -t "$toolchain_rpms" {} +
+  find "$toolchain_out" -type f -name '*.rpm' ! -name '*.src.rpm' \
+    -exec cp -t "$toolchain_rpms" {} +
   "$rpmx" repo --rpms "$toolchain_rpms" --output "$toolchain_repo"
   printf '%s\n' "$hash" >"$stamp"
 }
