@@ -1,0 +1,129 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# Multiple-precision C library. A build dependency for the GNU toolchain and the
+# rest of the minimal Eternal userland.
+schema: 1
+
+package:
+  name: mpc
+  version: "1.4.1"
+  release: 1
+  summary: Multiple-precision C library
+  description: |
+    GNU MPC is a C library for the arithmetic of complex numbers with arbitrarily high precision and correct rounding of the result.
+  license: LGPL-3.0-or-later
+  upstream: https://www.multiprecision.org/mpc/
+  cpe:
+    vendor: mpc
+    product: mpc
+
+sources:
+  - name: mpc-1.4.1.tar.xz
+    kind: archive
+    digest: "sha512:cdfbe64e80e30df64dbd536e8104a6bb10471582415d5b45a1dd30eb2a312781b38389a9531243413c14e0f88866a35159b20e77900718f28c1030253a1305b9"
+    locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/mpc/mpc-1.4.1.tar.xz
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/mpc/mpc-1.4.1.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, m4]
+    host: [gmp-devel, mpfr-devel]
+    tests: [bash-binsh, gmp-devel, mpfr-devel]
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          - --enable-shared
+          - --disable-static
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+    - uses: license/copy
+      with:
+        files: [COPYING.LESSER]
+        outputs: [mpc, mpc-devel, mpc-doc]
+    - uses: strip
+
+outputs:
+  - name: mpc
+    summary: Multiple-precision C library
+    files:
+      license:
+        - /usr/share/licenses/mpc/COPYING.LESSER
+    dependencies:
+      provides:
+        - libmpc = ${package.version}-${package.release}
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libmpc.so.* /usr/lib/libmpc.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: mpc-devel
+    summary: MPC development files
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/mpc-devel/COPYING.LESSER
+      license:
+        - /usr/share/licenses/mpc-devel/COPYING.LESSER
+    dependencies:
+      run:
+        - mpc = ${package.version}-${package.release}
+        - gmp-devel
+        - mpfr-devel
+        - filesystem
+      provides:
+        - libmpc-devel = ${package.version}-${package.release}
+
+  - name: mpc-doc
+    summary: MPC documentation
+    files:
+      include:
+        - "@doc"
+        - "@man"
+        - "@info"
+        - /usr/share/licenses/mpc-doc/COPYING.LESSER
+      license:
+        - /usr/share/licenses/mpc-doc/COPYING.LESSER
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: link
+    stage: installed
+    environment:
+      contents:
+        packages: [gcc, glibc-devel]
+    argv:
+      - sh
+      - -c
+      - |
+        cat > /tmp/test.c <<'EOF'
+        #include <mpc.h>
+        int main(void) {
+          mpc_t value;
+          mpc_init2(value, 64);
+          mpc_set_ui_ui(value, 1, 2, MPC_RNDNN);
+          mpc_clear(value);
+          return 0;
+        }
+        EOF
+        gcc /tmp/test.c -lmpc -lmpfr -lgmp -o /tmp/test
+        /tmp/test
