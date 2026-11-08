@@ -104,6 +104,30 @@ build:
         # ld.so.cache is host state, not package payload.
         rm -f "$STAGE/etc/ld.so.cache"
 
+    - runs: |
+        # Pin the development linker inputs to this glibc stream. The runtime
+        # owns the real SONAMEs; the -devel output gets copies so a build
+        # against 2.44 headers keeps using 2.44 symbols even when a newer
+        # glibc runtime is installed.
+        libdir="$STAGE$LIBDIR"
+        ver=2.44
+
+        for so in "$libdir"/*.so; do
+          [ -L "$so" ] || continue
+          case "$so" in
+            */libc.so | */libm.so | */libmemusage.so) continue ;;
+          esac
+          target=$(readlink "$so")
+          rm -f "$so"
+          cp -p "$libdir/$target" "$so"
+        done
+
+        cp -p "$libdir/libc.so.6" "$libdir/libc.so-$ver"
+        cp -p "$libdir/libm.so.6" "$libdir/libm.so-$ver"
+        sed -i "s|$LIBDIR/libc\.so\.6|$LIBDIR/libc.so-$ver|g" "$libdir/libc.so"
+        sed -i "s|$LIBDIR/libm\.so\.6|$LIBDIR/libm.so-$ver|g" "$libdir/libm.so"
+        sed -i "s|$LIBDIR/libmvec\.so\.1|$LIBDIR/libmvec.so|g" "$libdir/libm.so"
+
     - uses: license/copy
       with:
         files: [COPYINGv2, COPYING.LIB]
@@ -234,6 +258,14 @@ outputs:
       include:
         - "@dev"
         - /usr/lib*/*.o
+        - /usr/lib*/libc.so-*
+        - /usr/lib*/libm.so-*
+        - /usr/lib*/libc_nonshared.a
+        - /usr/lib*/libanl.a
+        - /usr/lib*/libdl.a
+        - /usr/lib*/libpthread.a
+        - /usr/lib*/librt.a
+        - /usr/lib*/libutil.a
         - /usr/share/licenses/glibc-2.44-devel/**
       exclude:
         - /usr/lib*/libmemusage.so
@@ -243,12 +275,88 @@ outputs:
     lint:
       allow:
         - static-archive
+    generators:
+      # The pinned copies have the runtime SONAMEs. They are linker inputs,
+      # not runtime providers; the runtime package owns those provides.
+      elf: false
     dependencies:
       run:
         - filesystem
-        - glibc-2.44 = ${package.version}-${package.release}
+        - glibc >= ${package.version}
       provides:
         - glibc-devel = ${package.version}-${package.release}
+    tests:
+      - name: installed
+        stage: installed
+        environment:
+          contents:
+            packages:
+              - binutils
+              - gcc
+              - grep
+        argv:
+          - sh
+          - -c
+          - |
+            libdir=/usr/lib64
+            [ -d "$libdir" ] || libdir=/usr/lib
+            test -f "$libdir/libc.so-2.44"
+            test -f "$libdir/libm.so-2.44"
+            test ! -L "$libdir/libc.so-2.44"
+            test ! -L "$libdir/libm.so-2.44"
+            case "$(cat "$libdir/libc.so")" in
+              *"$libdir/libc.so-2.44"*) ;;
+              *) echo "libc.so is not pinned"; exit 1 ;;
+            esac
+            case "$(cat "$libdir/libm.so")" in
+              *"$libdir/libm.so-2.44"*) ;;
+              *) echo "libm.so is not pinned"; exit 1 ;;
+            esac
+            test -f "$libdir/libc_nonshared.a"
+            test -f "$libdir/libpthread.a"
+            for so in libanl.so libBrokenLocale.so libc_malloc_debug.so \
+                      libmvec.so libnss_compat.so libnss_db.so libnss_hesiod.so \
+                      libresolv.so libthread_db.so; do
+              [ -e "$libdir/$so" ] || continue
+              test -f "$libdir/$so" || { echo "$libdir/$so is not a regular file"; exit 1; }
+              test ! -L "$libdir/$so" || { echo "$libdir/$so is still a symlink"; exit 1; }
+            done
+            cat >/tmp/glibc-devel-test.c <<'EOF'
+            #define _GNU_SOURCE
+            #include <gnu/libc-version.h>
+            #include <math.h>
+            #include <pthread.h>
+            #include <stdio.h>
+            #include <string.h>
+
+            static void *worker(void *arg) {
+              (void)arg;
+              return NULL;
+            }
+
+            int main(void) {
+              pthread_t thread;
+              if (pthread_create(&thread, NULL, worker, NULL) != 0) return 1;
+              pthread_join(thread, NULL);
+
+              char buf[8];
+              if (strlcpy(buf, "abc", sizeof buf) != 3) return 1;
+              if (strcmp(buf, "abc") != 0) return 1;
+
+              double x = log(exp(2.0));
+              if (fabs(x - 2.0) > 1e-9) return 1;
+
+              printf("%s\n", gnu_get_libc_version());
+              return 0;
+            }
+            EOF
+            gcc -O2 -Wall -Wextra -Werror -fstack-protector-all -pthread \
+              -o /tmp/glibc-devel-test /tmp/glibc-devel-test.c -lm
+            /tmp/glibc-devel-test
+            if readelf -d /tmp/glibc-devel-test |
+                grep -q '\.so-'; then
+              echo "test binary links a pinned library soname"; exit 1
+            fi
 
   - name: glibc-2.44-static
     summary: GNU C Library static libraries
@@ -256,6 +364,13 @@ outputs:
       include:
         - "@static"
         - /usr/share/licenses/glibc-2.44-static/**
+      exclude:
+        - /usr/lib*/libc_nonshared.a
+        - /usr/lib*/libanl.a
+        - /usr/lib*/libdl.a
+        - /usr/lib*/libpthread.a
+        - /usr/lib*/librt.a
+        - /usr/lib*/libutil.a
       license:
         - /usr/share/licenses/glibc-2.44-static/COPYINGv2
         - /usr/share/licenses/glibc-2.44-static/COPYING.LIB
