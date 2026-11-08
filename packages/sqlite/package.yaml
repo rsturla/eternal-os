@@ -1,0 +1,145 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# SQLite embedded database engine.
+schema: 1
+
+package:
+  name: sqlite
+  version: "3.54.1"
+  release: 1
+  summary: Library that implements an embeddable SQL database engine
+  description: |
+    SQLite is a C library that implements an embeddable SQL database engine.
+    Programs that link with the SQLite library can have SQL database access
+    without running a separate RDBMS process.
+  license: blessing
+  upstream: https://www.sqlite.org/
+  cpe:
+    vendor: sqlite
+    product: sqlite
+
+sources:
+  - name: sqlite-autoconf-3540100.tar.gz
+    kind: archive
+    digest: "sha512:3df4348f54f5cd0554eec6d91e1d08a70535b7b78f497b2c6f24910b5087f6ef70483c9e35fa388bd8f38483cb8d1cb84e98ccdd58b9f525a10e0cf48c8c6742"
+    locators:
+      - kind: https
+        url: https://www.sqlite.org/2026/sqlite-autoconf-3540100.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, pkgconf]
+    tests: [bash-binsh, coreutils, gcc, pkgconf, grep]
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          - --disable-static
+          - --enable-shared
+          - --enable-threadsafe
+          - --enable-load-extension
+          - --enable-fts3
+          - --enable-fts4
+          - --enable-fts5
+          - --enable-rtree
+          - --enable-session
+          - --soname=legacy
+    - uses: autotools/build
+    - uses: autotools/install
+    - uses: license/copy
+      with:
+        files: [README.txt]
+        outputs: [sqlite, sqlite-libs, sqlite-devel, sqlite-doc]
+    - uses: strip
+
+outputs:
+  - name: sqlite
+    summary: SQLite command line shell
+    files:
+      include:
+        - /usr/bin/sqlite3
+        - /usr/share/licenses/sqlite/**
+      license:
+        - /usr/share/licenses/sqlite/**
+    dependencies:
+      run:
+        - sqlite-libs = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            sqlite3 /tmp/sqlite-test.db 'create table t(v text); insert into t values (char(111,107)); select v from t;' | grep -Fx ok
+
+  - name: sqlite-libs
+    summary: Shared libraries for SQLite
+    files:
+      include:
+        - /usr/lib*/libsqlite3.so.*
+        - /usr/share/licenses/sqlite-libs/**
+      license:
+        - /usr/share/licenses/sqlite-libs/**
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libsqlite3.so.* /usr/lib/libsqlite3.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: sqlite-devel
+    summary: Development files for SQLite
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/sqlite-devel/**
+      license:
+        - /usr/share/licenses/sqlite-devel/**
+    dependencies:
+      run:
+        - sqlite-libs = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: link
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            cat > /tmp/sqlite-test.c <<'EOF'
+            #include <sqlite3.h>
+            int main(void) {
+                sqlite3 *db = 0;
+                return sqlite3_open(":memory:", &db) == SQLITE_OK ? 0 : 1;
+            }
+            EOF
+            gcc /tmp/sqlite-test.c $(pkg-config --cflags --libs sqlite3) -o /tmp/sqlite-test
+            /tmp/sqlite-test
+
+  - name: sqlite-doc
+    summary: Documentation for SQLite
+    files:
+      include:
+        - "@man"
+        - "@doc"
+        - /usr/share/licenses/sqlite-doc/**
+      license:
+        - /usr/share/licenses/sqlite-doc/**
+    dependencies:
+      run:
+        - filesystem
