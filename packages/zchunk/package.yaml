@@ -35,7 +35,7 @@ build:
   dependencies:
     tools: [meson, ninja, gcc, bash, coreutils, pkgconf]
     host: [openssl-devel, libzstd-devel]
-    tests: [bash-binsh, coreutils, gcc, pkgconf, grep, openssl-libs, openssl-devel, libzstd, libzstd-devel]
+    tests: [bash-binsh, coreutils, gcc, pkgconf, grep]
   pipeline:
     - uses: meson/setup
       with:

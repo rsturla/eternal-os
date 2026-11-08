@@ -35,7 +35,7 @@ build:
   dependencies:
     tools: [gcc, make, bash, coreutils, pkgconf]
     host: [zlib-devel]
-    tests: [bash-binsh, coreutils, gcc, pkgconf, grep, xz-libs, zlib, zlib-devel]
+    tests: [bash-binsh, coreutils, gcc, pkgconf, grep]
   pipeline:
     - uses: autotools/configure
       with:

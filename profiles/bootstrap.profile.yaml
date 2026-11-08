@@ -23,7 +23,7 @@ repositories:
     # Only the userland packages that have completed the self-hosting switch
     # are consumed from here. Keep the seed compiler and C library out until
     # their exact-release dependencies are stable.
-    exclude: [filesystem, basesystem, eternal-release, eternal-base, eternal-baselayout, glibc-*, gcc-*, ld-linux-*, libc-bin-*, libstdc++-*, libatomic-*, nss-db-*]
+    exclude: [filesystem, basesystem, eternal-release, eternal-base, eternal-baselayout, glibc-*, gcc-*, ld-linux-*, libc-bin-*, libstdc++-*, libatomic-*, nss-db-*, expat*, zstd*]
   - id: fedora
     metalink: https://mirrors.fedoraproject.org/metalink?repo=fedora-$releasever&arch=$basearch
     # These package names are already produced by Eternal. Hiding the Fedora
