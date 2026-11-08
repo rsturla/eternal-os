@@ -34,7 +34,7 @@ build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
   dependencies:
-    tools: [gcc, make, bash, coreutils, pkgconf-pkg-config]
+    tools: [gcc, make, bash, coreutils, pkgconf]
     host: [pcre2-devel]
     tests: [bash-binsh, coreutils]
   pipeline:
