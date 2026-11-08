@@ -1,0 +1,278 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# GCC 15, one of the supported side-by-side compiler streams. The version
+# is part of the package name so streams can be installed alongside each
+# other. `gcc-15-default` provides the unversioned `gcc` capability and the
+# stable command names; only one default package can own those links.
+#
+# The compiler is built without bootstrap (the seed compiler is the build
+# compiler) and without Fortran for the first import. The runtime libraries are
+# split the same way Wolfi splits them: libstdc++, libatomic and the compiler
+# proper are independent outputs.
+schema: 1
+
+package:
+  name: gcc-15
+  version: "15.3.0"
+  release: 1
+  summary: The GNU Compiler Collection, version 15
+  description: |
+    GCC 15 provides the C and C++ compilers, the GNU runtime libraries and the
+    compiler support files used to build Eternal Linux.
+  license: GPL-3.0-or-later WITH GCC-exception-3.1
+  upstream: https://gcc.gnu.org/
+  cpe:
+    vendor: gnu
+    product: gcc
+
+sources:
+  - name: gcc-15.3.0.tar.xz
+    kind: archive
+    digest: "sha512:0de9e296153b52c021b1c7e63c9c62151d7a0ac03f23ce6e9f772c1b0eb783f6acdd81cc4567bfe4128a6f64968c2cfc8eff40b36229cba7425349f7d637c654"
+    locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/gcc/gcc-15.3.0/gcc-15.3.0.tar.xz
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/gcc/gcc-15.3.0/gcc-15.3.0.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools:
+      - gcc
+      - gcc-c++
+      - make
+      - bash
+      - coreutils
+      - bison
+      - flex
+      - gawk
+      - sed
+      - grep
+      - diffutils
+      - findutils
+      - gettext
+      - python3
+      - texinfo
+      - patch
+      - tar
+      - gzip
+    host:
+      - gmp-devel
+      - mpfr-devel
+      - libmpc-devel
+      - isl-devel
+      - zlib-ng-compat-devel
+      - kernel-headers
+      - glibc-devel
+  pipeline:
+    - runs: |
+        mkdir build
+    - uses: autotools/configure
+      with:
+        dir: build
+        configure: ../configure
+        args:
+          - --program-suffix=-15
+          - '--with-pkgversion="Eternal gcc-15-1"'
+          - --with-glibc-version=2.44
+          - --with-sysroot=/
+          - --enable-languages=c,c++
+          - --disable-bootstrap
+          - --disable-nls
+          - --disable-werror
+          - --disable-multilib
+          - --disable-libsanitizer
+          - --disable-libquadmath
+          - --enable-shared
+          - --enable-threads=posix
+          - --enable-tls
+          - --enable-default-pie
+          - --enable-default-ssp
+          - --enable-initfini-array
+          - --enable-gnu-indirect-function
+          - --enable-gnu-unique-object
+          - --with-system-zlib
+          - --with-linker-hash-style=gnu
+    - uses: autotools/build
+      with:
+        dir: build
+    - uses: autotools/install
+      with:
+        dir: build
+    - runs: |
+        # Like Wolfi and Fedora, drop libtool archives. They embed build paths
+        # and are not needed at runtime or link time.
+        find "$STAGE" -name '*.la' -delete
+    - uses: license/copy
+      with:
+        files: [COPYING3, COPYING3.LIB, COPYING.RUNTIME]
+        outputs: [gcc-15, gcc-15-default, libstdc++-15, libstdc++-15-dev, libatomic-15, gcc-15-doc]
+    - runs: |
+        # The default package owns the stable command names. The versioned
+        # names stay with gcc-15.
+        install -d "$STAGE/usr/bin"
+        for name in cpp gcc g++ gcc-ar gcc-nm gcc-ranlib gcov gcov-dump gcov-tool lto-dump; do
+          ln -sf "$name-15" "$STAGE/usr/bin/$name"
+        done
+        # GCC does not install cc-15 or c++-15; point the generic names at the
+        # compilers that actually exist.
+        ln -sf gcc-15 "$STAGE/usr/bin/cc"
+        ln -sf g++-15 "$STAGE/usr/bin/c++"
+        ln -sf gcc-15 "$STAGE/usr/bin/c89"
+        ln -sf gcc-15 "$STAGE/usr/bin/c99"
+    - uses: strip
+
+outputs:
+  - name: gcc-15
+    summary: GCC 15 compiler and runtime
+    # Main package: driver, cc1/cc1plus, runtime libraries, compiler
+    # static archives and the license. libgcc.a and friends stay here because
+    # GCC needs them at link time, even in the main package.
+    files:
+      license:
+        - /usr/share/licenses/gcc-15/COPYING3
+        - /usr/share/licenses/gcc-15/COPYING3.LIB
+        - /usr/share/licenses/gcc-15/COPYING.RUNTIME
+    dependencies:
+      run:
+        - binutils
+        - filesystem
+        - glibc-2.44-dev = 2.44-1
+        - libstdc++-15 = ${package.version}-${package.release}
+      provides:
+        - gcc-15 = ${package.version}-${package.release}
+
+  - name: gcc-15-default
+    summary: Stable command names for GCC 15
+    files:
+      include:
+        - /usr/bin/c++
+        - /usr/bin/c89
+        - /usr/bin/c99
+        - /usr/bin/cc
+        - /usr/bin/cpp
+        - /usr/bin/g++
+        - /usr/bin/gcc
+        - /usr/bin/gcc-ar
+        - /usr/bin/gcc-nm
+        - /usr/bin/gcc-ranlib
+        - /usr/bin/gcov
+        - /usr/bin/gcov-dump
+        - /usr/bin/gcov-tool
+        - /usr/bin/lto-dump
+        - /usr/share/licenses/gcc-15-default/**
+      license:
+        - /usr/share/licenses/gcc-15-default/COPYING3
+        - /usr/share/licenses/gcc-15-default/COPYING3.LIB
+        - /usr/share/licenses/gcc-15-default/COPYING.RUNTIME
+    dependencies:
+      run:
+        - gcc-15 = ${package.version}-${package.release}
+      conflicts:
+        - gcc-13-default
+        - gcc-14-default
+        - gcc-16-default
+      provides:
+        - gcc = ${package.version}-${package.release}
+        - cc = ${package.version}-${package.release}
+
+  - name: libstdc++-15
+    summary: GNU Standard C++ Library
+    files:
+      include:
+        - /usr/lib*/libstdc++.so.*
+        - /usr/share/licenses/libstdc++-15/**
+      license:
+        - /usr/share/licenses/libstdc++-15/COPYING3
+        - /usr/share/licenses/libstdc++-15/COPYING3.LIB
+        - /usr/share/licenses/libstdc++-15/COPYING.RUNTIME
+    dependencies:
+      run:
+        - filesystem
+        - glibc-2.44 = 2.44-1
+      provides:
+        - libstdc++ = ${package.version}-${package.release}
+        - libstdc++-15 = ${package.version}-${package.release}
+
+  - name: libstdc++-15-dev
+    summary: GNU Standard C++ Library development files
+    files:
+      include:
+        - /usr/include/c++/**
+        - /usr/lib*/libstdc++.so
+        - /usr/lib*/libstdc++.a
+        - /usr/lib/gcc/**/libstdc++*
+        - /usr/lib/gcc/**/include/c++/**
+        - /usr/share/gcc-15/**
+        - /usr/share/licenses/libstdc++-15-dev/**
+      license:
+        - /usr/share/licenses/libstdc++-15-dev/COPYING3
+        - /usr/share/licenses/libstdc++-15-dev/COPYING3.LIB
+        - /usr/share/licenses/libstdc++-15-dev/COPYING.RUNTIME
+    dependencies:
+      run:
+        - libstdc++-15 = ${package.version}-${package.release}
+        - glibc-2.44-dev = 2.44-1
+        - filesystem
+      provides:
+        - libstdc++-dev = ${package.version}-${package.release}
+
+  - name: libatomic-15
+    summary: GCC atomic operations runtime
+    files:
+      include:
+        - /usr/lib*/libatomic.so.*
+        - /usr/lib/gcc/**/libatomic*
+        - /usr/share/licenses/libatomic-15/**
+      license:
+        - /usr/share/licenses/libatomic-15/COPYING3
+        - /usr/share/licenses/libatomic-15/COPYING3.LIB
+        - /usr/share/licenses/libatomic-15/COPYING.RUNTIME
+    dependencies:
+      run:
+        - filesystem
+        - glibc-2.44 = 2.44-1
+      provides:
+        - libatomic = ${package.version}-${package.release}
+
+  - name: gcc-15-doc
+    summary: GCC 15 documentation
+    files:
+      include:
+        - "@info"
+        - "@man"
+        - /usr/share/licenses/gcc-15-doc/**
+      license:
+        - /usr/share/licenses/gcc-15-doc/COPYING3
+        - /usr/share/licenses/gcc-15-doc/COPYING3.LIB
+        - /usr/share/licenses/gcc-15-doc/COPYING.RUNTIME
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: build
+    stage: build
+    argv:
+      - sh
+      - -c
+      - |
+        "$STAGE/usr/bin/gcc-15" --version | grep -q '15.3.0'
+        "$STAGE/usr/bin/g++-15" --version | grep -q '15.3.0'
+        "$STAGE/usr/bin/cc" --version | grep -q '15.3.0'
+        "$STAGE/usr/bin/c++" --version | grep -q '15.3.0'
+        printf '#include <stdio.h>\nint main(void) { puts("gcc-ok"); return 0; }\n' > /tmp/gcc-15-test.c
+        "$STAGE/usr/bin/gcc-15" /tmp/gcc-15-test.c -o /tmp/gcc-15-test
+        /tmp/gcc-15-test | grep -q gcc-ok
+        "$STAGE/usr/bin/cc" /tmp/gcc-15-test.c -o /tmp/gcc-15-test-cc
+        /tmp/gcc-15-test-cc | grep -q gcc-ok
+        printf '#include <iostream>\nint main() { std::cout << "g++-ok\\n"; }\n' > /tmp/gcc-15-test.cc
+        "$STAGE/usr/bin/g++-15" /tmp/gcc-15-test.cc -o /tmp/gcc-15-test-cxx
+        /tmp/gcc-15-test-cxx | grep -q g++-ok
+        "$STAGE/usr/bin/c++" /tmp/gcc-15-test.cc -o /tmp/gcc-15-test-cxx-default
+        /tmp/gcc-15-test-cxx-default | grep -q g++-ok
