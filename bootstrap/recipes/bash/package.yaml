@@ -82,7 +82,7 @@ build:
     - uses: license/copy
       with:
         files: [COPYING]
-        outputs: [bash, bash-binsh, bash-dev, bash-doc, bash-builtins]
+        outputs: [bash, bash-binsh, bash-devel, bash-doc, bash-builtins]
     - uses: strip
 
 outputs:
@@ -145,15 +145,15 @@ outputs:
       run:
         - filesystem
 
-  - name: bash-dev
+  - name: bash-devel
     summary: Bash development headers and bashbug
     files:
       include:
         - "@dev"
         - /usr/bin/bashbug
-        - /usr/share/licenses/bash-dev/COPYING
+        - /usr/share/licenses/bash-devel/COPYING
       license:
-        - /usr/share/licenses/bash-dev/COPYING
+        - /usr/share/licenses/bash-devel/COPYING
     dependencies:
       run:
         - bash = ${package.version}-${package.release}
