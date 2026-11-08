@@ -1,0 +1,98 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# GNU awk pattern-matching language. Part of the minimal Eternal userland and the
+# bootstrap tool set. The source is the upstream release tarball.
+schema: 1
+
+package:
+  name: gawk
+  version: "5.4.1"
+  release: 1
+  summary: GNU awk pattern-matching language
+  description: |
+    GNU awk is an implementation of the AWK text-processing language.
+  license: GPL-3.0-or-later
+  upstream: https://www.gnu.org/software/gawk/
+  cpe:
+    vendor: gnu
+    product: gawk
+
+sources:
+  - name: gawk-5.4.1.tar.xz
+    kind: archive
+    digest: "sha512:a1e79b71e13ce7d5487f89fb62125ec873dc89e0a3ff37ebdff017fdd6dfd38b1eaa95fedcf773c037ae84c95f0ea0817d53bc1c14b4284568f87606da6aa152"
+    locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/gawk/gawk-5.4.1.tar.xz
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/gawk/gawk-5.4.1.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+patches:
+  - file: patches/gawk-node-alignment-without-mpfr.patch
+    strip: 1
+    reason: "keep NODE alignment correct when gawk is built without MPFR and GMP"
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils]
+  pipeline:
+    - uses: autotools/configure
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [gawk, gawk-lang, gawk-doc]
+    - uses: strip
+
+outputs:
+  - name: gawk
+    summary: GNU awk pattern-matching language
+    files:
+      license:
+        - /usr/share/licenses/gawk/COPYING
+    dependencies:
+      provides:
+        - awk = ${package.version}-${package.release}
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            test "$(printf 'a 2\nb 3\n' | gawk '{sum += $2} END {print sum}')" = 5
+
+  - name: gawk-lang
+    summary: GNU awk translations
+    files:
+      include:
+        - "@locales"
+        - /usr/share/licenses/gawk-lang/COPYING
+      license:
+        - /usr/share/licenses/gawk-lang/COPYING
+    dependencies:
+      run:
+        - gawk = ${package.version}-${package.release}
+        - filesystem
+
+  - name: gawk-doc
+    summary: GNU awk pattern-matching language documentation
+    files:
+      include:
+        - "@man"
+        - "@info"
+        - "@doc"
+        - /usr/share/licenses/gawk-doc/COPYING
+      license:
+        - /usr/share/licenses/gawk-doc/COPYING
+    dependencies:
+      run:
+        - filesystem
