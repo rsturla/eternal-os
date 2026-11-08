@@ -6,12 +6,14 @@ repos:
       - id: check-merge-conflict
       - id: check-executables-have-shebangs
       - id: check-shebang-scripts-are-executable
+      # Patch files are applied verbatim: whitespace, blank lines and line
+      # endings are part of the diff, not cosmetic drift.
       - id: end-of-file-fixer
+        exclude: (^|/)patches/
       - id: trailing-whitespace
-        # Upstream bash patches are applied verbatim; their context lines
-        # contain significant trailing whitespace.
-        exclude: ^(packages|bootstrap/recipes)/bash/patches/
+        exclude: (^|/)patches/
       - id: mixed-line-ending
+        exclude: (^|/)patches/
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.10.0.1
     hooks:
