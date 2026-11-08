@@ -124,11 +124,11 @@ tests:
       contents:
         packages: [gcc]
       environment:
-        CFLAGS: "-specs=/usr/lib/eternal/gcc/openssf-13.spec"
+        GCC_SPEC_FILE: openssf-13.spec
     pipeline:
       - uses: test/compiler-hardening-check
         with:
-          cc: /usr/bin/gcc
+          cc: cc
 
   - name: spec-14
     stage: installed
@@ -136,11 +136,11 @@ tests:
       contents:
         packages: [gcc]
       environment:
-        CFLAGS: "-specs=/usr/lib/eternal/gcc/openssf-14.spec"
+        GCC_SPEC_FILE: openssf-14.spec
     pipeline:
       - uses: test/compiler-hardening-check
         with:
-          cc: /usr/bin/gcc
+          cc: cc
 
   - name: spec-15
     stage: installed
@@ -148,11 +148,11 @@ tests:
       contents:
         packages: [gcc]
       environment:
-        CFLAGS: "-specs=/usr/lib/eternal/gcc/openssf-15.spec"
+        GCC_SPEC_FILE: openssf-15.spec
     pipeline:
       - uses: test/compiler-hardening-check
         with:
-          cc: /usr/bin/gcc
+          cc: cc
 
   - name: spec-16
     stage: installed
@@ -160,8 +160,8 @@ tests:
       contents:
         packages: [gcc]
       environment:
-        CFLAGS: "-specs=/usr/lib/eternal/gcc/openssf-16.spec"
+        GCC_SPEC_FILE: openssf-16.spec
     pipeline:
       - uses: test/compiler-hardening-check
         with:
-          cc: /usr/bin/gcc
+          cc: cc
