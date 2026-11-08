@@ -115,7 +115,7 @@ build:
     - uses: license/copy
       with:
         files: [COPYING3, COPYING3.LIB, COPYING.RUNTIME]
-        outputs: [gcc-13, gcc-13-default, libstdc++-13, libstdc++-13-devel, libatomic-13, gcc-13-doc]
+        outputs: [gcc-13, gcc-13-default, libstdc++-13, libstdc++-13-devel, libstdc++-13-static, libatomic-13, gcc-13-doc]
     - runs: |
         # The default package owns the stable command names. The versioned
         # names stay with gcc-13.
@@ -183,6 +183,8 @@ outputs:
         - gcc-16-default
       provides:
         - gcc = ${package.version}-${package.release}
+        - gcc-c++ = ${package.version}-${package.release}
+        - cpp = ${package.version}-${package.release}
         - cc = ${package.version}-${package.release}
 
   - name: libstdc++-13
@@ -209,11 +211,14 @@ outputs:
       include:
         - /usr/include/c++/**
         - /usr/lib*/libstdc++.so
-        - /usr/lib*/libstdc++.a
         - /usr/lib/gcc/**/libstdc++*
         - /usr/lib/gcc/**/include/c++/**
         - /usr/share/gcc-13/**
         - /usr/share/licenses/libstdc++-13-devel/**
+      exclude:
+        - /usr/lib*/lib*.a
+        - /usr/lib/gcc/**/libstdc++*.a
+        - /usr/lib/gcc/**/libsupc++.a
       license:
         - /usr/share/licenses/libstdc++-13-devel/COPYING3
         - /usr/share/licenses/libstdc++-13-devel/COPYING3.LIB
@@ -225,6 +230,25 @@ outputs:
         - filesystem
       provides:
         - libstdc++-devel = ${package.version}-${package.release}
+
+  - name: libstdc++-13-static
+    summary: GNU Standard C++ Library static archives
+    files:
+      include:
+        - /usr/lib*/libstdc++.a
+        - /usr/lib/gcc/**/libstdc++*.a
+        - /usr/lib/gcc/**/libsupc++.a
+        - /usr/share/licenses/libstdc++-13-static/**
+      license:
+        - /usr/share/licenses/libstdc++-13-static/COPYING3
+        - /usr/share/licenses/libstdc++-13-static/COPYING3.LIB
+        - /usr/share/licenses/libstdc++-13-static/COPYING.RUNTIME
+    dependencies:
+      run:
+        - libstdc++-13-devel = ${package.version}-${package.release}
+        - filesystem
+      provides:
+        - libstdc++-static = ${package.version}-${package.release}
 
   - name: libatomic-13
     summary: GCC atomic operations runtime
