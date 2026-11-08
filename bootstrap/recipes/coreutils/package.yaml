@@ -1,8 +1,9 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
-# GNU coreutils is part of the bootstrap toolchain and the base userland. The
-# ladder hides the seed provider while a stage builds this package, so the EVR
-# does not need to outrank Fedora's copy.
+# GNU coreutils is part of the bootstrap toolchain and the base userland. This
+# bootstrap variant exists because the ladder hides the seed provider while a
+# stage builds this package, so the EVR does not need to outrank Fedora's copy.
+# The production recipe is in packages/coreutils/package.yaml.
 schema: 1
 
 package:
@@ -16,7 +17,6 @@ package:
   license: GPL-3.0-or-later
   # Fallback for standalone `rpmx lint`/`rpmx build`; the ladder supplies
   # the effective timestamp and a stage may override it.
-  source-date-epoch: 1704067200
   upstream: https://www.gnu.org/software/coreutils/
   cpe:
     vendor: gnu
@@ -27,6 +27,8 @@ sources:
     kind: archive
     digest: "sha512:976ccfb8b906273a687ec330938a25ab72fb130988ca2fcad4fb6e12f4b621eb76b6e9ee091ad060361e95a8da26835b2484fffd3b5f9c7cdb100c1eb7b7d676"
     locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/coreutils/coreutils-9.10.tar.xz
       - kind: https
         url: https://mirrors.kernel.org/gnu/coreutils/coreutils-9.10.tar.xz
     extract:
@@ -40,28 +42,23 @@ build:
     tools: [gcc, make, bash, coreutils]
     host: [gmp-devel, libacl-devel, libattr-devel, libcap-devel, libselinux-devel]
   pipeline:
-    - runs: |
-        ./configure \
-          --prefix=/usr \
-          --libdir=/usr/lib64 \
-          --enable-no-install-program=groups,hostname,kill,uptime
-        make -j"$JOBS"
-        make install DESTDIR="$STAGE"
-        install -D -m 0644 COPYING \
-          "$STAGE/usr/share/licenses/coreutils/COPYING"
+    - uses: autotools/configure
+      with:
+        args:
+          - --enable-no-install-program=groups,hostname,kill,uptime
+    - uses: autotools/build
+    - uses: autotools/install
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [coreutils, coreutils-doc]
     - uses: strip
 
 outputs:
   - name: coreutils
     summary: GNU core utilities
+    # Main package: programs, libexec helpers, translations and the license.
     files:
-      include:
-        - /usr/bin/**
-        - /usr/libexec/coreutils/**
-        - /usr/share/info/**
-        - /usr/share/locale/**
-        - /usr/share/man/**
-        - /usr/share/licenses/**
       license:
         - /usr/share/licenses/coreutils/COPYING
     dependencies:
@@ -71,6 +68,20 @@ outputs:
       provides:
         - coreutils-full
         - coreutils-single
+
+  - name: coreutils-doc
+    summary: GNU core utilities documentation
+    files:
+      include:
+        - "@doc"
+        - "@info"
+        - "@man"
+        - /usr/share/licenses/coreutils-doc/COPYING
+      license:
+        - /usr/share/licenses/coreutils-doc/COPYING
+    dependencies:
+      run:
+        - filesystem
 
 tests:
   - name: build
