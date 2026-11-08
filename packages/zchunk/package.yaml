@@ -1,0 +1,133 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# Zchunk compressed file format library and tools.
+schema: 1
+
+package:
+  name: zchunk
+  version: "1.5.5"
+  release: 1
+  summary: Compressed file format with support for deltas
+  description: |
+    zchunk is a compressed file format that splits the file into independent
+    chunks. This allows downloading only the chunks that have changed instead
+    of the entire file, which is used by rpm repository metadata.
+  license: BSD-2-Clause
+  upstream: https://github.com/zchunk/zchunk
+  cpe:
+    vendor: zchunk
+    product: zchunk
+
+sources:
+  - name: zchunk-1.5.5.tar.gz
+    kind: archive
+    digest: "sha512:ed5de3f950a5af9b36a6da536a4db1a6ea96a3be235627d8406905b74bbe70eedfd9714305a7143c03b68136d490d2b54cf5deafe2b0178a6f8be897f280a114"
+    locators:
+      - kind: https
+        url: https://github.com/zchunk/zchunk/archive/refs/tags/1.5.5.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [meson, ninja, gcc, bash, coreutils, pkgconf]
+    host: [openssl-devel, libzstd-devel]
+    tests: [bash-binsh, coreutils, gcc, pkgconf, grep, openssl-libs, openssl-devel, libzstd, libzstd-devel]
+  pipeline:
+    - uses: meson/setup
+      with:
+        args:
+          - -Ddocs=false
+          - -Dtests=false
+          - -Dwith-curl=disabled
+          - -Dwith-openssl=enabled
+          - -Dwith-zstd=enabled
+    - uses: meson/compile
+    - uses: meson/install
+    - uses: license/copy
+      with:
+        files: [LICENSE]
+        outputs: [zchunk, zchunk-libs, zchunk-devel]
+    - uses: strip
+
+outputs:
+  - name: zchunk
+    summary: Tools for creating and reading zchunk files
+    files:
+      include:
+        - /usr/bin/zck
+        - /usr/bin/unzck
+        - /usr/bin/zck_delta_size
+        - /usr/bin/zck_gen_zdict
+        - /usr/bin/zck_read_header
+        - /usr/share/licenses/zchunk/**
+      license:
+        - /usr/share/licenses/zchunk/**
+    dependencies:
+      run:
+        - zchunk-libs = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            printf 'zchunk test data\n' > /tmp/zchunk-test
+            zck -o /tmp/zchunk-test.zck /tmp/zchunk-test
+            test -s /tmp/zchunk-test.zck
+            zck_read_header /tmp/zchunk-test.zck >/dev/null
+
+  - name: zchunk-libs
+    summary: Libraries for zchunk
+    files:
+      include:
+        - /usr/lib*/libzck.so.*
+        - /usr/share/licenses/zchunk-libs/**
+      license:
+        - /usr/share/licenses/zchunk-libs/**
+    dependencies:
+      run:
+        - openssl-libs
+        - libzstd
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libzck.so.* /usr/lib/libzck.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: zchunk-devel
+    summary: Development files for zchunk
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/zchunk-devel/**
+      license:
+        - /usr/share/licenses/zchunk-devel/**
+    dependencies:
+      run:
+        - zchunk-libs = ${package.version}-${package.release}
+        - libzstd-devel
+        - openssl-devel
+        - filesystem
+    tests:
+      - name: link
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            printf '#include <zck.h>\nint main(void){return 0;}\n' > /tmp/zck.c
+            gcc /tmp/zck.c $(pkg-config --cflags --libs zck) -o /tmp/zck-test
+            /tmp/zck-test
