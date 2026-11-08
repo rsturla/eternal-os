@@ -18,7 +18,6 @@ package:
     from the bootstrap filesystem package until Eternal owns the full FHS
     layout.
   license: MIT
-  source-date-epoch: 1704067200
   upstream: https://github.com/rsturla/eternal-os
 
 context: files
@@ -46,9 +45,6 @@ outputs:
     summary: Eternal Linux base directory layout
     arch: noarch
     files:
-      include:
-        - /usr/lib/eternal/baselayout
-        - /usr/share/licenses/eternal-baselayout/LICENSE
       license:
         - /usr/share/licenses/eternal-baselayout/LICENSE
       directories:
