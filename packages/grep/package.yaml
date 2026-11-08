@@ -1,0 +1,81 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# GNU grep pattern matcher. Part of the minimal Eternal userland and the
+# bootstrap tool set. The source is the upstream release tarball.
+schema: 1
+
+package:
+  name: grep
+  version: "3.12"
+  release: 1
+  summary: GNU grep pattern matcher
+  description: |
+    GNU grep searches files for lines matching basic, extended or Perl-compatible regular expressions.
+  license: GPL-3.0-or-later
+  upstream: https://www.gnu.org/software/grep/
+  cpe:
+    vendor: gnu
+    product: grep
+
+sources:
+  - name: grep-3.12.tar.xz
+    kind: archive
+    digest: "sha512:c54b4db5a8b9afe098c088decd94977746305284d716666a60bac82b4edc0fae4acf828970b5b6fc7d58ecd549f638e17e6958f33a71fedcc7d7415b9228b161"
+    locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/grep/grep-3.12.tar.xz
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/grep/grep-3.12.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, pkgconf-pkg-config]
+    host: [pcre2-devel]
+  pipeline:
+    - uses: autotools/configure
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [grep, grep-doc]
+    - uses: strip
+
+outputs:
+  - name: grep
+    summary: GNU grep pattern matcher
+    files:
+      license:
+        - /usr/share/licenses/grep/COPYING
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            printf 'alpha\nbeta\n' > file
+            test "$(grep beta file)" = beta
+            test "$(grep -c . file)" = 2
+            printf 'abc123\n' | grep -P '\d+' > /dev/null
+
+  - name: grep-doc
+    summary: GNU grep pattern matcher documentation
+    files:
+      include:
+        - "@man"
+        - "@info"
+        - "@doc"
+        - /usr/share/licenses/grep-doc/COPYING
+      license:
+        - /usr/share/licenses/grep-doc/COPYING
+    dependencies:
+      run:
+        - filesystem
