@@ -1,0 +1,196 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# GNU gettext internationalisation tools. Every autotools project in the build
+# root runs `msgfmt`, `msgmerge` and `xgettext`, and `gettextize`/`autopoint`
+# ship the `AM_GNU_GETTEXT` macros that those projects' `configure.ac` call.
+#
+# The tools and the runtime libraries are imported together: `libgettextpo` is
+# what a program that reads translation files links, and the private
+# `libgettextlib`/`libgettextsrc` objects are the tools' own runtime and stay in
+# the shared-library output with them. There is no `libintl` package: glibc
+# 2.42 moved the `gettext` family into libc, so `<libintl.h>` comes from
+# `glibc-devel` and programs link the functions without a separate library.
+#
+# The build is configured without the language bindings, without the VCS
+# reader back ends and without static libraries: all three would drag in build
+# tools this distribution does not carry yet. `autopoint` still needs `xz` to
+# unpack the infrastructure archive it installs, so that is a run dependency.
+schema: 1
+
+package:
+  name: gettext
+  version: "1.0"
+  release: 1
+  summary: GNU internationalisation and localisation utilities
+  description: |
+    GNU gettext provides the tools and libraries that programs use to
+    translate their messages: the msg* tool family, the libintl runtime and
+    the autoconf macros that wire a build system into it.
+  license: GPL-3.0-or-later AND LGPL-2.1-or-later
+  upstream: https://www.gnu.org/software/gettext/
+  cpe:
+    vendor: gnu
+    product: gettext
+
+sources:
+  - name: gettext-1.0.tar.xz
+    kind: archive
+    digest: "sha512:fa657faf5685dae7121a9b0293d3308a3910a72b90943a7a493b88cf88e95f29c5758e1573320169fe9beac6f101ef76f4165a279a7f3294155d7a773e2fa09f"
+    locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/gettext/gettext-1.0.tar.xz
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/gettext/gettext-1.0.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, gcc-c++, make, bash, coreutils, perl, sed, grep, diffutils, findutils, tar, gzip]
+    host: [libunistring-devel, libxml2-devel, ncurses-devel]
+    tests: [bash-binsh, coreutils, gcc, perl]
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          - --disable-static
+          - --disable-java
+          - --disable-csharp
+          - --disable-rpath
+          - --without-emacs
+          - --without-git
+          - --without-bzr
+          - --without-cvs
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+        find "$STAGE" -name '*.la' -delete
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [gettext, gettext-libs, gettext-devel, gettext-doc]
+    - uses: strip
+
+outputs:
+  - name: gettext
+    summary: GNU internationalisation and localisation utilities
+    files:
+      license:
+        - /usr/share/licenses/gettext/COPYING
+    dependencies:
+      run:
+        - gettext-libs = ${package.version}-${package.release}
+        - xz
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            msgfmt --version | head -1 | grep -q '0\.26\|1\.0'
+            cat > hello.po <<'EOF'
+            msgid ""
+            msgstr ""
+            "Content-Type: text/plain; charset=UTF-8\n"
+
+            msgid "hello"
+            msgstr "hallo"
+            EOF
+            msgfmt --check -o hello.mo hello.po
+            msgunfmt hello.mo | grep -qx 'msgstr "hallo"'
+            xgettext --version | head -1
+            echo 'hello world' | envsubst | grep -qx 'hello world'
+            N=eternal sh -c 'echo "hello $N"' | envsubst | grep -qx 'hello eternal'
+
+  - name: gettext-libs
+    summary: Runtime libraries for gettext
+    files:
+      include:
+        - /usr/lib*/libasprintf.so.*
+        - /usr/lib*/libgettextpo.so.*
+        - /usr/lib*/libtextstyle.so.*
+        - /usr/lib*/libgettextlib*
+        - /usr/lib*/libgettextsrc*
+        - /usr/lib*/preloadable_libintl.so
+        - /usr/share/licenses/gettext-libs/COPYING
+      license:
+        - /usr/share/licenses/gettext-libs/COPYING
+    dependencies:
+      run:
+        - ncurses-libs
+        - filesystem
+
+  - name: gettext-devel
+    summary: Development files for gettext
+    files:
+      # Narrow selectors rather than "@dev": the tools' private libraries
+      # match the development pattern (libtool names them libgettext<name>.so
+      # with no separate soname file) but are runtime, not development, files.
+      include:
+        - /usr/include/autosprintf.h
+        - /usr/include/gettext-po.h
+        - /usr/include/textstyle*
+        - /usr/lib*/libasprintf.so
+        - /usr/lib*/libgettextpo.so
+        - /usr/lib*/libtextstyle.so
+        - /usr/share/aclocal
+        - /usr/lib*/pkgconfig
+        - /usr/share/licenses/gettext-devel/COPYING
+      license:
+        - /usr/share/licenses/gettext-devel/COPYING
+    dependencies:
+      run:
+        - gettext-libs = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: link
+        stage: installed
+        environment:
+          contents:
+            packages: [gcc, glibc-devel, pkgconf, grep]
+        argv:
+          - sh
+          - -c
+          - |
+            test -f /usr/include/gettext-po.h
+            test -f /usr/share/aclocal/gettext.m4
+            test -f /usr/share/aclocal/nls.m4
+            cat > /tmp/po.c <<'EOF'
+            #include <gettext-po.h>
+            #include <libintl.h>
+            /* Take the address of a gettext-po entry point so the link proves
+               the library is present, without opening a catalogue first. */
+            int main(void) {
+              po_message_iterator_t (*iterator)(po_file_t, const char *) =
+                po_message_iterator;
+              return iterator == 0 || gettext("eternal") == 0;
+            }
+            EOF
+            gcc /tmp/po.c -lgettextpo -o /tmp/po
+            /tmp/po
+
+  - name: gettext-doc
+    summary: Documentation for gettext
+    files:
+      include:
+        - "@man"
+        - "@info"
+        - "@doc"
+        - /usr/share/licenses/gettext-doc/COPYING
+      license:
+        - /usr/share/licenses/gettext-doc/COPYING
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: hardening
+    stage: build
+    pipeline:
+      - uses: test/hardening-check
