@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# Shadow the real compiler and apply the OpenSSF hardening spec. GCC resolves
-# -specs relative to its own library directory, so the specs are absolute.
+# Shadow the real compiler and apply the Eternal compiler policy. GCC resolves
+# -specs relative to its own library directory, so every spec is absolute.
 set -eu
 
 name=${0##*/}
@@ -27,4 +27,18 @@ case "$spec" in
     *) spec="/usr/lib/eternal/gcc/$spec" ;;
 esac
 
+arch_spec=
+case "${RPMX_TARGET_ARCH:-$(uname -m)}" in
+    x86_64|amd64)
+        arch_spec=/usr/lib/eternal/gcc/openssf-arch-x86_64.spec
+        ;;
+    aarch64|arm64)
+        arch_spec=/usr/lib/eternal/gcc/openssf-arch-aarch64.spec
+        ;;
+esac
+[ -f "$arch_spec" ] || arch_spec=
+
+if [ -n "$arch_spec" ]; then
+    exec /usr/bin/"$name" -specs "$spec" -specs "$arch_spec" "$@"
+fi
 exec /usr/bin/"$name" -specs "$spec" "$@"

@@ -1,8 +1,10 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
-# Compiler hardening policy, installed as a package instead of repeated in every
-# profile and recipe. The wrapper in /usr/local/bin shadows the real compiler,
-# and the versioned GCC specs hold the OpenSSF controls. A recipe opts out with
+# Compiler policy, installed as a package instead of repeated in every profile
+# and recipe. The wrapper in /usr/local/bin shadows the real compiler, and the
+# versioned GCC specs hold the OpenSSF controls plus the common build policy
+# (optimisation, warnings, unwind tables) and the target ISA baseline. A recipe
+# opts out with
 #   environment:
 #     GCC_SPEC_FILE: no-hardening.spec
 # or with an absolute spec path.
@@ -13,7 +15,7 @@ schema: 1
 
 package:
   name: openssf-compiler-options
-  version: "20261108"
+  version: "20261109"
   release: 1
   summary: OpenSSF compiler hardening options
   description: |
@@ -37,8 +39,11 @@ build:
                    "$STAGE/usr/share/licenses/openssf-compiler-options"
         install -m 0755 gcc-wrapper "$STAGE/usr/local/bin/gcc-wrapper"
         install -m 0644 openssf-13.spec openssf-14.spec openssf-15.spec \
-          openssf-16.spec openssf-default.spec no-hardening.spec \
-          "$STAGE/usr/lib/eternal/gcc/"
+          openssf-16.spec openssf-default.spec \
+          openssf-soft-format-13.spec openssf-soft-format-14.spec \
+          openssf-soft-format-15.spec openssf-soft-format-16.spec \
+          openssf-arch-x86_64.spec openssf-arch-aarch64.spec \
+          no-hardening.spec "$STAGE/usr/lib/eternal/gcc/"
         install -m 0644 LICENSE \
           "$STAGE/usr/share/licenses/openssf-compiler-options/LICENSE"
 
@@ -84,13 +89,24 @@ tests:
         test "$(readlink "$STAGE/usr/local/bin/gcc")" = gcc-wrapper
         for version in 13 14 15 16; do
           test -f "$STAGE/usr/lib/eternal/gcc/openssf-$version.spec"
+          test -f "$STAGE/usr/lib/eternal/gcc/openssf-soft-format-$version.spec"
+          grep -q -- '-Werror=format-security' \
+            "$STAGE/usr/lib/eternal/gcc/openssf-$version.spec"
+          ! grep -q -- '-Werror=format-security' \
+            "$STAGE/usr/lib/eternal/gcc/openssf-soft-format-$version.spec"
         done
+        test -f "$STAGE/usr/lib/eternal/gcc/openssf-arch-x86_64.spec"
+        test -f "$STAGE/usr/lib/eternal/gcc/openssf-arch-aarch64.spec"
         grep -q -- '-fPIE' \
           "$STAGE/usr/lib/eternal/gcc/openssf-16.spec"
         grep -q -- '-fzero-init-padding-bits=all' \
           "$STAGE/usr/lib/eternal/gcc/openssf-16.spec"
         ! grep -q -- '-fzero-init-padding-bits=all' \
           "$STAGE/usr/lib/eternal/gcc/openssf-13.spec"
+        grep -q -- '-march=x86-64-v2' \
+          "$STAGE/usr/lib/eternal/gcc/openssf-arch-x86_64.spec"
+        grep -q -- '-mbranch-protection=standard' \
+          "$STAGE/usr/lib/eternal/gcc/openssf-arch-aarch64.spec"
 
   - name: default-wrapper
     stage: installed
