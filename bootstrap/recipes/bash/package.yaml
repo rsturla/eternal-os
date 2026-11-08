@@ -1,0 +1,180 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# GNU Bash is part of the bootstrap toolchain and the base userland. The
+# upstream release is 5.3; the recipe applies the official 5.3.1 through 5.3.9
+# patches so the packaged version matches the current patch level.
+#
+# The runtime package stays small. Documentation, development files, loadable
+# builtins and the /bin/sh symlink are separate subpackages, matching Wolfi's
+# split: an image that only needs a shell does not pull man pages or headers.
+#
+# This bootstrap variant exists because the ladder hides the seed bash provider
+# while a stage builds this package. The production recipe is in
+# packages/bash/package.yaml.
+schema: 1
+
+package:
+  name: bash
+  version: "5.3.9"
+  release: 1
+  summary: The GNU Bourne Again SHell
+  description: |
+    Bash is an sh-compatible command language interpreter that executes
+    commands read from the standard input or from a file.
+  license: GPL-3.0-or-later
+  upstream: https://www.gnu.org/software/bash/
+  cpe:
+    vendor: gnu
+    product: bash
+
+sources:
+  - name: bash-5.3.tar.gz
+    kind: archive
+    digest: "sha512:426702c8b0fb9e0c9956259973ce5b657890fd47f4f807a64febf20077bb48d0b91474ed6e843d2ef277186b46c5fffa79b808da9b48d4ec027d5e2de1b28ed8"
+    locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/bash/bash-5.3.tar.gz
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/bash/bash-5.3.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+patches:
+  - { file: patches/bash53-001, strip: 0, reason: "bash53-001: POSIX wait -n respects PID arguments" }
+  - { file: patches/bash53-002, strip: 0, reason: "bash53-002: avoid shm_open for anonymous files" }
+  - { file: patches/bash53-003, strip: 0, reason: "bash53-003: fix nested array subscript expansion" }
+  - { file: patches/bash53-004, strip: 0, reason: "bash53-004: ignore /sys/block uevent size mismatch" }
+  - { file: patches/bash53-005, strip: 0, reason: "bash53-005: avoid crash restoring signal disposition in a subshell" }
+  - { file: patches/bash53-006, strip: 0, reason: "bash53-006: fix globasciiranges non-ASCII ranges" }
+  - { file: patches/bash53-007, strip: 0, reason: "bash53-007: keep no-fork substitution redirections local" }
+  - { file: patches/bash53-008, strip: 0, reason: "bash53-008: fix multibyte handling in $'...' strings" }
+  - { file: patches/bash53-009, strip: 0, reason: "bash53-009: avoid SIGINT reverse-i-search crash" }
+
+build:
+  root:
+    profile: ../../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools:
+      - gcc
+      - make
+      - bash
+      - coreutils
+      - bison
+      - texinfo
+      - ncurses-devel
+      - gettext
+      - gawk
+      - sed
+      - grep
+      - diffutils
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          - --with-bash-malloc=no
+          - --with-afs
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        ln -sfn bash "$STAGE/usr/bin/sh"
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [bash, bash-binsh, bash-dev, bash-doc, bash-builtins]
+    - uses: strip
+
+outputs:
+  - name: bash
+    summary: The GNU Bourne Again SHell
+    # Main package: bash, its translations and its license. No file list.
+    files:
+      license:
+        - /usr/share/licenses/bash/COPYING
+    dependencies:
+      run:
+        - filesystem >= 3
+      provides:
+        - /bin/bash
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - bash
+          - -c
+          - |
+            bash --version | grep -q 'version 5.3.9'
+
+  - name: bash-binsh
+    summary: /bin/sh provided by Bash
+    files:
+      include:
+        - /usr/bin/sh
+        - /usr/share/licenses/bash-binsh/COPYING
+      license:
+        - /usr/share/licenses/bash-binsh/COPYING
+    dependencies:
+      run:
+        - bash = ${package.version}-${package.release}
+        - filesystem
+      provides:
+        - /bin/sh
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            test -L /usr/bin/sh
+            test -x /usr/bin/sh
+            sh -c 'echo ok' | grep -q ok
+
+  - name: bash-doc
+    summary: Bash documentation
+    files:
+      include:
+        - "@doc"
+        - "@info"
+        - "@man"
+        - /usr/share/licenses/bash-doc/COPYING
+      license:
+        - /usr/share/licenses/bash-doc/COPYING
+    dependencies:
+      run:
+        - filesystem
+
+  - name: bash-dev
+    summary: Bash development headers and bashbug
+    files:
+      include:
+        - "@dev"
+        - /usr/bin/bashbug
+        - /usr/share/licenses/bash-dev/COPYING
+      license:
+        - /usr/share/licenses/bash-dev/COPYING
+    dependencies:
+      run:
+        - bash = ${package.version}-${package.release}
+        - filesystem
+
+  - name: bash-builtins
+    summary: Bash loadable builtins
+    files:
+      include:
+        - /usr/lib*/bash/**
+        - /usr/share/licenses/bash-builtins/COPYING
+      license:
+        - /usr/share/licenses/bash-builtins/COPYING
+    dependencies:
+      run:
+        - bash = ${package.version}-${package.release}
+        - filesystem
+
+tests:
+  - name: build
+    stage: build
+    argv:
+      - sh
+      - -c
+      - ./bash --version | grep -q 'version 5.3.9'
