@@ -87,36 +87,22 @@ Release identity lives in `packages/eternal-release`:
 
 ## Images
 
-The image tools live in this repository, but image publishing is separate from
-the package release. `scripts/build-image.sh` composes an image instead of
-building one with a Dockerfile:
+An image is a package set, not a Dockerfile, and the set is the `eternal-base`
+recipe, so an image definition is a recipe review. Composition lives in a
+separate repository: it installs `eternal-base` from a published package
+repository, so every image is a function of a specific repository state and
+never of a branch checkout. A bad package cannot reach an image before it
+reaches the repository.
 
-1. create an empty root;
-2. run `dnf5 --installroot` in a bootstrap container against a published
-   repository (plus the bootstrap repositories still needed);
-3. remove package-manager caches and add the container-only directories;
-4. import the root as an OCI image and tag it.
-
-The package list is `eternal-base`, so the image definition is a recipe review,
-not a Dockerfile review. Every image is a function of a specific published
-repository state, not of a branch checkout.
-
-The composed root has no extra layers and no bootstrap base image: it is the
-package set. `dnf5` stays in it because the base image is also the entry point
-for building and extending an Eternal system; a future `eternal-minimal` image
-can drop it. Container-only directories (`/tmp`, `/var/tmp`, `/run`, `/root`)
-are created explicitly until `eternal-baselayout` owns the full FHS layout, and
-composition removes its caches and logs so the image depends on the repository,
-not on the build host. A published image should carry `:rolling`, `:latest` and
-`:sha-<commit>` manifest lists for x86_64 and aarch64.
+This repository stops at the published repository. OCI import, tags and
+manifest lists are not part of `make` or of `release.yml`, so nothing here needs
+`podman` for image work.
 
 ## Pipeline
 
 CI runs the same scripts a developer runs. `make check`, `make build` and
 `make repo` are the release interfaces; the workflows add only secret
 materialization, artifact transfer between jobs and GitHub Pages credentials.
-`make image` composes an image locally, but image publishing is a separate
-pipeline.
 
 `ci.yml` runs on pull requests and on demand:
 
@@ -166,10 +152,9 @@ produced once by `prepare` and exposed as reusable-workflow outputs; the RPMs
 travel as artifacts. A future persistent repository or OCI registry can
 replace the artifact hop without changing the recipe model.
 
-The image package set is the `eternal-base` recipe, used by local image
-composition and by the separate image pipeline. An image is built from a
-published repository, so a bad package cannot slip into an image before the
-repository is published.
+The image package set is the `eternal-base` recipe, consumed by the image
+repository. An image is built from a published repository, so a bad package
+cannot slip into an image before the repository is published.
 
 ### Why not Buck2 yet?
 

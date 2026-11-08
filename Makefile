@@ -5,13 +5,10 @@ OUT ?= out
 SITE ?= site
 RELEASE ?= rolling
 ARCH ?= x86_64
-IMAGE ?= ghcr.io/rsturla/eternal-os/base
-TAG ?= $(RELEASE)
-PACKAGES ?= eternal-base
 BASE ?= origin/HEAD
 BOOTSTRAP ?= bootstrap/bootstrap.yaml
 
-.PHONY: help bootstrap bootstrap-plan bootstrap-build bootstrap-clean doctor check lint arches affected hash build build-affected build-all lock lock-check repo image push all ci clean
+.PHONY: help bootstrap bootstrap-plan bootstrap-build bootstrap-clean doctor check lint arches affected hash build build-affected build-all lock lock-check repo all ci clean
 
 help:
 	@echo "Eternal Linux"
@@ -32,8 +29,6 @@ help:
 	@echo "  make lock            Write local package.lock.json files"
 	@echo "  make lock-check      Fail when a local lock is stale (network)"
 	@echo "  make repo            Assemble $(SITE)/$(RELEASE)/<arch>/ from $(OUT)/"
-	@echo "  make image           Compose $(IMAGE):$(TAG) locally (image publishing is separate)"
-	@echo "  make push            Push a locally composed image"
 	@echo "  make all             check + build + repo"
 	@echo "  make ci              Alias for 'make all'"
 	@echo "  make clean           Remove build and publish output"
@@ -90,18 +85,6 @@ repo: build
 		--packages $(OUT) \
 		--output $(SITE) \
 		--release $(RELEASE)
-
-image: repo
-	./scripts/build-image.sh \
-		--repo $(SITE)/$(RELEASE)/$(ARCH) \
-		--packages "$(PACKAGES)" \
-		--releasever 44 \
-		--image-version $(RELEASE) \
-		--arch $(ARCH) \
-		--tag $(IMAGE):$(TAG)
-
-push:
-	podman push $(IMAGE):$(TAG)
 
 all: check build repo
 
