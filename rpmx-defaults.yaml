@@ -5,6 +5,9 @@
 # (license, CPE, upstream URL) or package-specific build settings.
 schema: 1
 package:
+  # Fallback for packages with no upstream source of their own. Packages with
+  # an archive or git source derive their timestamp from that source instead.
+  source-date-epoch: 1704067200
   maintainers:
     - name: Eternal Linux maintainers
       email: maintainers@eternal.sturla.tech
