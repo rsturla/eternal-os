@@ -329,11 +329,15 @@ Eternal-specific policy does not.
 
 ### Compiler hardening
 
-Hardening policy is a package, not a per-profile flag list. The bootstrap
-profile installs `openssf-compiler-options`, which puts a `gcc` wrapper in
-`/usr/local/bin` and versioned GCC specs under `/usr/lib/eternal/gcc/`. The
-wrapper shadows the real compiler for every C and C++ build, so recipes do not
-repeat the policy and a hardening change is a package change.
+Compiler policy is a package, not a per-profile flag list. Profiles contain
+repositories, packages and install paths only; they have no `flags`. The
+bootstrap profile installs `openssf-compiler-options`, which puts a `gcc`
+wrapper in `/usr/local/bin` and versioned GCC specs under
+`/usr/lib/eternal/gcc/`. The wrapper shadows the real compiler for every C and
+C++ build and applies the shared policy spec plus an architecture spec for the
+target ISA baseline. Optimisation, warnings, hardening and unwind tables are
+therefore all part of the root closure, and changing any of them is a package
+change.
 
 The wrapper also has the only correct place for `-pie`: GCC specs can add it
 to executable links while leaving `-shared` links alone. Do not put `-pie` in
@@ -348,10 +352,12 @@ build:
     GCC_SPEC_FILE: no-hardening.spec
 ```
 
-Use the absolute `/usr/lib/eternal/gcc/openssf-<major>.spec` path only when a
-test needs to exercise one compiler stream directly. Packages that ship ELF
-files assert the result with `test/hardening-check`; compiler-options packages
-use `test/compiler-hardening-check`.
+GCC packages use `openssf-soft-format-<major>.spec`: it applies the same
+policy while keeping the compiler's own `-Werror=format-security` diagnostics
+non-fatal. Use the absolute `/usr/lib/eternal/gcc/openssf-<major>.spec` path
+only when a test needs to exercise one compiler stream directly. Packages that
+ship ELF files assert the result with `test/hardening-check`; compiler-options
+packages use `test/compiler-hardening-check`.
 
 ## 5. Source, identity and metadata
 
