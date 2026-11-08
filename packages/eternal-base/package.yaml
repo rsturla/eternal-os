@@ -20,7 +20,6 @@ package:
     the shell and core utilities, the package manager and the certificates and
     time zone data a usable base image needs.
   license: MIT
-  source-date-epoch: 1704067200
   upstream: https://github.com/rsturla/eternal-os
 
 context: files
@@ -41,8 +40,6 @@ outputs:
     summary: The Eternal Linux base system
     metapackage: true
     files:
-      include:
-        - /usr/share/licenses/eternal-base/LICENSE
       license:
         - /usr/share/licenses/eternal-base/LICENSE
     dependencies:
@@ -51,7 +48,7 @@ outputs:
         - eternal-baselayout
         # Bootstrap-owned today. Each name becomes an Eternal recipe in time.
         - basesystem
-        - bash
+        - bash-binsh
         - coreutils
         - dnf5
         - ca-certificates
