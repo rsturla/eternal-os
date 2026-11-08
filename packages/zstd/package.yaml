@@ -1,0 +1,183 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# Zstandard compression tools and library. Used by tar and other tooling in
+# the minimal Eternal userland.
+schema: 1
+
+package:
+  name: zstd
+  version: "1.5.7"
+  release: 1
+  summary: Zstandard compression tools and library
+  description: |
+    Zstandard is a fast lossless compression algorithm and the zstd command line tool.
+  license: BSD-3-Clause OR GPL-2.0-only
+  upstream: https://facebook.github.io/zstd/
+  cpe:
+    vendor: facebook
+    product: zstd
+
+sources:
+  - name: zstd-1.5.7.tar.gz
+    kind: archive
+    digest: "sha512:b4de208f179b68d4c6454139ca60d66ed3ef3893a560d6159a056640f83d3ee67cdf6ffb88971cdba35449dba4b597eaa8b4ae908127ef7fd58c89f40bf9a705"
+    locators:
+      - kind: https
+        url: https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils]
+    tests: [bash-binsh, coreutils]
+  pipeline:
+    - uses: make/build
+      with:
+        args:
+          - PREFIX=$PREFIX
+          - LIBDIR=$LIBDIR
+    - uses: make/install
+      with:
+        args:
+          - PREFIX=$PREFIX
+          - LIBDIR=$LIBDIR
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+    - uses: license/copy
+      with:
+        files: [COPYING, LICENSE]
+        outputs: [zstd, zstd-libs, zstd-devel, zstd-static, zstd-doc]
+    - uses: strip
+
+outputs:
+  - name: zstd
+    summary: Zstandard compression tools
+    files:
+      license:
+        - /usr/share/licenses/zstd/COPYING
+        - /usr/share/licenses/zstd/LICENSE
+    dependencies:
+      run:
+        - zstd-libs = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            printf '%s\n' hello > /tmp/file
+            zstd /tmp/file -o /tmp/file.zst
+            zstd -d /tmp/file.zst -o /tmp/file.out
+            test "$(cat /tmp/file.out)" = hello
+
+  - name: zstd-libs
+    summary: Zstandard runtime library
+    files:
+      include:
+        - /usr/lib*/libzstd.so.*
+        - /usr/share/licenses/zstd-libs/COPYING
+        - /usr/share/licenses/zstd-libs/LICENSE
+      license:
+        - /usr/share/licenses/zstd-libs/COPYING
+        - /usr/share/licenses/zstd-libs/LICENSE
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libzstd.so.* /usr/lib/libzstd.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: zstd-devel
+    summary: Zstandard development files
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/zstd-devel/COPYING
+        - /usr/share/licenses/zstd-devel/LICENSE
+      exclude:
+        - /usr/lib*/libzstd.a
+      license:
+        - /usr/share/licenses/zstd-devel/COPYING
+        - /usr/share/licenses/zstd-devel/LICENSE
+    dependencies:
+      run:
+        - zstd-libs = ${package.version}-${package.release}
+        - filesystem
+      provides:
+        - libzstd-devel = ${package.version}-${package.release}
+
+  - name: zstd-static
+    summary: Zstandard static library
+    files:
+      include:
+        - /usr/lib*/libzstd.a
+        - /usr/share/licenses/zstd-static/COPYING
+        - /usr/share/licenses/zstd-static/LICENSE
+      license:
+        - /usr/share/licenses/zstd-static/COPYING
+        - /usr/share/licenses/zstd-static/LICENSE
+    dependencies:
+      run:
+        - zstd-devel = ${package.version}-${package.release}
+        - filesystem
+      provides:
+        - libzstd-static = ${package.version}-${package.release}
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libzstd.a /usr/lib/libzstd.a; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: zstd-doc
+    summary: Zstandard documentation
+    files:
+      include:
+        - "@man"
+        - "@doc"
+        - /usr/share/licenses/zstd-doc/COPYING
+        - /usr/share/licenses/zstd-doc/LICENSE
+      license:
+        - /usr/share/licenses/zstd-doc/COPYING
+        - /usr/share/licenses/zstd-doc/LICENSE
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: link
+    stage: installed
+    environment:
+      contents:
+        packages: [gcc, glibc-devel]
+    argv:
+      - sh
+      - -c
+      - |
+        cat > /tmp/test.c <<'EOF'
+        #include <zstd.h>
+        int main(void) {
+          return ZSTD_versionNumber() != ZSTD_VERSION_NUMBER;
+        }
+        EOF
+        gcc /tmp/test.c -lzstd -o /tmp/test
+        /tmp/test
