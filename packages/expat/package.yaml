@@ -1,0 +1,145 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# XML parser library. A build dependency for gettext and other tooling in the
+# minimal Eternal userland.
+schema: 1
+
+package:
+  name: expat
+  version: "2.10.0"
+  release: 1
+  summary: XML parser library
+  description: |
+    Expat is a stream-oriented XML parser library written in C.
+  license: MIT
+  upstream: https://libexpat.github.io/
+  cpe:
+    vendor: libexpat_project
+    product: libexpat
+
+sources:
+  - name: expat-2.10.0.tar.xz
+    kind: archive
+    digest: "sha512:bd61f361d823f67586dad246fa4d4abbe3d22f5a0f9a28401e7a2fc96753d5bae33fbe4068fae72f016998d0da9d8c92edc4abd2fe8a8e4aafc775a8ab547c44"
+    locators:
+      - kind: https
+        url: https://github.com/libexpat/libexpat/releases/download/R_2_10_0/expat-2.10.0.tar.xz
+      - kind: https
+        url: https://downloads.sourceforge.net/project/expat/expat/2.10.0/expat-2.10.0.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, gcc-c++, make, bash, coreutils]
+    tests: [bash-binsh]
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          - --disable-static
+          - --without-docbook
+          - --without-examples
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [expat, expat-libs, expat-devel, expat-doc]
+    - uses: strip
+
+outputs:
+  - name: expat
+    summary: XML parser tools
+    files:
+      license:
+        - /usr/share/licenses/expat/COPYING
+    dependencies:
+      run:
+        - expat-libs = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            xmlwf -v
+            printf '<root/>' | xmlwf
+
+  - name: expat-libs
+    summary: Expat runtime library
+    files:
+      include:
+        - /usr/lib*/libexpat.so.*
+        - /usr/share/licenses/expat-libs/COPYING
+      license:
+        - /usr/share/licenses/expat-libs/COPYING
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libexpat.so.* /usr/lib/libexpat.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: expat-devel
+    summary: Expat development files
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/expat-devel/COPYING
+      license:
+        - /usr/share/licenses/expat-devel/COPYING
+    dependencies:
+      run:
+        - expat-libs = ${package.version}-${package.release}
+        - filesystem
+
+  - name: expat-doc
+    summary: Expat documentation
+    files:
+      include:
+        - "@man"
+        - "@doc"
+        - /usr/share/licenses/expat-doc/COPYING
+      license:
+        - /usr/share/licenses/expat-doc/COPYING
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: link
+    stage: installed
+    environment:
+      contents:
+        packages: [gcc, glibc-devel]
+    argv:
+      - sh
+      - -c
+      - |
+        cat > /tmp/test.c <<'EOF'
+        #include <expat.h>
+        int main(void) {
+          XML_Parser parser = XML_ParserCreate(0);
+          if (parser == 0) return 1;
+          XML_ParserFree(parser);
+          return 0;
+        }
+        EOF
+        gcc /tmp/test.c -lexpat -o /tmp/test
+        /tmp/test
