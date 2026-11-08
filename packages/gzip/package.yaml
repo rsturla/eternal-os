@@ -1,0 +1,92 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# GNU gzip compression utility. Part of the minimal Eternal userland and the
+# bootstrap tool set. The source is the upstream release tarball.
+schema: 1
+
+package:
+  name: gzip
+  version: "1.15"
+  release: 1
+  summary: GNU gzip compression utility
+  description: |
+    GNU gzip compresses and decompresses files using the DEFLATE format.
+  license: GPL-3.0-or-later
+  upstream: https://www.gnu.org/software/gzip/
+  cpe:
+    vendor: gnu
+    product: gzip
+
+sources:
+  - name: gzip-1.15.tar.xz
+    kind: archive
+    digest: "sha512:4a2ff92df8a49e1bbcbf65c3a70434660ad02f084d1b453f7dcaa8ee84f248cc4bb06f62bd8e57fea1e05ba1275c7c584ce97a58856e4ca6105f6417c8efbc3c"
+    locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/gzip/gzip-1.15.tar.xz
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/gzip/gzip-1.15.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+patches:
+  - file: patches/gzip-1.15_arm.patch
+    strip: 1
+    reason: "avoid aarch64 build failure from gzip.h's head macro and asm/sigcontext.h"
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils]
+  environment:
+    DEFS: "NO_ASM"
+  pipeline:
+    - uses: autotools/configure
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+        ln -sf gunzip "$STAGE/usr/bin/uncompress"
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [gzip, gzip-doc]
+    - uses: strip
+
+outputs:
+  - name: gzip
+    summary: GNU gzip compression utility
+    files:
+      license:
+        - /usr/share/licenses/gzip/COPYING
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            printf 'hello\n' > file
+            gzip file
+            test -f file.gz
+            gunzip file.gz
+            test "$(cat file)" = hello
+            gzip file
+            uncompress file.gz
+            test "$(cat file)" = hello
+
+  - name: gzip-doc
+    summary: GNU gzip compression utility documentation
+    files:
+      include:
+        - "@man"
+        - "@info"
+        - "@doc"
+        - /usr/share/licenses/gzip-doc/COPYING
+      license:
+        - /usr/share/licenses/gzip-doc/COPYING
+    dependencies:
+      run:
+        - filesystem
