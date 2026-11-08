@@ -21,7 +21,7 @@ help:
 	@echo "  make bootstrap-build Run the bootstrap ladder for $(ARCH)"
 	@echo "  make bootstrap-clean Remove bootstrap roots and locks (root-owned files included)"
 	@echo "  make doctor          Check the host toolchain"
-	@echo "  make check           pre-commit + lint every recipe (same as CI)"
+	@echo "  make check           pre-commit + commit checks + lint (same as CI)"
 	@echo "  make lint            Validate every recipe"
 	@echo "  make arches          List target architectures from the profile"
 	@echo "  make affected        List packages affected since $(BASE)"
@@ -55,6 +55,7 @@ doctor:
 
 check:
 	pre-commit run --all-files --show-diff-on-failure
+	./scripts/check-commits.sh --base $(BASE)
 	RPMX=$(RPMX) ./scripts/lint-all.sh
 
 lint:
