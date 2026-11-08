@@ -1,0 +1,144 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# libsolv dependency solver and repository metadata library.
+schema: 1
+
+package:
+  name: libsolv
+  version: "0.7.41"
+  release: 1
+  summary: Package dependency solver
+  description: |
+    libsolv is a library for solving package dependencies and managing
+    repository metadata. It is used by dnf5 through libdnf5 for package
+    resolution.
+  license: BSD-3-Clause
+  upstream: https://github.com/openSUSE/libsolv
+  cpe:
+    vendor: opensuse
+    product: libsolv
+
+sources:
+  - name: libsolv-0.7.41.tar.gz
+    kind: archive
+    digest: "sha512:60f5ebcfe85381e79fb560d2f3250002a5bbb79eb416650290b36189eb3c544eb2b8ab40b47aad8138623e269137a3844c4749d288ca98c0df287a561fa43317"
+    locators:
+      - kind: https
+        url: https://github.com/openSUSE/libsolv/archive/refs/tags/0.7.41.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [cmake, make, gcc, bash, coreutils, pkgconf]
+    host: [bzip2-devel, expat-devel, xz-devel, zchunk-devel, zlib-devel, libzstd-devel, rpm-devel]
+    tests: [bash-binsh, coreutils, gcc, pkgconf, grep, bzip2-libs, expat, xz-libs, rpm-libs, rpm-devel, zchunk-libs, libzstd]
+  pipeline:
+    - uses: cmake/configure
+      with:
+        args:
+          - -DENABLE_RPMDB=ON
+          - -DENABLE_RPMMD=ON
+          - -DENABLE_RPMDB_BYRPMHEADER=ON
+          - -DENABLE_RPMDB_LIBRPM=ON
+          - -DENABLE_RPMPKG_LIBRPM=ON
+          - -DENABLE_PUBKEY=OFF
+          - -DENABLE_COMPS=OFF
+          - -DENABLE_ZLIB_COMPRESSION=ON
+          - -DENABLE_LZMA_COMPRESSION=ON
+          - -DENABLE_BZIP2_COMPRESSION=ON
+          - -DENABLE_ZSTD_COMPRESSION=ON
+          - -DENABLE_ZCHUNK_COMPRESSION=ON
+          - -DENABLE_STATIC=OFF
+          - -DENABLE_PYTHON=OFF
+          - -DENABLE_PERL=OFF
+          - -DENABLE_RUBY=OFF
+          - -DENABLE_TCL=OFF
+          - -DENABLE_LUA=OFF
+    - uses: cmake/build
+    - uses: cmake/install
+    - uses: license/copy
+      with:
+        files: [LICENSE.BSD]
+        outputs: [libsolv, libsolv-devel, libsolv-tools]
+    - uses: strip
+
+outputs:
+  - name: libsolv
+    summary: Package dependency solver library
+    files:
+      include:
+        - /usr/lib*/libsolv.so.*
+        - /usr/share/licenses/libsolv/**
+      license:
+        - /usr/share/licenses/libsolv/**
+    dependencies:
+      run:
+        - bzip2-libs
+        - expat
+        - xz-libs
+        - zchunk-libs
+        - zlib
+        - libzstd
+        - rpm-libs
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libsolv.so.* /usr/lib/libsolv.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: libsolv-devel
+    summary: Development files for libsolv
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/libsolv-devel/**
+      license:
+        - /usr/share/licenses/libsolv-devel/**
+    dependencies:
+      run:
+        - libsolv = ${package.version}-${package.release}
+        - rpm-devel
+        - filesystem
+    tests:
+      - name: link
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            printf '#include <solv/pool.h>\nint main(void){return 0;}\n' > /tmp/solv.c
+            gcc /tmp/solv.c $(pkg-config --cflags --libs libsolv) -o /tmp/solv-test
+            /tmp/solv-test
+
+  - name: libsolv-tools
+    summary: Tools for working with libsolv repositories
+    files:
+      include:
+        - /usr/bin/*
+        - /usr/share/licenses/libsolv-tools/**
+      license:
+        - /usr/share/licenses/libsolv-tools/**
+    dependencies:
+      run:
+        - libsolv = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            test -x /usr/bin/testsolv
+            test -x /usr/bin/dumpsolv
