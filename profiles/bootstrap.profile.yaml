@@ -18,16 +18,29 @@ archs: [x86_64, aarch64]
 builder:
   image: registry.fedoraproject.org/fedora:44
 repositories:
+  - id: eternal
+    baseurl: https://rsturla.github.io/eternal-os/rolling/$basearch
+    # Only the userland packages that have completed the self-hosting switch
+    # are consumed from here. Keep the seed compiler and C library out until
+    # their exact-release dependencies are stable.
+    exclude: [filesystem, basesystem, eternal-release, eternal-base, eternal-baselayout, glibc-*, gcc-*, ld-linux-*, libc-bin-*, libstdc++-*, libatomic-*, nss-db-*]
   - id: fedora
     metalink: https://mirrors.fedoraproject.org/metalink?repo=fedora-$releasever&arch=$basearch
+    # These package names are already produced by Eternal. Hiding the Fedora
+    # copies is what makes the build root consume the published Eternal
+    # repository instead of only using it for metadata.
+    exclude: [bash, bash-binsh, binutils, coreutils, coreutils-single, make]
   - id: updates
     metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch
+    exclude: [bash, bash-binsh, binutils, coreutils, coreutils-single, make]
   - id: eternal-toolchain
     baseurl: file://../.work/toolchain-repo
 packages:
   install:
     - openssf-compiler-options
     - bash
+    - bash-binsh
+    - binutils
     - coreutils
     - findutils
     - gcc
