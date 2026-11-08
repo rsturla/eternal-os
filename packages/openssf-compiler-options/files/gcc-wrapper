@@ -1,7 +1,8 @@
 #!/bin/sh
 
 # Shadow the real compiler and apply the Eternal compiler policy. GCC resolves
-# -specs relative to its own library directory, so every spec is absolute.
+# -specs relative to its own library directory, so every spec is absolute. The
+# build environment puts this directory before /usr/bin.
 set -eu
 
 name=${0##*/}

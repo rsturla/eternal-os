@@ -1,7 +1,8 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # Compiler policy, installed as a package instead of repeated in every profile
-# and recipe. The wrapper in /usr/local/bin shadows the real compiler, and the
+# and recipe. The wrappers live under /usr/libexec/eternal/gcc/bin and the
+# repository's build environment puts that directory before /usr/bin. The
 # versioned GCC specs hold the OpenSSF controls plus the common build policy
 # (optimisation, warnings, unwind tables) and the target ISA baseline. A recipe
 # opts out with
@@ -16,7 +17,7 @@ schema: 1
 package:
   name: openssf-compiler-options
   version: "20261109"
-  release: 1
+  release: 2
   summary: OpenSSF compiler hardening options
   description: |
     GCC wrapper scripts and versioned spec files that apply the OpenSSF
@@ -34,10 +35,10 @@ build:
     tools: [bash, coreutils]
   pipeline:
     - runs: |
-        install -d "$STAGE/usr/local/bin" \
+        install -d "$STAGE/usr/libexec/eternal/gcc/bin" \
                    "$STAGE/usr/lib/eternal/gcc" \
                    "$STAGE/usr/share/licenses/openssf-compiler-options"
-        install -m 0755 gcc-wrapper "$STAGE/usr/local/bin/gcc-wrapper"
+        install -m 0755 gcc-wrapper "$STAGE/usr/libexec/eternal/gcc/bin/gcc-wrapper"
         install -m 0644 openssf-13.spec openssf-14.spec openssf-15.spec \
           openssf-16.spec openssf-default.spec \
           openssf-soft-format-13.spec openssf-soft-format-14.spec \
@@ -47,7 +48,7 @@ build:
         install -m 0644 LICENSE \
           "$STAGE/usr/share/licenses/openssf-compiler-options/LICENSE"
 
-        cd "$STAGE/usr/local/bin"
+        cd "$STAGE/usr/libexec/eternal/gcc/bin"
         for name in gcc g++ cc c++ cpp gfortran; do
           ln -s gcc-wrapper "$name"
         done
@@ -85,8 +86,8 @@ tests:
       - sh
       - -c
       - |
-        test -L "$STAGE/usr/local/bin/gcc"
-        test "$(readlink "$STAGE/usr/local/bin/gcc")" = gcc-wrapper
+        test -L "$STAGE/usr/libexec/eternal/gcc/bin/gcc"
+        test "$(readlink "$STAGE/usr/libexec/eternal/gcc/bin/gcc")" = gcc-wrapper
         for version in 13 14 15 16; do
           test -f "$STAGE/usr/lib/eternal/gcc/openssf-$version.spec"
           test -f "$STAGE/usr/lib/eternal/gcc/openssf-soft-format-$version.spec"
@@ -113,6 +114,8 @@ tests:
     environment:
       contents:
         packages: [gcc]
+      environment:
+        PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     pipeline:
       - uses: test/compiler-hardening-check
         with:
@@ -124,6 +127,7 @@ tests:
       contents:
         packages: [gcc]
       environment:
+        PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
         GCC_SPEC_FILE: openssf-13.spec
     pipeline:
       - uses: test/compiler-hardening-check
@@ -136,6 +140,7 @@ tests:
       contents:
         packages: [gcc]
       environment:
+        PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
         GCC_SPEC_FILE: openssf-14.spec
     pipeline:
       - uses: test/compiler-hardening-check
@@ -148,6 +153,7 @@ tests:
       contents:
         packages: [gcc]
       environment:
+        PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
         GCC_SPEC_FILE: openssf-15.spec
     pipeline:
       - uses: test/compiler-hardening-check
@@ -160,6 +166,7 @@ tests:
       contents:
         packages: [gcc]
       environment:
+        PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
         GCC_SPEC_FILE: openssf-16.spec
     pipeline:
       - uses: test/compiler-hardening-check
