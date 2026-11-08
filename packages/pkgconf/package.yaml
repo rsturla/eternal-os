@@ -1,0 +1,93 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# An implementation of pkg-config. Part of the minimal Eternal userland and the
+# bootstrap tool set. The source is the upstream release tarball.
+schema: 1
+
+package:
+  name: pkgconf
+  version: "3.0.10"
+  release: 1
+  summary: An implementation of pkg-config
+  description: |
+    pkgconf is a package compiler and linker metadata toolkit that provides pkg-config compatibility.
+  license: ISC
+  upstream: https://github.com/pkgconf/pkgconf
+
+sources:
+  - name: pkgconf-3.0.10.tar.xz
+    kind: archive
+    digest: "sha512:7fcc5a9dbb40f2a16b573161d9638649274cdd6b1aa955a22204e7932314880bbbbb8f5960ba118e52efba5e0680a1630ffaa28a43e35c899be95ba1c6c26d68"
+    locators:
+      - kind: https
+        url: https://github.com/pkgconf/pkgconf/releases/download/pkgconf-3.0.10/pkgconf-3.0.10.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils]
+  pipeline:
+    - uses: autotools/configure
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+    - runs: |
+        find "$STAGE" -name '*.la' -delete
+        ln -sf pkgconf "$STAGE/usr/bin/pkg-config"
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [pkgconf, pkgconf-dev, pkgconf-doc]
+    - uses: strip
+
+outputs:
+  - name: pkgconf
+    summary: An implementation of pkg-config
+    files:
+      license:
+        - /usr/share/licenses/pkgconf/COPYING
+    dependencies:
+      provides:
+        - pkg-config = ${package.version}-${package.release}
+        - pkgconf-pkg-config = ${package.version}-${package.release}
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            test "$(pkgconf --version)" = 3.0.10
+            test "$(pkg-config --version)" = 3.0.10
+
+  - name: pkgconf-dev
+    summary: pkgconf development files
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/pkgconf-dev/COPYING
+      license:
+        - /usr/share/licenses/pkgconf-dev/COPYING
+    dependencies:
+      run:
+        - pkgconf = ${package.version}-${package.release}
+        - filesystem
+
+  - name: pkgconf-doc
+    summary: An implementation of pkg-config documentation
+    files:
+      include:
+        - "@man"
+        - "@info"
+        - "@doc"
+        - /usr/share/licenses/pkgconf-doc/COPYING
+      license:
+        - /usr/share/licenses/pkgconf-doc/COPYING
+    dependencies:
+      run:
+        - filesystem
