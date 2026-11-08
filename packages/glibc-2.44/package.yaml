@@ -63,6 +63,10 @@ build:
       - gzip
     host:
       - kernel-headers
+  environment:
+    # glibc has its own fortify and stack-protector configuration. The
+    # distribution spec would apply them to the bootstrap compiler as well.
+    GCC_SPEC_FILE: no-hardening.spec
   pipeline:
     - runs: |
         mkdir build
