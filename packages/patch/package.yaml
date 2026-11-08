@@ -1,0 +1,80 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# GNU patch. Part of the minimal Eternal userland and the
+# bootstrap tool set. The source is the upstream release tarball.
+schema: 1
+
+package:
+  name: patch
+  version: "2.8.1"
+  release: 1
+  summary: GNU patch
+  description: |
+    GNU patch applies diff files to source trees and other text files.
+  license: GPL-3.0-or-later
+  upstream: https://www.gnu.org/software/patch/
+  cpe:
+    vendor: gnu
+    product: patch
+
+sources:
+  - name: patch-2.8.1.tar.xz
+    kind: archive
+    digest: "sha512:344cad0f3a19a651c8f0188c89402018c65406b106adecdfec52df4359046ca5d86a70ce8d7943f8c41deed79918291b0a86bfa57dcec2c0aa2b4bbca6edc698"
+    locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/patch/patch-2.8.1.tar.xz
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/patch/patch-2.8.1.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils]
+  pipeline:
+    - uses: autotools/configure
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [patch, patch-doc]
+    - uses: strip
+
+outputs:
+  - name: patch
+    summary: GNU patch
+    files:
+      license:
+        - /usr/share/licenses/patch/COPYING
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            printf 'old\n' > file
+            printf '%s\n' '--- file' '+++ file' '@@ -1 +1 @@' '-old' '+new' > change.diff
+            patch file < change.diff
+            test "$(cat file)" = new
+
+  - name: patch-doc
+    summary: GNU patch documentation
+    files:
+      include:
+        - "@man"
+        - "@info"
+        - "@doc"
+        - /usr/share/licenses/patch-doc/COPYING
+      license:
+        - /usr/share/licenses/patch-doc/COPYING
+    dependencies:
+      run:
+        - filesystem
