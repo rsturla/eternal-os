@@ -17,7 +17,6 @@ package:
     The distribution identity for Eternal Linux: /etc/os-release, the legacy
     release files, and the Eternal package repository definition.
   license: MIT
-  source-date-epoch: 1704067200
   upstream: https://github.com/rsturla/eternal-os
 
 context: files
@@ -45,12 +44,6 @@ outputs:
       The distribution identity and repository definition for Eternal Linux.
     arch: noarch
     files:
-      include:
-        - /etc/os-release
-        - /etc/system-release
-        - /etc/redhat-release
-        - /etc/yum.repos.d/eternal.repo
-        - /usr/share/licenses/eternal-release/LICENSE
       license:
         - /usr/share/licenses/eternal-release/LICENSE
       config:
