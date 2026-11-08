@@ -35,6 +35,7 @@ build:
     profile: ../../profiles/bootstrap.profile.yaml
   dependencies:
     tools: [gcc, make, bash, coreutils]
+    tests: [bash-binsh, coreutils]
   environment:
     FORCE_UNSAFE_CONFIGURE: "1"
   pipeline:
