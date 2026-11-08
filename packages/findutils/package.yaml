@@ -43,6 +43,7 @@ build:
       with:
         args:
           - --localstatedir=/var/lib/locatedb
+          - --libexecdir=/usr/libexec/findutils
     - uses: autotools/build
     - uses: autotools/install
     - runs: |
@@ -77,7 +78,7 @@ outputs:
       include:
         - /usr/bin/locate
         - /usr/bin/updatedb
-        - /usr/libexec/frcode
+        - /usr/libexec/findutils/frcode
         - /var/lib/locatedb/**
         - /usr/share/licenses/findutils-locate/COPYING
       license:
@@ -94,7 +95,8 @@ outputs:
           - -c
           - |
             locate --version
-            test -x /usr/sbin/updatedb
+            test -x /usr/bin/updatedb
+            test -x /usr/libexec/findutils/frcode
 
   - name: findutils-doc
     summary: GNU find utilities documentation
