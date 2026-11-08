@@ -43,7 +43,7 @@ build:
     - uses: license/copy
       with:
         files: [COPYING]
-        outputs: [pkgconf, pkgconf-devel, pkgconf-doc]
+        outputs: [pkgconf, pkgconf-libs, pkgconf-devel, pkgconf-static, pkgconf-doc]
     - uses: strip
 
 outputs:
@@ -53,6 +53,9 @@ outputs:
       license:
         - /usr/share/licenses/pkgconf/COPYING
     dependencies:
+      run:
+        - pkgconf-libs = ${package.version}-${package.release}
+        - filesystem
       provides:
         - pkg-config = ${package.version}-${package.release}
         - pkgconfig = ${package.version}-${package.release}
@@ -67,6 +70,29 @@ outputs:
             test "$(pkgconf --version)" = 3.0.10
             test "$(pkg-config --version)" = 3.0.10
 
+  - name: pkgconf-libs
+    summary: pkgconf runtime library
+    files:
+      include:
+        - /usr/lib*/libpkgconf.so.*
+        - /usr/share/licenses/pkgconf-libs/COPYING
+      license:
+        - /usr/share/licenses/pkgconf-libs/COPYING
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libpkgconf.so.* /usr/lib/libpkgconf.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
   - name: pkgconf-devel
     summary: pkgconf development files
     files:
@@ -77,8 +103,29 @@ outputs:
         - /usr/share/licenses/pkgconf-devel/COPYING
     dependencies:
       run:
-        - pkgconf = ${package.version}-${package.release}
+        - pkgconf-libs = ${package.version}-${package.release}
         - filesystem
+
+  - name: pkgconf-static
+    summary: pkgconf static libraries
+    files:
+      include:
+        - "@static"
+        - /usr/share/licenses/pkgconf-static/COPYING
+      license:
+        - /usr/share/licenses/pkgconf-static/COPYING
+    dependencies:
+      run:
+        - pkgconf-devel = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            test -f /usr/lib64/libpkgconf.a
 
   - name: pkgconf-doc
     summary: An implementation of pkg-config documentation
