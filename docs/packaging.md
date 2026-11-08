@@ -211,7 +211,9 @@ none, one, or all of them.
 
 - **`-devel`** contains only what is needed to compile and link against the
   package: headers, unversioned `.so` linker links, pkg-config and CMake
-  metadata. It never contains static archives.
+  metadata. It never contains user-linkable static archives. The only
+  exceptions are archives declared with `lint.allow: [static-archive]` in the
+  recipe (compiler runtimes and linker-script helpers).
 - **`-static`** contains static archives (`lib*.a`). It depends on the matching
   `-devel` output, because a static link needs the headers and linker metadata
   as well as the archive.
@@ -247,12 +249,25 @@ Use these rules:
   `libstdc++-16` and `libatomic-16`; glibc keeps `ld-linux-2.44` and
   `libc-bin-2.44`. Those names are part of the toolchain interface, so
   renaming them to `gcc-libs` or `glibc-libs` would make the interface worse.
-- Compiler runtime archives (`libgcc.a`, `libgcc_eh.a`, `libgcov.a`) stay in
-  the compiler's main output. They are required for ordinary linking, not an
-  optional static build.
+- Compiler runtime archives (`libgcc.a`, `libgcc_eh.a`, `libgcov.a`,
+  `libatomic.a`, `libgomp.a`, `libitm.a`) stay in the compiler's main output.
+  They are required for ordinary linking, not an optional static build.
 - Linker plugin archives under `/usr/lib*/bfd-plugins/` (`libdep.a`) stay in
   the matching `-devel` output. They are loaded by the linker at build time;
   they are not user-linkable static libraries.
+
+These are the only outputs that may carry a static archive outside `-static`.
+Each one declares the exception explicitly:
+
+```yaml
+    lint:
+      allow:
+        - static-archive
+```
+
+`rpmx` has no package-name exceptions: the rule is generic, and the recipe
+opts in at the output that needs it. Do not add `static-archive` to an output
+just to silence the rule; move the archive to `-static` instead.
 
 `@dev` and `@static` are disjoint. Static archives are selected only by
 `@static`, so a `-devel` output cannot accidentally claim a `-static` file.
@@ -688,6 +703,9 @@ other outputs use narrow selectors:
         - /usr/share/licenses/glibc-2.44-devel/**
       exclude:
         - /usr/lib*/libmemusage.so
+    lint:
+      allow:
+        - static-archive
 
   - name: glibc-2.44-static
     files:
@@ -749,8 +767,9 @@ bootstrap variant; the production recipe stays.
       tools; use the split presets instead of listing every path. Compiler
       runtime archives needed for linking are the exception.
 - [ ] Development output is named `-devel`, never `-dev`.
-- [ ] Static archives are in `-static`, not in `-devel`; the static output
-      depends on the matching `-devel` output.
+- [ ] User static archives are in `-static`, not in `-devel`; the static
+      output depends on the matching `-devel` output. Compiler and glibc
+      link-time helper archives declare `lint.allow: [static-archive]`.
 - [ ] A package that ships commands and shared libraries has one `-libs`
       output for the runtime SONAMEs; the main package and `-devel` depend on
       it. Library-only packages do not get a `-libs` output.
