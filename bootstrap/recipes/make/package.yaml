@@ -1,8 +1,9 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
-# GNU Make is part of the bootstrap toolchain. The ladder hides the seed
-# provider while a stage builds this package, so the EVR does not need to
-# outrank Fedora's copy. Epoch 1 is make's upstream epoch.
+# GNU Make is part of the bootstrap toolchain. This bootstrap variant exists
+# because the ladder hides the seed provider while a stage builds this package,
+# so the EVR does not need to outrank Fedora's copy. Epoch 1 is make's upstream
+# epoch. The production recipe is in packages/make/package.yaml.
 schema: 1
 
 package:
@@ -17,7 +18,6 @@ package:
   license: GPL-3.0-or-later
   # Fallback for standalone `rpmx lint`/`rpmx build`; the ladder supplies
   # the effective timestamp and a stage may override it.
-  source-date-epoch: 1704067200
   upstream: https://www.gnu.org/software/make/
   cpe:
     vendor: gnu
@@ -28,6 +28,8 @@ sources:
     kind: archive
     digest: "sha512:145260cbd6a8226cef3dfef0c8baba31847beaebc7e6b65d39d02715fd4f4cab9b139b6c3772e550088d4f9ae80c6d3ed20b9a7664c693644dfb96b4cb60e67c"
     locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz
       - kind: https
         url: https://mirrors.kernel.org/gnu/make/make-4.4.1.tar.gz
     extract:
@@ -40,26 +42,47 @@ build:
   dependencies:
     tools: [gcc, make, bash, coreutils]
   pipeline:
-    - runs: |
-        ./configure --prefix=/usr --libdir=/usr/lib64
-        make -j"$JOBS"
-        make install DESTDIR="$STAGE"
-        install -D -m 0644 COPYING "$STAGE/usr/share/licenses/make/COPYING"
+    - uses: autotools/configure
+    - uses: autotools/build
+    - uses: autotools/install
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [make, make-dev, make-doc]
     - uses: strip
 
 outputs:
   - name: make
     summary: GNU Make build automation tool
+    # Main package: the make binary, translations and the license.
     files:
-      include:
-        - /usr/bin/**
-        - /usr/include/**
-        - /usr/share/info/**
-        - /usr/share/locale/**
-        - /usr/share/man/**
-        - /usr/share/licenses/**
       license:
         - /usr/share/licenses/make/COPYING
+
+  - name: make-dev
+    summary: GNU Make development files
+    files:
+      include:
+        - "@headers"
+        - /usr/share/licenses/make-dev/COPYING
+      license:
+        - /usr/share/licenses/make-dev/COPYING
+    dependencies:
+      run:
+        - filesystem
+
+  - name: make-doc
+    summary: GNU Make documentation
+    files:
+      include:
+        - "@info"
+        - "@man"
+        - /usr/share/licenses/make-doc/COPYING
+      license:
+        - /usr/share/licenses/make-doc/COPYING
+    dependencies:
+      run:
+        - filesystem
 
 tests:
   - name: build

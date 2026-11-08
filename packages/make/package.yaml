@@ -19,7 +19,6 @@ package:
     GNU Make is a tool which controls the generation of executables and other
     non-source files of a program from the program's source files.
   license: GPL-3.0-or-later
-  source-date-epoch: 1713139200
   upstream: https://www.gnu.org/software/make/
   cpe:
     vendor: gnu
@@ -30,6 +29,8 @@ sources:
     kind: archive
     digest: "sha512:145260cbd6a8226cef3dfef0c8baba31847beaebc7e6b65d39d02715fd4f4cab9b139b6c3772e550088d4f9ae80c6d3ed20b9a7664c693644dfb96b4cb60e67c"
     locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz
       - kind: https
         url: https://mirrors.kernel.org/gnu/make/make-4.4.1.tar.gz
     extract:
@@ -42,26 +43,47 @@ build:
   dependencies:
     tools: [gcc, make, bash, coreutils]
   pipeline:
-    - runs: |
-        ./configure --prefix=/usr --libdir=/usr/lib64
-        make -j"$JOBS"
-        make install DESTDIR="$STAGE"
-        install -D -m 0644 COPYING "$STAGE/usr/share/licenses/make/COPYING"
+    - uses: autotools/configure
+    - uses: autotools/build
+    - uses: autotools/install
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [make, make-dev, make-doc]
     - uses: strip
 
 outputs:
   - name: make
     summary: GNU Make build automation tool
+    # Main package: the make binary, translations and the license.
     files:
-      include:
-        - /usr/bin/**
-        - /usr/include/**
-        - /usr/share/info/**
-        - /usr/share/locale/**
-        - /usr/share/man/**
-        - /usr/share/licenses/**
       license:
         - /usr/share/licenses/make/COPYING
+
+  - name: make-dev
+    summary: GNU Make development files
+    files:
+      include:
+        - "@headers"
+        - /usr/share/licenses/make-dev/COPYING
+      license:
+        - /usr/share/licenses/make-dev/COPYING
+    dependencies:
+      run:
+        - filesystem
+
+  - name: make-doc
+    summary: GNU Make documentation
+    files:
+      include:
+        - "@info"
+        - "@man"
+        - /usr/share/licenses/make-doc/COPYING
+      license:
+        - /usr/share/licenses/make-doc/COPYING
+    dependencies:
+      run:
+        - filesystem
 
 tests:
   - name: build
