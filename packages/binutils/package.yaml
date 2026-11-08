@@ -148,3 +148,8 @@ tests:
       - sh
       - -c
       - ./binutils/objdump --version | grep -q 'GNU objdump'
+
+  - name: hardening
+    stage: build
+    pipeline:
+      - uses: test/hardening-check
