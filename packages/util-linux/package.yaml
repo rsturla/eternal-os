@@ -1,0 +1,261 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# Random collection of Linux utilities. This recipe builds the base tools and
+# the libblkid, libfdisk, libmount, libsmartcols and libuuid runtime libraries.
+# Login and su-like tools are left to shadow so the two packages do not fight
+# over /usr/bin.
+schema: 1
+
+package:
+  name: util-linux
+  version: "2.42.4"
+  release: 1
+  summary: Collection of Linux utilities
+  description: |
+    util-linux provides the standard Linux system utilities for mounting,
+    block devices, namespaces, terminals and process control, together with
+    the libblkid, libfdisk, libmount, libsmartcols and libuuid libraries.
+  license: GPL-3.0-or-later AND GPL-2.0-or-later AND LGPL-2.1-or-later AND BSD-3-Clause AND MIT
+  upstream: https://github.com/util-linux/util-linux
+  cpe:
+    vendor: kernel
+    product: util-linux
+
+sources:
+  - name: util-linux-2.42.4.tar.xz
+    kind: archive
+    digest: "sha512:3aea9ebd835b353e0c73356f0e4543ba4c3ad448e4f50a386c35cfaac81cbf45425b1a6c7552ed5673580acf2b58f8af2792f5b3019ffe478edd77c7ebf444dc"
+    locators:
+      - kind: https
+        url: https://mirrors.edge.kernel.org/pub/linux/utils/util-linux/v2.42/util-linux-2.42.4.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, pkgconf]
+    host: [libselinux-devel, ncurses-devel, pam-devel, zlib-devel]
+    tests: [bash-binsh, coreutils, libxcrypt, zlib, pam]
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          - --disable-static
+          - --disable-nls
+          - --disable-tls
+          - --disable-kill
+          - --disable-wall
+          - --disable-makeinstall-chown
+          - --disable-makeinstall-setuid
+          - --disable-makeinstall-tty-setgid
+          - --disable-pam-lastlog2
+          - --without-python
+          - --without-econf
+          - --without-systemd
+          - --without-udev
+          - --disable-libmount-udev-support
+          - --with-selinux
+          - --bindir=/usr/bin
+          - --sbindir=/usr/bin
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        find "$STAGE" -name '*.la' -delete
+    - uses: license/copy
+      with:
+        files:
+          - COPYING
+          - Documentation/licenses/COPYING.LGPL-2.1-or-later
+          - Documentation/licenses/COPYING.BSD-3-Clause
+        outputs:
+          - util-linux
+          - libblkid
+          - libfdisk
+          - libmount
+          - libsmartcols
+          - libuuid
+          - util-linux-devel
+          - util-linux-doc
+    - uses: strip
+
+outputs:
+  - name: util-linux
+    summary: Collection of Linux utilities
+    files:
+      license:
+        - /usr/share/licenses/util-linux/**
+    dependencies:
+      run:
+        - libblkid = ${package.version}-${package.release}
+        - libmount = ${package.version}-${package.release}
+        - libsmartcols = ${package.version}-${package.release}
+        - libuuid = ${package.version}-${package.release}
+        - pam
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            mount --version
+            lsblk --version
+            blkid --version
+            findmnt --version
+            flock --version
+            uuidgen | grep -E '^[0-9a-f-]{36}$'
+
+  - name: libblkid
+    summary: Block device identification library
+    files:
+      include:
+        - /usr/lib*/libblkid.so.*
+        - /usr/share/licenses/libblkid/**
+      license:
+        - /usr/share/licenses/libblkid/**
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libblkid.so.* /usr/lib/libblkid.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: libfdisk
+    summary: Partitioning library
+    files:
+      include:
+        - /usr/lib*/libfdisk.so.*
+        - /usr/share/licenses/libfdisk/**
+      license:
+        - /usr/share/licenses/libfdisk/**
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libfdisk.so.* /usr/lib/libfdisk.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: libmount
+    summary: Block device mounting library
+    files:
+      include:
+        - /usr/lib*/libmount.so.*
+        - /usr/share/licenses/libmount/**
+      license:
+        - /usr/share/licenses/libmount/**
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libmount.so.* /usr/lib/libmount.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: libsmartcols
+    summary: Table formatting library
+    files:
+      include:
+        - /usr/lib*/libsmartcols.so.*
+        - /usr/share/licenses/libsmartcols/**
+      license:
+        - /usr/share/licenses/libsmartcols/**
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libsmartcols.so.* /usr/lib/libsmartcols.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: libuuid
+    summary: Universally unique identifier library
+    files:
+      include:
+        - /usr/lib*/libuuid.so.*
+        - /usr/share/licenses/libuuid/**
+      license:
+        - /usr/share/licenses/libuuid/**
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libuuid.so.* /usr/lib/libuuid.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: util-linux-devel
+    summary: Development files for util-linux libraries
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/util-linux-devel/**
+      license:
+        - /usr/share/licenses/util-linux-devel/**
+    dependencies:
+      run:
+        - libblkid = ${package.version}-${package.release}
+        - libfdisk = ${package.version}-${package.release}
+        - libmount = ${package.version}-${package.release}
+        - libsmartcols = ${package.version}-${package.release}
+        - libuuid = ${package.version}-${package.release}
+        - filesystem
+      provides:
+        - libblkid-devel = ${package.version}-${package.release}
+        - libfdisk-devel = ${package.version}-${package.release}
+        - libmount-devel = ${package.version}-${package.release}
+        - libsmartcols-devel = ${package.version}-${package.release}
+        - libuuid-devel = ${package.version}-${package.release}
+
+  - name: util-linux-doc
+    summary: Documentation for util-linux
+    files:
+      include:
+        - "@man"
+        - "@doc"
+        - /usr/share/licenses/util-linux-doc/**
+      license:
+        - /usr/share/licenses/util-linux-doc/**
+    dependencies:
+      run:
+        - filesystem
