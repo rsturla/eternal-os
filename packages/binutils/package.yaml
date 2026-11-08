@@ -81,7 +81,7 @@ build:
     - uses: license/copy
       with:
         files: [COPYING3, COPYING3.LIB]
-        outputs: [binutils, binutils-dev, binutils-doc]
+        outputs: [binutils, binutils-devel, binutils-doc]
     - uses: strip
 
 outputs:
@@ -106,16 +106,16 @@ outputs:
             as --version | grep -q 'GNU assembler'
             objdump --version | grep -q 'GNU objdump'
 
-  - name: binutils-dev
+  - name: binutils-devel
     summary: Binutils development headers and libraries
     files:
       include:
         - "@dev"
         - /usr/lib*/bfd-plugins/**
-        - /usr/share/licenses/binutils-dev/**
+        - /usr/share/licenses/binutils-devel/**
       license:
-        - /usr/share/licenses/binutils-dev/COPYING3
-        - /usr/share/licenses/binutils-dev/COPYING3.LIB
+        - /usr/share/licenses/binutils-devel/COPYING3
+        - /usr/share/licenses/binutils-devel/COPYING3.LIB
     dependencies:
       run:
         - binutils = ${package.version}-${package.release}
