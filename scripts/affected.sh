@@ -111,6 +111,15 @@ if [[ -z $merge_base ]]; then
   exit 0
 fi
 
+# A package that did not exist in the base cannot have changed the build of an
+# existing package: the build root still resolves the seed provider. Propagate
+# to reverse build dependents only when the changed package already existed.
+declare -A base_package
+while IFS= read -r name; do
+  [[ -n $name ]] && base_package[$name]=1
+done < <(git -C "$root" ls-tree -d --name-only "$merge_base" packages/ \
+  | sed 's#^packages/##')
+
 changed=$(mktemp)
 trap 'rm -f "$changed"' EXIT
 
@@ -126,6 +135,10 @@ global=0
 while IFS= read -r -d '' path; do
   [[ -n $path ]] || continue
   case "$path" in
+    scripts/affected.sh)
+      # This file only decides which packages to select; changing it does not
+      # change package output. The commit and lint checks still run.
+      ;;
     profiles/* | scripts/* | .rpmx-revision | rpmx-defaults.yaml)
       global=1
       break
@@ -173,7 +186,7 @@ declare -A affected
 queue=()
 for name in "${!changed_package[@]}"; do
   affected[$name]=1
-  queue+=("$name")
+  [[ -n ${base_package[$name]:-} ]] && queue+=("$name")
 done
 
 i=0
