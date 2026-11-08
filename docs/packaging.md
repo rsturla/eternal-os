@@ -1,8 +1,9 @@
 # Packaging guide
 
-This is the house style for Eternal packages. It follows Wolfi's package
-patterns, adapted to RPM and to rpmx. The goal is a small container-first
-distribution whose recipes are predictable, reviewable and reproducible.
+This is the house style for Eternal packages. It borrows from Fedora and Wolfi
+where their conventions agree with Eternal's goals, but the rules below are
+Eternal's own. The goal is a small container-first distribution whose recipes
+are predictable, reviewable and reproducible.
 
 This guide defines the Eternal packaging model, not the current limits of
 rpmx. Where the tool is stricter or less expressive, a recipe uses the closest
@@ -145,19 +146,19 @@ outputs:
         - "@info"
         - /usr/share/licenses/bash-doc/COPYING
 
-  - name: bash-dev
+  - name: bash-devel
     files:
       include:
         - "@dev"
         - /usr/bin/bashbug
-        - /usr/share/licenses/bash-dev/COPYING
+        - /usr/share/licenses/bash-devel/COPYING
 ```
 
 The available presets expand during planning:
 
 | Preset | Contents |
 |---|---|
-| `@dev` | headers, static libraries, unversioned `.so` linker scripts, pkg-config, aclocal and CMake files |
+| `@dev` | headers, unversioned `.so` linker scripts, pkg-config, aclocal and CMake files |
 | `@headers` | `/usr/include/**` |
 | `@static` | `/usr/lib*/lib*.a` |
 | `@pkgconfig` | `/usr/lib*/pkgconfig/**`, `/usr/share/pkgconfig/**` |
@@ -177,7 +178,9 @@ Create a subpackage only when there is a real reason:
 
 | Output | Why |
 |---|---|
-| `-dev` | headers, static libraries, pkg-config and linker scripts are build-only |
+| `-devel` | headers, unversioned `.so` links, pkg-config and CMake files are build-only |
+| `-static` | static archives are only needed by static-link builds |
+| `-libs` | the shared runtime library when the package also ships tools |
 | `-doc` | man pages, info pages and examples are optional |
 | `-locales` | locale data is large and often unnecessary in a container |
 | `-binsh` | `/bin/sh` is a separate capability from the shell package |
@@ -188,6 +191,68 @@ Create a subpackage only when there is a real reason:
 
 The main package must stay lean enough for a minimal image. A split that only
 exists to satisfy a tool is not a reason to create a package.
+
+### Do not use `-common`
+
+There is no `-common` convention. Do not create a `-common` output as a place
+for files that did not fit elsewhere.
+
+`-common` hides ownership: it usually starts with one shared data file and
+becomes a dumping ground for unrelated payload. If a package has shared data,
+name the output after its function (`-locales`, `-iconv`, `-doc`) or keep the
+data in the main package when it is genuinely part of the runtime. If several
+subpackages need the same files, the split is wrong; move those files to the
+output that owns the behavior.
+
+### Development, static and runtime-library outputs
+
+Eternal uses three deliberate splits. They are independent: a package can have
+none, one, or all of them.
+
+- **`-devel`** contains only what is needed to compile and link against the
+  package: headers, unversioned `.so` linker links, pkg-config and CMake
+  metadata. It never contains static archives.
+- **`-static`** contains static archives (`lib*.a`). It depends on the matching
+  `-devel` output, because a static link needs the headers and linker metadata
+  as well as the archive.
+- **`-libs`** contains shared runtime libraries when a source package also
+  ships commands. The main package is the command package, and both the main
+  package and `-devel` depend on `-libs`. This keeps the runtime library
+  installable without the commands and stops `-devel` from pulling tools into
+  a build root.
+
+The split names follow the **source package**, not the library filename:
+
+```text
+xz          xz-libs          xz-devel
+zstd        zstd-libs        zstd-devel        zstd-static
+expat       expat-libs       expat-devel
+pcre2       pcre2-libs       pcre2-devel
+zlib        (library only)   zlib-devel        zlib-static
+```
+
+A package only gets a `-static` output when its build actually produces static
+archives. A package that configures with `--disable-static` has no `-static`
+output and must not advertise a static capability.
+
+Use these rules:
+
+- A library-only package such as `zlib`, `gmp`, `mpfr`, `mpc`, `isl` or
+  `libffi` has no `-libs` output. Its main package is already the runtime
+  library.
+- A package that ships commands plus one or more shared libraries uses one
+  `-libs` output for all of its runtime SONAMEs. Do not invent a separate
+  output per ABI unless the ABIs are independently useful in a minimal image.
+- Established toolchain identities are the exception. GCC keeps
+  `libstdc++-16` and `libatomic-16`; glibc keeps `ld-linux-2.44` and
+  `libc-bin-2.44`. Those names are part of the toolchain interface, so
+  renaming them to `gcc-libs` or `glibc-libs` would make the interface worse.
+- Compiler runtime archives (`libgcc.a`, `libgcc_eh.a`, `libgcov.a`) stay in
+  the compiler's main output. They are required for ordinary linking, not an
+  optional static build.
+
+`@dev` and `@static` are disjoint. Static archives are selected only by
+`@static`, so a `-devel` output cannot accidentally claim a `-static` file.
 
 ### Ownership
 
@@ -207,10 +272,6 @@ pkg-config/CMake files, documentation or locale source data, and names the
 preset that would split them. Use `rpmx explain files` to inspect the planned
 selectors and which output is the main package.
 
-Compiler runtime archives (`libgcc.a`, `libgcc_eh.a`, `libgcov.a`) are the
-exception: they stay with the compiler's main output because GCC needs them to
-link, so the static-library warning is expected for that class of package.
-
 ### Every output owns its license copy
 
 RPM cannot install two packages that claim the same path. If a subpackage is
@@ -222,7 +283,7 @@ pipeline:
   - uses: license/copy
     with:
       files: [COPYING]
-      outputs: [bash, bash-binsh, bash-doc, bash-dev, bash-builtins]
+      outputs: [bash, bash-binsh, bash-doc, bash-devel, bash-builtins]
 ```
 
 The main package gets its copy through the main-package fallback. A subpackage
@@ -231,9 +292,9 @@ claims its copy in `files.include` and marks it in `files.license`:
 ```yaml
 files:
   include:
-    - /usr/share/licenses/bash-dev/COPYING
+    - /usr/share/licenses/bash-devel/COPYING
   license:
-    - /usr/share/licenses/bash-dev/COPYING
+    - /usr/share/licenses/bash-devel/COPYING
 ```
 
 Do not point two outputs at the same license path.
@@ -267,17 +328,22 @@ outputs:
       run:
         - binutils
         - filesystem
-        - glibc-2.44-dev = 2.44-1
+        - glibc-2.44-devel
 ```
 
 Rules:
 
 - List package names, not commands: `bash`, not `sh`; `gcc`, not `cc`.
 - Prefer capabilities (`glibc`, `gcc`) when the stream is not part of the
-  interface. Pin the versioned package when mixing streams would be wrong.
+  interface. Depend on the versioned package name when mixing streams would be
+  wrong, but do not pin a specific release. Use `= version-release` only
+  between sibling outputs of the same source package.
 - Never add a test-only package to the build root; put it on the test.
 - `provides` describes what an output supplies. RPMX also generates ELF
-  `libfoo.so.N()(64bit)`, script interpreter, pkg-config and similar requires.
+  `libfoo.so.N()(64bit)`, script interpreter, pkg-config and similar
+  dependencies.
+- RPMX reads `.pc` files and generates both `pkgconfig(foo)` provides and
+  `pkgconfig(foo)` requires. Do not add those by hand.
 - Do not add a runtime dependency on a development package unless the package
   genuinely cannot work without it; GCC needing glibc headers to compile is a
   deliberate exception.
@@ -428,6 +494,19 @@ Packages should install into `/usr` and use `$PREFIX`/`$LIBDIR` where possible.
 The `filesystem` package owns the top-level FHS directories and symlinks;
 packages own their own subdirectories. Do not claim a directory in two outputs.
 
+Use the executable directories consistently:
+
+- `/usr/bin` is for commands users invoke directly.
+- `/usr/libexec/<component>/` is for helper programs that another program runs
+  and users are not expected to call. The component is the package or the named
+  helper. Do not install private helpers directly in `/usr/libexec` or `/usr/bin`.
+- `/usr/share/<package>/` is for architecture-independent data.
+- `/usr/lib/<package>/` is for architecture-specific package data that is not
+  a shared library. Shared libraries still belong in `$LIBDIR`.
+
+A helper that is useful on its own becomes a command in `/usr/bin`; a helper
+that exists only to implement another command stays under `/usr/libexec`.
+
 For x86_64, use `/usr/lib64` for 64-bit libraries; for aarch64, `/usr/lib`.
 Build steps can branch on `${arch}`:
 
@@ -518,36 +597,78 @@ outputs:
         - gcc-16 = ${package.version}-${package.release}
       provides:
         - gcc = ${package.version}-${package.release}
+        - gcc-c++ = ${package.version}-${package.release}
+        - cpp = ${package.version}-${package.release}
 ```
+
+`gcc-16-default` is the only output that provides the unversioned capabilities.
+Advertise `gcc`, `gcc-c++`, `cpp` and `cc` together so a recipe that asks for
+the C++ compiler cannot accidentally get a C-only default stream.
+
+`libstdc++-16-devel` provides `libstdc++-devel`; the separate
+`libstdc++-16-static` output provides `libstdc++-static`. A static C++ link
+therefore asks for the static capability, not for the development package.
 
 Use `--disable-bootstrap` for the first import; a later toolchain-generation
 job can rebuild GCC with itself.
 
 ## 9. Versioned ABI example: glibc
 
-Keep both supported glibc streams as separate recipes:
+glibc is the reference for a versioned ABI stream. Keep both supported streams
+as separate recipes:
 
 ```text
 packages/glibc-2.43/package.yaml
 packages/glibc-2.44/package.yaml
 ```
 
-Both provide `glibc`, and each runtime output conflicts with the other stream.
-Each stream owns its own versioned subpackages:
+Both streams provide the unversioned `glibc` capability, and their runtime
+packages conflict with each other. The versioned names are the implementation;
+the unversioned name is only a provide.
+
+Each stream owns its own subpackages:
 
 ```text
 glibc-2.44
-glibc-2.44-dev
+glibc-2.44-devel
+glibc-2.44-doc
 glibc-2.44-iconv
 glibc-2.44-locales
-glibc-2.44-doc
+glibc-2.44-static
 ld-linux-2.44
 libc-bin-2.44
 nss-db-2.44
 ```
 
-The main `glibc-2.44` output has no `files.include`; it owns the runtime
-libraries, `/etc/rpc` and the license. Optional data is split by purpose:
+The split is by function, not one output per file:
+
+- `glibc-2.44` is the runtime library package. It owns the shared libc, libm,
+  libpthread, libdl and the other core SONAMEs, plus `/etc/rpc` and the
+  license. It provides `glibc` and conflicts with `glibc-2.43`.
+- `ld-linux-2.44` owns the ELF interpreter, `/etc/ld.so.conf`, and the loader
+  configuration. It provides `ld-linux`, so a package can depend on the loader
+  without depending on the whole libc stream.
+- `libc-bin-2.44` owns the operator commands: `ldconfig`, `ldd`, `locale`,
+  `localedef`, `getent`, `iconv`, `zic` and the rest. Keeping them out of the
+  runtime package is what makes a minimal image possible.
+- `glibc-2.44-iconv` owns the gconv modules. They are large and only needed
+  when character-set conversion is used.
+- `glibc-2.44-locales` owns locale source data and compiled locales. This is
+  the one place Eternal deliberately differs from Fedora's per-language
+  `glibc-langpack-*` split: one `-locales` output is simpler while the locale
+  payload is still small enough. If it becomes a size problem, split it by
+  language later; do not rename the current output to `langpack` without
+  actually making per-language packages.
+- `nss-db-2.44` owns the NSS database module, which is optional.
+- `glibc-2.44-devel` owns headers, `crt*.o`, the unversioned `.so` linker
+  links, and the static-link metadata. It provides `glibc-devel`.
+- `glibc-2.44-static` owns the static archives (`libc.a`, `libm.a`,
+  `libpthread.a`, ...). It depends on `glibc-2.44-devel` and provides
+  `glibc-static`. Static archives never live in `-devel`.
+- `glibc-2.44-doc` owns the man, info and documentation payload.
+
+The main output has no `files.include`; it collects the runtime remainder. The
+other outputs use narrow selectors:
 
 ```yaml
   - name: glibc-2.44-locales
@@ -555,6 +676,27 @@ libraries, `/etc/rpc` and the license. Optional data is split by purpose:
       include:
         - "@locales"
         - /usr/share/licenses/glibc-2.44-locales/COPYING
+
+  - name: glibc-2.44-devel
+    files:
+      include:
+        - "@dev"
+        - /usr/lib*/*.o
+        - /usr/share/licenses/glibc-2.44-devel/**
+      exclude:
+        - /usr/lib*/libmemusage.so
+
+  - name: glibc-2.44-static
+    files:
+      include:
+        - "@static"
+        - /usr/share/licenses/glibc-2.44-static/**
+    dependencies:
+      run:
+        - glibc-2.44-devel = ${package.version}-${package.release}
+        - filesystem
+      provides:
+        - glibc-static = ${package.version}-${package.release}
 ```
 
 Keep the unversioned capability on the runtime package:
@@ -567,8 +709,14 @@ dependencies:
     - glibc = ${package.version}-${package.release}
 ```
 
-Packages that must link against a specific stream depend on the versioned dev
-package (`glibc-2.44-dev = 2.44-1`), not only on `glibc`.
+Packages that must link against a specific stream depend on the versioned
+development package (`glibc-2.44-devel`), not only on `glibc`. The package
+name selects the stream; do not pin a release such as `= 2.44-1`. A release
+bump within the same stream must not force every consumer to rebuild.
+
+Use an exact `= version-release` requirement only between outputs of the same
+source package, where the compiler and its runtime libraries must match. For
+an external package, the package name is the interface.
 
 ## 10. Bootstrap variants
 
@@ -597,6 +745,12 @@ bootstrap variant; the production recipe stays.
 - [ ] Runtime output contains no docs, headers, static libraries or build
       tools; use the split presets instead of listing every path. Compiler
       runtime archives needed for linking are the exception.
+- [ ] Development output is named `-devel`, never `-dev`.
+- [ ] Static archives are in `-static`, not in `-devel`; the static output
+      depends on the matching `-devel` output.
+- [ ] A package that ships commands and shared libraries has one `-libs`
+      output for the runtime SONAMEs; the main package and `-devel` depend on
+      it. Library-only packages do not get a `-libs` output.
 - [ ] Every separately installable output has its own license copy and claims
       it in `files.include` and `files.license`.
 - [ ] Every user-facing output has a test, or the package-level test covers it.
