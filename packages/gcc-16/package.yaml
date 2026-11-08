@@ -69,6 +69,11 @@ build:
       - zlib-ng-compat-devel
       - kernel-headers
       - glibc-devel
+  flags:
+    exclude:
+      # GCC's own diagnostics should not become build failures while the
+      # target compiler is still being assembled.
+      - -Werror=format-security
   pipeline:
     - runs: |
         mkdir build
