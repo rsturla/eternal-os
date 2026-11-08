@@ -1,0 +1,135 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# GNU Texinfo, the documentation format the GNU toolchain ships. binutils,
+# GCC, glibc, bash and bison all install info pages, and their `make` runs
+# `makeinfo` for the pages the release tarball does not pre-build.
+#
+# `makeinfo` and `texi2any` are Perl programs, so this package depends on the
+# Perl interpreter at run time. It is the reason Perl is imported in the same
+# wave: the alternative is carrying a second converter implementation.
+#
+# The release tarball ships the translated message catalogs, so the build does
+# not need msgfmt. Its own info pages are built with the `texi2any` this build
+# produces.
+schema: 1
+
+package:
+  name: texinfo
+  version: "7.3"
+  release: 1
+  summary: GNU documentation system
+  description: |
+    Texinfo is the documentation system used by the GNU project. It provides
+    `makeinfo`/`texi2any` to convert Texinfo sources into info, HTML, plain
+    text and XML, the `info` reader, `install-info` and indexing tools.
+  license: GPL-3.0-or-later
+  upstream: https://www.gnu.org/software/texinfo/
+  cpe:
+    vendor: gnu
+    product: texinfo
+
+sources:
+  - name: texinfo-7.3.tar.xz
+    kind: archive
+    digest: "sha512:fb1a16df67f870e79c31f4b96d8431d9c944eb84e5aa71e9d94890417ce63047918d55620fa63bd582232c47e9b412a6f95a11a2479f53f40e92e49bc018d926"
+    locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/texinfo/texinfo-7.3.tar.xz
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/texinfo/texinfo-7.3.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  # The repository PATH looks in /usr/sbin before /usr/bin, and on a merged
+  # /usr the two spell the same interpreter. `configure` records the path it
+  # finds into the texi2any shebang, so pin it to the path Perl actually owns.
+  environment:
+    PERL: /usr/bin/perl
+  dependencies:
+    tools: [gcc, make, bash, coreutils, perl, gawk, sed, grep, diffutils, findutils]
+    host: [ncurses-devel]
+    tests: [bash-binsh, coreutils, perl, gcc]
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          - --disable-nls
+          - --disable-static
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        set -eu
+        rm -f "$STAGE/usr/share/info/dir"
+        find "$STAGE" -name '*.la' -delete
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [texinfo, texinfo-doc]
+    - uses: strip
+
+outputs:
+  - name: texinfo
+    summary: GNU documentation system
+    files:
+      license:
+        - /usr/share/licenses/texinfo/COPYING
+    # The Perl modules under /usr/share/texi2any/lib implement the converter.
+    # They are recorded as provides, so a package that needs one can ask for
+    # it, but the requirements they imply are noise: `perl(:VERSION) >= 5.003`
+    # spellings that no 5.x release can satisfy in rpm's ordering.
+    generators:
+      perl:
+        requires: false
+    dependencies:
+      run:
+        - perl
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            makeinfo --version | head -1 | grep -q '7.3'
+            texi2any --version | head -1 | grep -q '7.3'
+            info --version | head -1 | grep -q '7.3'
+            cat > sample.texi <<'EOF'
+            \input texinfo
+            @setfilename sample.info
+            @node Top
+            @chapter Hello
+            Eternal Texinfo works.
+            @bye
+            EOF
+            makeinfo --no-split -o sample.info sample.texi
+            grep -q 'Eternal Texinfo works.' sample.info
+            install-info --version | head -1
+
+  - name: texinfo-doc
+    summary: Documentation for Texinfo
+    files:
+      include:
+        - "@man"
+        - "@info"
+        - "@doc"
+        - /usr/share/licenses/texinfo-doc/COPYING
+      license:
+        - /usr/share/licenses/texinfo-doc/COPYING
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: hardening
+    stage: build
+    pipeline:
+      - uses: test/hardening-check
+        with:
+          # The XS converter modules are built by the Perl extension
+          # toolchain with Perl's own compiler flags. Check the programs.
+          paths: [/usr/bin]
