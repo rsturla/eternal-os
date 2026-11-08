@@ -1,0 +1,53 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# The base-system metapackage. It is intentionally a metapackage: the actual
+# filesystem layout, release identity and shell come from separate recipes.
+# Keeping this name stable means `eternal-base` and other packages can depend
+# on `basesystem` even as the provider changes from Fedora to Eternal.
+#
+# The bootstrap variant lives in bootstrap/recipes/basesystem/package.yaml.
+schema: 1
+
+package:
+  name: basesystem
+  version: "12"
+  release: 1
+  summary: Eternal Linux base system metapackage
+  description: |
+    Metapackage for the minimum Eternal Linux base: the filesystem layout and
+    the Eternal-specific base layout.
+  license: MIT
+  upstream: https://github.com/rsturla/eternal-os
+
+context: files
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [bash, coreutils]
+  pipeline:
+    - runs: |
+        install -d "$STAGE/usr/share/licenses/basesystem"
+        install -m 0644 LICENSE "$STAGE/usr/share/licenses/basesystem/LICENSE"
+
+outputs:
+  - name: basesystem
+    summary: Eternal Linux base system metapackage
+    arch: noarch
+    metapackage: true
+    files:
+      license:
+        - /usr/share/licenses/basesystem/LICENSE
+    dependencies:
+      run:
+        - filesystem
+        - eternal-baselayout
+
+tests:
+  - name: license
+    stage: build
+    argv:
+      - sh
+      - -c
+      - test -f "$STAGE/usr/share/licenses/basesystem/LICENSE"
