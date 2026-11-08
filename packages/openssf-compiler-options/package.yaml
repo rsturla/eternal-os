@@ -1,0 +1,151 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# Compiler hardening policy, installed as a package instead of repeated in every
+# profile and recipe. The wrapper in /usr/local/bin shadows the real compiler,
+# and the versioned GCC specs hold the OpenSSF controls. A recipe opts out with
+#   environment:
+#     GCC_SPEC_FILE: no-hardening.spec
+# or with an absolute spec path.
+#
+# This mirrors Wolfi's openssf-compiler-options: the compiler package depends on
+# the policy package, and every build that installs the compiler inherits it.
+schema: 1
+
+package:
+  name: openssf-compiler-options
+  version: "20261108"
+  release: 1
+  summary: OpenSSF compiler hardening options
+  description: |
+    GCC wrapper scripts and versioned spec files that apply the OpenSSF
+    compiler hardening guide to C/C++ builds. The package is a build
+    dependency of the Eternal toolchain, not part of a runtime image.
+  license: MIT
+  upstream: https://best.openssf.org/Compiler-Hardening-Guides/Compiler-Options-Hardening-Guide-for-C-and-C++.html
+
+context: files
+
+build:
+  root:
+    profile: ../../profiles/bootstrap-toolchain.profile.yaml
+  dependencies:
+    tools: [bash, coreutils]
+  pipeline:
+    - runs: |
+        install -d "$STAGE/usr/local/bin" \
+                   "$STAGE/usr/lib/eternal/gcc" \
+                   "$STAGE/usr/share/licenses/openssf-compiler-options"
+        install -m 0755 gcc-wrapper "$STAGE/usr/local/bin/gcc-wrapper"
+        install -m 0644 openssf-13.spec openssf-14.spec openssf-15.spec \
+          openssf-16.spec openssf-default.spec no-hardening.spec \
+          "$STAGE/usr/lib/eternal/gcc/"
+        install -m 0644 LICENSE \
+          "$STAGE/usr/share/licenses/openssf-compiler-options/LICENSE"
+
+        cd "$STAGE/usr/local/bin"
+        for name in gcc g++ cc c++ cpp gfortran; do
+          ln -s gcc-wrapper "$name"
+        done
+        for version in 13 14 15 16; do
+          for name in gcc g++ cpp gfortran; do
+            ln -s gcc-wrapper "$name-$version"
+          done
+        done
+        for triple in x86_64-redhat-linux aarch64-redhat-linux \
+                      x86_64-eternal-linux aarch64-eternal-linux \
+                      x86_64-linux-gnu aarch64-linux-gnu; do
+          for name in gcc g++ cpp gfortran; do
+            ln -s gcc-wrapper "$triple-$name"
+            for version in 13 14 15 16; do
+              ln -s gcc-wrapper "$triple-$name-$version"
+            done
+          done
+        done
+
+outputs:
+  - name: openssf-compiler-options
+    summary: OpenSSF compiler hardening options
+    arch: noarch
+    files:
+      license:
+        - /usr/share/licenses/openssf-compiler-options/LICENSE
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: layout
+    stage: build
+    argv:
+      - sh
+      - -c
+      - |
+        test -L "$STAGE/usr/local/bin/gcc"
+        test "$(readlink "$STAGE/usr/local/bin/gcc")" = gcc-wrapper
+        for version in 13 14 15 16; do
+          test -f "$STAGE/usr/lib/eternal/gcc/openssf-$version.spec"
+        done
+        grep -q -- '-fPIE' \
+          "$STAGE/usr/lib/eternal/gcc/openssf-16.spec"
+        grep -q -- '-fzero-init-padding-bits=all' \
+          "$STAGE/usr/lib/eternal/gcc/openssf-16.spec"
+        ! grep -q -- '-fzero-init-padding-bits=all' \
+          "$STAGE/usr/lib/eternal/gcc/openssf-13.spec"
+
+  - name: default-wrapper
+    stage: installed
+    environment:
+      contents:
+        packages: [gcc]
+    pipeline:
+      - uses: test/compiler-hardening-check
+        with:
+          cc: cc
+
+  - name: spec-13
+    stage: installed
+    environment:
+      contents:
+        packages: [gcc]
+      environment:
+        CFLAGS: "-specs=/usr/lib/eternal/gcc/openssf-13.spec"
+    pipeline:
+      - uses: test/compiler-hardening-check
+        with:
+          cc: /usr/bin/gcc
+
+  - name: spec-14
+    stage: installed
+    environment:
+      contents:
+        packages: [gcc]
+      environment:
+        CFLAGS: "-specs=/usr/lib/eternal/gcc/openssf-14.spec"
+    pipeline:
+      - uses: test/compiler-hardening-check
+        with:
+          cc: /usr/bin/gcc
+
+  - name: spec-15
+    stage: installed
+    environment:
+      contents:
+        packages: [gcc]
+      environment:
+        CFLAGS: "-specs=/usr/lib/eternal/gcc/openssf-15.spec"
+    pipeline:
+      - uses: test/compiler-hardening-check
+        with:
+          cc: /usr/bin/gcc
+
+  - name: spec-16
+    stage: installed
+    environment:
+      contents:
+        packages: [gcc]
+      environment:
+        CFLAGS: "-specs=/usr/lib/eternal/gcc/openssf-16.spec"
+    pipeline:
+      - uses: test/compiler-hardening-check
+        with:
+          cc: /usr/bin/gcc

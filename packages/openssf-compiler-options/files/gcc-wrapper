@@ -1,0 +1,30 @@
+#!/bin/sh
+
+# Shadow the real compiler and apply the OpenSSF hardening spec. GCC resolves
+# -specs relative to its own library directory, so the specs are absolute.
+set -eu
+
+name=${0##*/}
+
+if [ -n "${GCC_SPEC_FILE:-}" ]; then
+    spec=$GCC_SPEC_FILE
+else
+    cache=${TMPDIR:-/tmp}/.eternal-gcc-$name
+    if [ -r "$cache" ]; then
+        major=$(cat "$cache")
+    else
+        major=$(/usr/bin/"$name" -dumpversion 2>/dev/null |
+            sed -n 's/^\([0-9][0-9]*\).*/\1/p')
+        [ -n "$major" ] || major=default
+        printf '%s\n' "$major" >"$cache" 2>/dev/null || true
+    fi
+    spec="/usr/lib/eternal/gcc/openssf-$major.spec"
+    [ -f "$spec" ] || spec="/usr/lib/eternal/gcc/openssf-default.spec"
+fi
+
+case "$spec" in
+    /*) ;;
+    *) spec="/usr/lib/eternal/gcc/$spec" ;;
+esac
+
+exec /usr/bin/"$name" -specs "$spec" "$@"
