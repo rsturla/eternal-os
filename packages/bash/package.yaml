@@ -176,3 +176,12 @@ tests:
       - sh
       - -c
       - ./bash --version | grep -q 'version 5.3.9'
+
+  - name: hardening
+    stage: build
+    pipeline:
+      - uses: test/hardening-check
+        with:
+          # The loadable builtins are tiny wrappers; several have no stack
+          # buffer or fortified libc call to observe. Check the shell itself.
+          paths: [/usr/bin/bash]
