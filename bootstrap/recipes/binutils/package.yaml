@@ -52,7 +52,7 @@ build:
       - texinfo
       - bison
       - flex
-      - zlib-ng-compat-devel
+      - zlib-devel
       - gawk
       - sed
       - grep
