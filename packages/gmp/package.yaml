@@ -1,0 +1,133 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# A library for arbitrary precision arithmetic. A build dependency for the GNU toolchain and the
+# rest of the minimal Eternal userland.
+schema: 1
+
+package:
+  name: gmp
+  version: "6.3.0"
+  release: 1
+  summary: A library for arbitrary precision arithmetic
+  description: |
+    GMP is a free library for arbitrary precision arithmetic, operating on signed integers, rational numbers and floating-point numbers.
+  license: LGPL-3.0-or-later OR GPL-2.0-or-later
+  upstream: https://gmplib.org/
+  cpe:
+    vendor: gmp
+    product: gmp
+
+sources:
+  - name: gmp-6.3.0.tar.xz
+    kind: archive
+    digest: "sha512:e85a0dab5195889948a3462189f0e0598d331d3457612e2d3350799dba2e244316d256f8161df5219538eb003e4b5343f989aaa00f96321559063ed8c8f29fd2"
+    locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/gmp/gmp-6.3.0.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, m4]
+    tests: [bash-binsh]
+  environment:
+    # GMP 6.3.0 was written for C17. GCC 15 and newer default to C23, where
+    # "void f()" is a prototype and GMP's configure compiler probe fails.
+    CFLAGS: -std=gnu17
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          - --disable-cxx
+          - --with-pic
+          - --enable-shared
+          - --disable-static
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+    - uses: license/copy
+      with:
+        files: [COPYING.LESSERv3, COPYINGv3]
+        outputs: [gmp, gmp-devel, gmp-doc]
+    - uses: strip
+
+outputs:
+  - name: gmp
+    summary: A library for arbitrary precision arithmetic
+    files:
+      license:
+        - /usr/share/licenses/gmp/COPYING.LESSERv3
+        - /usr/share/licenses/gmp/COPYINGv3
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libgmp.so.* /usr/lib/libgmp.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: gmp-devel
+    summary: GMP development files
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/gmp-devel/COPYING.LESSERv3
+        - /usr/share/licenses/gmp-devel/COPYINGv3
+      license:
+        - /usr/share/licenses/gmp-devel/COPYING.LESSERv3
+        - /usr/share/licenses/gmp-devel/COPYINGv3
+    dependencies:
+      run:
+        - gmp = ${package.version}-${package.release}
+        - filesystem
+
+  - name: gmp-doc
+    summary: GMP documentation
+    files:
+      include:
+        - "@doc"
+        - "@man"
+        - "@info"
+        - /usr/share/licenses/gmp-doc/COPYING.LESSERv3
+        - /usr/share/licenses/gmp-doc/COPYINGv3
+      license:
+        - /usr/share/licenses/gmp-doc/COPYING.LESSERv3
+        - /usr/share/licenses/gmp-doc/COPYINGv3
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: link
+    stage: installed
+    environment:
+      contents:
+        packages: [gcc, glibc-devel]
+    argv:
+      - sh
+      - -c
+      - |
+        cat > /tmp/test.c <<'EOF'
+        #include <gmp.h>
+        int main(void) {
+          mpz_t value;
+          mpz_init_set_ui(value, 2);
+          mpz_mul_ui(value, value, 3);
+          int result = mpz_cmp_ui(value, 6) != 0;
+          mpz_clear(value);
+          return result;
+        }
+        EOF
+        gcc /tmp/test.c -lgmp -o /tmp/test
+        /tmp/test
