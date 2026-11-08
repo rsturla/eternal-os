@@ -8,6 +8,9 @@ repos:
       - id: check-shebang-scripts-are-executable
       - id: end-of-file-fixer
       - id: trailing-whitespace
+        # Upstream bash patches are applied verbatim; their context lines
+        # contain significant trailing whitespace.
+        exclude: ^(packages|bootstrap/recipes)/bash/patches/
       - id: mixed-line-ending
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.10.0.1

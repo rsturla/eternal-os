@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Write package.lock.json for every recipe. Commit the locks.
+# Write local package.lock.json files for every recipe.
+# They are gitignored while the bootstrap root follows live Fedora.
 set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)

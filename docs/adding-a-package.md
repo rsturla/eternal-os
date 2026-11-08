@@ -1,5 +1,9 @@
 # Adding a package
 
+Read the [packaging guide](packaging.md) first. It defines the naming,
+versioned-stream, subpackage, dependency, licensing and testing conventions
+that recipes in this repository follow.
+
 ## Start from a template
 
 ```console
@@ -52,10 +56,9 @@ build:
     - uses: strip
 
 outputs:
+  # The first output is the main package. It receives everything the later
+  # outputs do not claim, so a single-binary package needs no files.include.
   - name: foo
-    files:
-      include:
-        - /usr/bin/foo
     tests:
       - name: installed-smoke
         stage: installed
@@ -72,6 +75,10 @@ tests:
 
 Rules that matter:
 
+- The first output is the main package. Do not enumerate the whole runtime
+  payload; split only what needs its own package. Use `@dev`, `@doc`, `@man`,
+  `@info`, `@locales`, `@static`, `@pkgconfig`, `@headers` or `@debug` in
+  `files.include` instead of repeating every path.
 - `package.name` is the RPM name. Do not rename a component when Eternal takes
   ownership of it; keep the upstream/bootstrap name so `eternal-base` and
   consumers do not change.
@@ -85,6 +92,9 @@ Rules that matter:
   `vendor: eternal`; omit it for Eternal-owned packages with no upstream CPE.
 - `build.dependencies.tools` lists **package names**, not commands: `bash`, not
   `sh`; `gcc`, not `cc`.
+- Use the reusable build steps (`autotools/configure`, `autotools/build`,
+  `autotools/install`, `make/build`, `make/install`, `cmake/configure`, ...)
+  instead of copying the configure/make shell sequence into every recipe.
 - Use `$STAGE` for the install root and `$PREFIX`/`$LIBDIR` for layout.
 - Include a test. `rpmx build` runs tests by default, so a green build means
   tested.
@@ -151,12 +161,12 @@ script, rpmx revision or in-tree build dependency changes. Use
 `./scripts/build-all.sh --affected --since origin/main` to rebuild only what a
 branch touches, or `make build-all` to force everything.
 
-Commit `packages/foo/package.lock.json` with the recipe. It records the
-resolved build root and step digests, and the package content hash covers it.
-`make lock-check` re-resolves and exits non-zero on drift. CI does not pass
-`--locked` yet: the bootstrap profile follows live Fedora 44, so the recorded
-root closure moves when Fedora updates. Pin the bootstrap repositories (or add
-a committed root lock) before making the builds refuse drift.
+`packages/foo/package.lock.json` is local build metadata, not a repository
+input. `./scripts/lock-all.sh` writes it, and `make lock-check` verifies it, but
+the file is gitignored while the bootstrap profile follows live Fedora 44: the
+recorded root closure moves whenever Fedora updates. Start committing locks
+only after the bootstrap repositories or root closure are pinned and CI builds
+with `--locked`.
 
 When `foo` gains users, `scripts/package-graph.sh` picks up build edges from
 `build.dependencies` and runtime edges from `outputs[].dependencies.run` via
@@ -168,5 +178,5 @@ When `foo` gains users, `scripts/package-graph.sh` picks up build edges from
 - [ ] The package builds with `./scripts/build-all.sh --package NAME`.
 - [ ] `make affected` includes the package and anything that builds against it.
 - [ ] At least one test fails if the packaged files disappear.
-- [ ] `package.lock.json` is committed.
+- [ ] No tracked `package.lock.json` is added while the bootstrap root floats.
 - [ ] No secrets, signing keys or local paths are in the recipe.

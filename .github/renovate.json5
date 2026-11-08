@@ -18,13 +18,12 @@
     }
   ],
 
-  // The pinned rpmx revision is managed by hand in
-  // .github/actions/setup-rpmx/action.yml and scripts/install-rpmx.sh.
+  // The pinned rpmx revision is the single source of truth.
   "customManagers": [
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^scripts/install-rpmx\\.sh$/"],
-      "matchStrings": ["RPMX_REV:-?(?<currentValue>[0-9a-f]{40})"],
+      "managerFilePatterns": ["/^\\.rpmx-revision$/"],
+      "matchStrings": ["(?<currentValue>[0-9a-f]{40})"],
       "depNameTemplate": "rsturla/rpmx",
       "datasourceTemplate": "git-refs",
       "versioningTemplate": "git"

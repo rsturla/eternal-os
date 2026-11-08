@@ -49,6 +49,7 @@ produced by [rpmx](https://github.com/rsturla/rpmx):
 ├── docs/
 │   ├── adding-a-package.md
 │   ├── architecture.md
+│   ├── packaging.md             # house style for every recipe
 │   └── signing.md
 ├── bootstrap/                     # dedicated seed -> self-hosted build definition
 │   ├── bootstrap.yaml              # stage graph, roots, replaces map
@@ -117,10 +118,15 @@ packages.
 
 ## Incremental builds
 
-Every package has a content hash over its recipe, context, lock, profiles,
+Every package has a content hash over its tracked recipe, context, profiles,
 build scripts, the pinned rpmx revision, and its in-tree build dependencies
 transitively. `scripts/build-all.sh` records the hash in `out/.stamps/` and
 skips a package when the stamp matches and its RPMs are present.
+
+`package.lock.json` files are local build metadata while the bootstrap root
+follows live Fedora. `make lock` writes them and `make lock-check` checks them,
+but they are gitignored: the root closure moves independently of the recipes.
+Commit locks only after the root is pinned and CI builds with `--locked`.
 
 ```console
 make hash            # content hashes, one per package

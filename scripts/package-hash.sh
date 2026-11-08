@@ -2,7 +2,7 @@
 # Content hash for one or more packages.
 #
 # The hash covers everything that changes a package's output:
-#   - every file under packages/<name>/ (recipe, includes, context, lock);
+#   - every tracked file under packages/<name>/ (recipe, includes, context);
 #   - every profile, because a build-root change can affect any output;
 #   - scripts/, because a change to the build entry points is a build change;
 #   - the pinned rpmx revision and repository defaults;
