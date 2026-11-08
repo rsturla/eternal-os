@@ -115,7 +115,7 @@ build:
     - uses: license/copy
       with:
         files: [COPYING3, COPYING3.LIB, COPYING.RUNTIME]
-        outputs: [gcc-15, gcc-15-default, libstdc++-15, libstdc++-15-dev, libatomic-15, gcc-15-doc]
+        outputs: [gcc-15, gcc-15-default, libstdc++-15, libstdc++-15-devel, libatomic-15, gcc-15-doc]
     - runs: |
         # The default package owns the stable command names. The versioned
         # names stay with gcc-15.
@@ -146,7 +146,7 @@ outputs:
       run:
         - binutils
         - filesystem
-        - glibc-2.44-dev = 2.44-1
+        - glibc-2.44-devel = 2.44-1
         - libstdc++-15 = ${package.version}-${package.release}
       provides:
         - gcc-15 = ${package.version}-${package.release}
@@ -203,7 +203,7 @@ outputs:
         - libstdc++ = ${package.version}-${package.release}
         - libstdc++-15 = ${package.version}-${package.release}
 
-  - name: libstdc++-15-dev
+  - name: libstdc++-15-devel
     summary: GNU Standard C++ Library development files
     files:
       include:
@@ -213,18 +213,18 @@ outputs:
         - /usr/lib/gcc/**/libstdc++*
         - /usr/lib/gcc/**/include/c++/**
         - /usr/share/gcc-15/**
-        - /usr/share/licenses/libstdc++-15-dev/**
+        - /usr/share/licenses/libstdc++-15-devel/**
       license:
-        - /usr/share/licenses/libstdc++-15-dev/COPYING3
-        - /usr/share/licenses/libstdc++-15-dev/COPYING3.LIB
-        - /usr/share/licenses/libstdc++-15-dev/COPYING.RUNTIME
+        - /usr/share/licenses/libstdc++-15-devel/COPYING3
+        - /usr/share/licenses/libstdc++-15-devel/COPYING3.LIB
+        - /usr/share/licenses/libstdc++-15-devel/COPYING.RUNTIME
     dependencies:
       run:
         - libstdc++-15 = ${package.version}-${package.release}
-        - glibc-2.44-dev = 2.44-1
+        - glibc-2.44-devel = 2.44-1
         - filesystem
       provides:
-        - libstdc++-dev = ${package.version}-${package.release}
+        - libstdc++-devel = ${package.version}-${package.release}
 
   - name: libatomic-15
     summary: GCC atomic operations runtime
