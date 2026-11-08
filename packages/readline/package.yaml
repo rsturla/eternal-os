@@ -1,0 +1,155 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# GNU Readline line editing library. Python's `readline` module links it, and
+# so do most interactive shells; it is imported so that nothing in the build
+# root silently links the seed's copy.
+#
+# Readline is configured against ncurses instead of a standalone termcap so
+# that libreadline records its real terminfo dependency. An underlinked
+# readline works until something links it with `-Wl,--no-as-needed`.
+schema: 1
+
+package:
+  name: readline
+  version: "8.3"
+  release: 1
+  summary: The GNU line editing library
+  description: |
+    Readline is a library that provides command line editing, history
+    expansion and completion for interactive programs. It ships the readline
+    and history shared libraries and the associated development files.
+  license: GPL-3.0-or-later
+  upstream: https://tiswww.case.edu/php/chet/readline/rltop.html
+  cpe:
+    vendor: gnu
+    product: readline
+
+sources:
+  - name: readline-8.3.tar.gz
+    kind: archive
+    digest: "sha512:513002753dcf5db9213dbbb61d51217245f6a40d33b1dd45238e8062dfa8eef0c890b87a5548e11db959e842724fb572c4d3d7fb433773762a63c30efe808344"
+    locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/readline/readline-8.3.tar.gz
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/readline/readline-8.3.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  # Fedora's ncurses-devel carries a libtermcap compatibility symlink, so the
+  # upstream probe would pick `-ltermcap` and write `Requires.private: termcap`
+  # into readline.pc. Nothing ships termcap.pc; pin the probe to libtinfo so
+  # the packaged metadata names the library that is really linked.
+  environment:
+    bash_cv_termcap_lib: libtinfo
+  dependencies:
+    tools: [gcc, make, bash, coreutils, sed, grep, diffutils]
+    host: [ncurses-devel]
+    tests: [bash-binsh, coreutils, gcc, pkgconf]
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          # Link the shared readline library against the shared terminfo
+          # library. Without this the library carries undefined termcap
+          # symbols and only works when the caller happens to link ncurses.
+          - --with-shared-termcap-library
+          - --disable-static
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [readline, readline-devel, readline-doc]
+    - uses: strip
+
+outputs:
+  - name: readline
+    summary: The GNU line editing library
+    files:
+      include:
+        - /usr/lib*/libreadline.so.*
+        - /usr/lib*/libhistory.so.*
+        - /usr/share/licenses/readline/COPYING
+      license:
+        - /usr/share/licenses/readline/COPYING
+    dependencies:
+      run:
+        - ncurses-libs
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libreadline.so.* /usr/lib/libreadline.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: readline-devel
+    summary: Development files for readline
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/readline-devel/COPYING
+      license:
+        - /usr/share/licenses/readline-devel/COPYING
+    dependencies:
+      run:
+        - readline = ${package.version}-${package.release}
+        - ncurses-devel
+        - filesystem
+    tests:
+      - name: link
+        stage: installed
+        environment:
+          contents:
+            packages: [gcc, glibc-devel, pkgconf, grep]
+        argv:
+          - sh
+          - -c
+          - |
+            test -f /usr/include/readline/readline.h
+            cat > /tmp/hist.c <<'EOF'
+            #include <stdio.h>
+            #include <readline/readline.h>
+            #include <readline/history.h>
+            int main(void) {
+              add_history("eternal");
+              printf("%d\n", history_length);
+              return 0;
+            }
+            EOF
+            # --no-as-needed proves libreadline itself records its terminfo
+            # dependency instead of relying on the program's link line.
+            gcc /tmp/hist.c -Wl,--no-as-needed -lreadline -o /tmp/hist
+            test "$(/tmp/hist)" = 1
+
+  - name: readline-doc
+    summary: Documentation for readline
+    files:
+      include:
+        - "@man"
+        - "@info"
+        - "@doc"
+        - /usr/share/licenses/readline-doc/COPYING
+      license:
+        - /usr/share/licenses/readline-doc/COPYING
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: hardening
+    stage: build
+    pipeline:
+      - uses: test/hardening-check
