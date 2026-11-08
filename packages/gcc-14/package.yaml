@@ -142,6 +142,9 @@ outputs:
         - /usr/share/licenses/gcc-14/COPYING3
         - /usr/share/licenses/gcc-14/COPYING3.LIB
         - /usr/share/licenses/gcc-14/COPYING.RUNTIME
+    lint:
+      allow:
+        - static-archive
     dependencies:
       run:
         - binutils
