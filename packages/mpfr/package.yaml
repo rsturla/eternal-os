@@ -1,0 +1,125 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# Multiple-precision floating-point library. A build dependency for the GNU toolchain and the
+# rest of the minimal Eternal userland.
+schema: 1
+
+package:
+  name: mpfr
+  version: "4.2.2"
+  release: 1
+  summary: Multiple-precision floating-point library
+  description: |
+    MPFR is a portable C library for multiple-precision floating-point computations with correct rounding.
+  license: LGPL-3.0-or-later
+  upstream: https://www.mpfr.org/
+  cpe:
+    vendor: mpfr
+    product: mpfr
+
+sources:
+  - name: mpfr-4.2.2.tar.xz
+    kind: archive
+    digest: "sha512:eb9e7f51b5385fb349cc4fba3a45ffdf0dd53be6dfc74932dc01258158a10514667960c530c47dd9dfc5aa18be2bd94859d80499844c5713710581e6ac6259a9"
+    locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.2.tar.xz
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/mpfr/mpfr-4.2.2.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, m4]
+    host: [gmp-devel]
+    tests: [bash-binsh, gmp-devel]
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          - --enable-shared
+          - --disable-static
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+    - uses: license/copy
+      with:
+        files: [COPYING.LESSER]
+        outputs: [mpfr, mpfr-devel, mpfr-doc]
+    - uses: strip
+
+outputs:
+  - name: mpfr
+    summary: Multiple-precision floating-point library
+    files:
+      license:
+        - /usr/share/licenses/mpfr/COPYING.LESSER
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libmpfr.so.* /usr/lib/libmpfr.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: mpfr-devel
+    summary: MPFR development files
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/mpfr-devel/COPYING.LESSER
+      license:
+        - /usr/share/licenses/mpfr-devel/COPYING.LESSER
+    dependencies:
+      run:
+        - mpfr = ${package.version}-${package.release}
+        - gmp-devel
+        - filesystem
+
+  - name: mpfr-doc
+    summary: MPFR documentation
+    files:
+      include:
+        - "@doc"
+        - "@man"
+        - "@info"
+        - /usr/share/licenses/mpfr-doc/COPYING.LESSER
+      license:
+        - /usr/share/licenses/mpfr-doc/COPYING.LESSER
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: link
+    stage: installed
+    environment:
+      contents:
+        packages: [gcc, glibc-devel]
+    argv:
+      - sh
+      - -c
+      - |
+        cat > /tmp/test.c <<'EOF'
+        #include <mpfr.h>
+        int main(void) {
+          mpfr_t value;
+          mpfr_init2(value, 64);
+          mpfr_set_ui(value, 2, MPFR_RNDN);
+          mpfr_mul_ui(value, value, 3, MPFR_RNDN);
+          int result = mpfr_cmp_ui(value, 6) != 0;
+          mpfr_clear(value);
+          return result;
+        }
+        EOF
+        gcc /tmp/test.c -lmpfr -lgmp -o /tmp/test
+        /tmp/test
