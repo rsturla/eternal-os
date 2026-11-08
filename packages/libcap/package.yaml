@@ -1,0 +1,144 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# POSIX capabilities library and tools. rpm and libdnf5 link against libcap,
+# and coreutils uses it for capability-aware ls colouring.
+schema: 1
+
+package:
+  name: libcap
+  version: "2.78"
+  release: 1
+  summary: POSIX 1003.1e capabilities
+  description: |
+    libcap implements the POSIX 1003.1e capabilities API, the capsh, getcap,
+    getpcaps and setcap utilities, and the pam_cap module.
+  license: BSD-3-Clause OR GPL-2.0-only
+  upstream: https://sites.google.com/site/fullycapable/
+  cpe:
+    vendor: kernel
+    product: libcap
+
+sources:
+  - name: libcap-2.78.tar.xz
+    kind: archive
+    digest: "sha512:a156a8708dd59f13400f701f4e1ddc81f915fe4e7b32f93a328f7d6f030b7a004fb985fa9ac60812dfffeb8ad860d2e1f59895485497350250efd9378682626b"
+    locators:
+      - kind: https
+        url: https://mirrors.edge.kernel.org/pub/linux/libs/security/linux-privs/libcap2/libcap-2.78.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils]
+    tests: [bash-binsh, coreutils]
+  pipeline:
+    - runs: |
+        make -j"$(nproc)" \
+          BUILD_CC=gcc CC=gcc \
+          prefix=/usr lib=lib64 sbindir=/usr/bin \
+          PAM_CAP=no GOLANG=no RAISE_SETFCAP=no
+    - runs: |
+        make \
+          prefix=/usr lib=lib64 sbindir=/usr/bin \
+          PAM_CAP=no GOLANG=no RAISE_SETFCAP=no \
+          DESTDIR="$STAGE" install
+        chmod 0755 "$STAGE"/usr/lib64/libcap.so.*
+    - uses: license/copy
+      with:
+        files: [License]
+        outputs: [libcap, libcap-utils, libcap-devel, libcap-static, libcap-doc]
+    - uses: strip
+
+outputs:
+  - name: libcap
+    summary: Library for getting and setting POSIX capabilities
+    files:
+      include:
+        - /usr/lib*/libcap.so.*
+        - /usr/lib*/libpsx.so.*
+        - /usr/share/licenses/libcap/**
+      license:
+        - /usr/share/licenses/libcap/**
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libcap.so.* /usr/lib/libcap.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: libcap-utils
+    summary: Utilities for manipulating POSIX capabilities
+    files:
+      include:
+        - /usr/bin/capsh
+        - /usr/bin/getcap
+        - /usr/bin/getpcaps
+        - /usr/bin/setcap
+        - /usr/share/licenses/libcap-utils/**
+      license:
+        - /usr/share/licenses/libcap-utils/**
+    dependencies:
+      run:
+        - libcap = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            capsh --print >/dev/null
+            getpcaps $$ >/dev/null
+            getcap /usr/bin/capsh >/dev/null
+
+  - name: libcap-devel
+    summary: Development files for libcap
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/libcap-devel/**
+      license:
+        - /usr/share/licenses/libcap-devel/**
+    dependencies:
+      run:
+        - libcap = ${package.version}-${package.release}
+        - filesystem
+
+  - name: libcap-static
+    summary: Static libraries for libcap
+    files:
+      include:
+        - "@static"
+        - /usr/share/licenses/libcap-static/**
+      license:
+        - /usr/share/licenses/libcap-static/**
+    dependencies:
+      run:
+        - libcap-devel = ${package.version}-${package.release}
+        - filesystem
+
+  - name: libcap-doc
+    summary: Documentation for libcap
+    files:
+      include:
+        - "@man"
+        - "@doc"
+        - /usr/share/licenses/libcap-doc/**
+      license:
+        - /usr/share/licenses/libcap-doc/**
+    dependencies:
+      run:
+        - filesystem
