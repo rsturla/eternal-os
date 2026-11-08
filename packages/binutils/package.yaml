@@ -81,7 +81,7 @@ build:
     - uses: license/copy
       with:
         files: [COPYING3, COPYING3.LIB]
-        outputs: [binutils, binutils-devel, binutils-doc]
+        outputs: [binutils, binutils-devel, binutils-static, binutils-doc]
     - uses: strip
 
 outputs:
@@ -128,6 +128,27 @@ outputs:
           - -c
           - |
             test -f /usr/include/bfd.h
+
+  - name: binutils-static
+    summary: Binutils static libraries
+    files:
+      include:
+        - "@static"
+        - /usr/share/licenses/binutils-static/**
+      license:
+        - /usr/share/licenses/binutils-static/COPYING3
+        - /usr/share/licenses/binutils-static/COPYING3.LIB
+    dependencies:
+      run:
+        - binutils-devel = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
             test -f /usr/lib64/libbfd.a
 
   - name: binutils-doc
