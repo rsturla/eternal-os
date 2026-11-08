@@ -419,11 +419,12 @@ Eternal-specific policy does not.
 
 Compiler policy is a package, not a per-profile flag list. Profiles contain
 repositories, packages and install paths only; they have no `flags`. The
-bootstrap profile installs `openssf-compiler-options`, which puts a `gcc`
-wrapper in `/usr/local/bin` and versioned GCC specs under
-`/usr/lib/eternal/gcc/`. The wrapper shadows the real compiler for every C and
-C++ build and applies the shared policy spec plus an architecture spec for the
-target ISA baseline. Optimisation, warnings, hardening and unwind tables are
+bootstrap profile installs `openssf-compiler-options`, which puts compiler
+wrappers under `/usr/libexec/eternal/gcc/bin/` and versioned GCC specs under
+`/usr/lib/eternal/gcc/`. The repository default build environment puts that
+directory before `/usr/bin`, so the wrapper shadows the real compiler for every
+C and C++ build and applies the shared policy spec plus an architecture spec
+for the target ISA baseline. Optimisation, warnings, hardening and unwind tables are
 therefore all part of the root closure, and changing any of them is a package
 change.
 
