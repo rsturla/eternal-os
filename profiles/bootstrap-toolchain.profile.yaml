@@ -2,8 +2,8 @@
 #
 # This profile deliberately does not install `openssf-compiler-options` or use
 # its specs: the package is built before it exists in the toolchain repository.
-# Everything else matches the bootstrap root so the package is assembled with
-# the same shell and coreutils as the rest of the first bootstrap stage.
+# It uses the stable Fedora seed shell and coreutils, not the packages that
+# are about to be replaced during the self-hosting switch.
 document: rpmx-profile
 version: 1
 name: bootstrap-toolchain
@@ -30,9 +30,3 @@ options:
 paths:
   prefix: /usr
   libdir: /usr/lib64
-
-# The package only installs files. Keep the bootstrap compiler's defaults out
-# of the way so the package is not coupled to the hardening policy it ships.
-flags:
-  cflags: [-O2, -g]
-  cxxflags: [-O2, -g]
