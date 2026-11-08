@@ -182,7 +182,7 @@ jobs:
           # unprivileged runner. podman unshare packs and unpacks them with the
           # right ownership.
           path: ${{ runner.temp }}/rpmx-cache.tar.gz
-          key: rpmx-root-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('profiles/**') }}
+          key: rpmx-root-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('profiles/**', 'packages/openssf-compiler-options/**') }}
           restore-keys: |
             rpmx-root-${{ runner.os }}-${{ matrix.arch }}-
 
