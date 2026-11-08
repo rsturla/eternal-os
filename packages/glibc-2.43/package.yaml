@@ -107,7 +107,7 @@ build:
     - uses: license/copy
       with:
         files: [COPYINGv2, COPYING.LIB]
-        outputs: [glibc-2.43, ld-linux-2.43, libc-bin-2.43, glibc-2.43-iconv, glibc-2.43-locales, nss-db-2.43, glibc-2.43-dev, glibc-2.43-doc]
+        outputs: [glibc-2.43, ld-linux-2.43, libc-bin-2.43, glibc-2.43-iconv, glibc-2.43-locales, nss-db-2.43, glibc-2.43-devel, glibc-2.43-doc]
     - runs: |
         # The loader configuration is owned by ld-linux-2.43, not by the
         # library package.
@@ -228,24 +228,24 @@ outputs:
       provides:
         - nss-db = ${package.version}-${package.release}
 
-  - name: glibc-2.43-dev
+  - name: glibc-2.43-devel
     summary: GNU C Library development headers and libraries
     files:
       include:
         - "@dev"
         - /usr/lib*/*.o
-        - /usr/share/licenses/glibc-2.43-dev/**
+        - /usr/share/licenses/glibc-2.43-devel/**
       exclude:
         - /usr/lib*/libmemusage.so
       license:
-        - /usr/share/licenses/glibc-2.43-dev/COPYINGv2
-        - /usr/share/licenses/glibc-2.43-dev/COPYING.LIB
+        - /usr/share/licenses/glibc-2.43-devel/COPYINGv2
+        - /usr/share/licenses/glibc-2.43-devel/COPYING.LIB
     dependencies:
       run:
         - filesystem
         - glibc-2.43 = ${package.version}-${package.release}
       provides:
-        - glibc-dev = ${package.version}-${package.release}
+        - glibc-devel = ${package.version}-${package.release}
 
   - name: glibc-2.43-doc
     summary: GNU C Library documentation
