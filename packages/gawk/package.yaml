@@ -40,6 +40,7 @@ build:
     profile: ../../profiles/bootstrap.profile.yaml
   dependencies:
     tools: [gcc, make, bash, coreutils]
+    tests: [bash-binsh, coreutils]
   pipeline:
     - uses: autotools/configure
     - uses: autotools/build
