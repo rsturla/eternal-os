@@ -1,0 +1,113 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# Command line option parser used by rpm.
+schema: 1
+
+package:
+  name: popt
+  version: "1.19"
+  release: 1
+  summary: C library for parsing command line parameters
+  description: |
+    popt is a C library for parsing command line parameters with a flexible
+    and easy-to-use API. It is used by rpm and several other system tools.
+  license: MIT
+  upstream: https://github.com/rpm-software-management/popt
+  cpe:
+    vendor: rpm-software-management
+    product: popt
+
+sources:
+  - name: popt-1.19.tar.gz
+    kind: archive
+    digest: "sha512:021c6d7c4ef837de8cad48641700e5fba3baf8c7d381fd3717ee49b5da5ed4277e985db265ad4c2708e192d50de84eb0a54e11bc15951d0d45d5cd3fd02d32d4"
+    locators:
+      - kind: https
+        url: https://github.com/rpm-software-management/popt/archive/refs/tags/popt-1.19-release.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, pkgconf, autoconf, automake, libtool, gettext]
+    tests: [bash-binsh, coreutils, gcc, pkgconf]
+  pipeline:
+    - runs: |
+        autoreconf -fi
+    - uses: autotools/configure
+      with:
+        args:
+          - --disable-static
+          - --disable-nls
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        find "$STAGE" -name '*.la' -delete
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [popt, popt-devel, popt-doc]
+    - uses: strip
+
+outputs:
+  - name: popt
+    summary: Command line option parsing library
+    files:
+      include:
+        - /usr/lib*/libpopt.so.*
+        - /usr/share/licenses/popt/**
+      license:
+        - /usr/share/licenses/popt/**
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libpopt.so.* /usr/lib/libpopt.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: popt-devel
+    summary: Development files for popt
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/popt-devel/**
+      license:
+        - /usr/share/licenses/popt-devel/**
+    dependencies:
+      run:
+        - popt = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: link
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            printf '#include <popt.h>\nint main(void){return 0;}\n' > /tmp/popt.c
+            gcc /tmp/popt.c $(pkg-config --cflags --libs popt) -o /tmp/popt-test
+            /tmp/popt-test
+
+  - name: popt-doc
+    summary: Documentation for popt
+    files:
+      include:
+        - "@man"
+        - "@doc"
+        - /usr/share/licenses/popt-doc/**
+      license:
+        - /usr/share/licenses/popt-doc/**
+    dependencies:
+      run:
+        - filesystem
