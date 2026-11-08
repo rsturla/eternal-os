@@ -55,7 +55,6 @@ produced by [rpmx](https://github.com/rsturla/rpmx):
 │   ├── bootstrap.yaml              # stage graph, roots, replaces map
 │   ├── recipes/                    # bootstrap-only recipe variants
 │   └── profiles/                   # bootstrap-only stage profiles
-├── images/base/                   # base image definition and docs
 ├── packages/                      # one directory per rolling recipe (source of truth)
 ├── rpmx-defaults.yaml             # repo-wide package metadata (maintainers)
 ├── profiles/
@@ -165,8 +164,8 @@ There is no CI-only build logic. Every workflow step calls a script in
 The plan comes from `scripts/list-packages.sh`, `scripts/affected.sh`,
 `scripts/package-graph.sh` and `scripts/package-hash.sh`; the rpmx revision
 from `.rpmx-revision`. A local build and a CI build therefore consume exactly
-the same inputs. Local image composition additionally reads
-`images/base/packages.txt`; image publishing is separate.
+the same inputs. Local image composition additionally installs the
+`eternal-base` package set; image publishing is separate.
 
 The only difference is secret delivery. CI writes `RPMX_SIGNING_KEY` and
 `RPMX_PUBLIC_KEY` to temporary files; locally, pass the files directly:
@@ -246,10 +245,11 @@ and read [`docs/adding-a-package.md`](docs/adding-a-package.md).
 
 ## Images
 
-`images/base/` defines the distribution's base image as a package set, not a
-Dockerfile. `scripts/build-image.sh` installs that set into a fresh root with
-`dnf5 --installroot`, imports the result as an OCI image and tags it. This is
-the apko-style half of the Wolfi model.
+The distribution's base image is a package set, not a Dockerfile, and the set
+is the `eternal-base` recipe. `scripts/build-image.sh` installs it into a fresh
+root with `dnf5 --installroot`, imports the result as an OCI image and tags it.
+This is the apko-style half of the Wolfi model: the image is a function of a
+published repository state, never of a branch checkout.
 
 The image currently bootstraps the userspace from Fedora 44 while Eternal
 packages provide the identity and layout. The package list lives in

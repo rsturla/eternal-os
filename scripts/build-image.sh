@@ -15,15 +15,13 @@ work=
 push=0
 tags=()
 
-root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-
 usage() {
   cat <<'EOF'
 usage: build-image.sh --repo DIR --tag REF [options]
 
   --repo DIR         Repository directory containing the RPMs and repodata
   --tag REF          Image reference (repeatable)
-  --packages LIST    Space-separated package set (default: images/base/packages.txt)
+  --packages LIST    Space-separated package set (default: eternal-base)
   --releasever VER   dnf releasever used during composition (default: 44)
   --image-version V  OCI version label (default: rolling)
   --arch ARCH        Architecture of the repository (default: x86_64)
@@ -98,7 +96,7 @@ command -v podman >/dev/null 2>&1 || {
 
 repo=$(realpath "$repo")
 if [[ -z $packages ]]; then
-  packages=$(tr '\n' ' ' <"$root/images/base/packages.txt")
+  packages=eternal-base
 fi
 cleanup=
 if [[ -z $work ]]; then

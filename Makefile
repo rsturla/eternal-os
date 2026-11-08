@@ -7,7 +7,7 @@ RELEASE ?= rolling
 ARCH ?= x86_64
 IMAGE ?= ghcr.io/rsturla/eternal-os/base
 TAG ?= $(RELEASE)
-PACKAGES ?= $(shell cat images/base/packages.txt)
+PACKAGES ?= eternal-base
 BASE ?= origin/HEAD
 BOOTSTRAP ?= bootstrap/bootstrap.yaml
 
