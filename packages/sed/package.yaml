@@ -1,0 +1,79 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# GNU stream editor. Part of the minimal Eternal userland and the
+# bootstrap tool set. The source is the upstream release tarball.
+schema: 1
+
+package:
+  name: sed
+  version: "4.10"
+  release: 1
+  summary: GNU stream editor
+  description: |
+    GNU sed is a non-interactive stream editor for filtering and transforming text.
+  license: GPL-3.0-or-later
+  upstream: https://www.gnu.org/software/sed/
+  cpe:
+    vendor: gnu
+    product: sed
+
+sources:
+  - name: sed-4.10.tar.xz
+    kind: archive
+    digest: "sha512:20224df834b363ca1357024234bb93df3929c252c40c7ef3d23e78fc05177c7986e3145a5049d63db746a4dc2c97befb0324a87ea081507292ff6cd5383ee9db"
+    locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/sed/sed-4.10.tar.xz
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/sed/sed-4.10.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils]
+  pipeline:
+    - uses: autotools/configure
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [sed, sed-doc]
+    - uses: strip
+
+outputs:
+  - name: sed
+    summary: GNU stream editor
+    files:
+      license:
+        - /usr/share/licenses/sed/COPYING
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            test "$(printf 'hello\n' | sed 's/hello/world/')" = world
+            printf 'a\nb\nc\n' | sed '2d' > out
+            test "$(wc -l < out)" -eq 2
+
+  - name: sed-doc
+    summary: GNU stream editor documentation
+    files:
+      include:
+        - "@man"
+        - "@info"
+        - "@doc"
+        - /usr/share/licenses/sed-doc/COPYING
+      license:
+        - /usr/share/licenses/sed-doc/COPYING
+    dependencies:
+      run:
+        - filesystem
