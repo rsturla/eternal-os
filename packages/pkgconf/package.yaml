@@ -43,7 +43,7 @@ build:
     - uses: license/copy
       with:
         files: [COPYING]
-        outputs: [pkgconf, pkgconf-dev, pkgconf-doc]
+        outputs: [pkgconf, pkgconf-devel, pkgconf-doc]
     - uses: strip
 
 outputs:
@@ -67,14 +67,14 @@ outputs:
             test "$(pkgconf --version)" = 3.0.10
             test "$(pkg-config --version)" = 3.0.10
 
-  - name: pkgconf-dev
+  - name: pkgconf-devel
     summary: pkgconf development files
     files:
       include:
         - "@dev"
-        - /usr/share/licenses/pkgconf-dev/COPYING
+        - /usr/share/licenses/pkgconf-devel/COPYING
       license:
-        - /usr/share/licenses/pkgconf-dev/COPYING
+        - /usr/share/licenses/pkgconf-devel/COPYING
     dependencies:
       run:
         - pkgconf = ${package.version}-${package.release}
