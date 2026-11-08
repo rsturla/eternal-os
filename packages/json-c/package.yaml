@@ -1,0 +1,119 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# JSON implementation in C.
+schema: 1
+
+package:
+  name: json-c
+  version: "0.19"
+  release: 1
+  summary: JSON implementation in C
+  description: |
+    JSON-C implements a reference counting object model that allows you to
+    easily construct JSON objects in C, output them as JSON formatted strings
+    and parse JSON formatted strings back into the C representation of JSON
+    objects.
+  license: MIT
+  upstream: https://github.com/json-c/json-c
+  cpe:
+    vendor: json-c
+    product: json-c
+
+sources:
+  - name: json-c-0.19-20260627.tar.gz
+    kind: archive
+    digest: "sha512:3be9058351acb3d9a66c7ae850391ebaa80472b42ee3f013f8b655743eb41b55513e0546c6798399af98ed049b80d11c93286ea3f5af26dc5f199905a28c4db1"
+    locators:
+      - kind: https
+        url: https://github.com/json-c/json-c/archive/refs/tags/json-c-0.19-20260627.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [cmake, make, gcc, bash, coreutils]
+    tests: [bash-binsh, coreutils, gcc, pkgconf, grep]
+  pipeline:
+    - uses: cmake/configure
+      with:
+        args:
+          - -DBUILD_SHARED_LIBS=ON
+          - -DBUILD_APPS=OFF
+          - -DBUILD_TESTING=OFF
+          - -DDISABLE_WERROR=ON
+    - uses: cmake/build
+    - uses: cmake/install
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [json-c, json-c-devel, json-c-static]
+    - uses: strip
+
+outputs:
+  - name: json-c
+    summary: JSON parsing library
+    files:
+      include:
+        - /usr/lib*/libjson-c.so.*
+        - /usr/share/licenses/json-c/**
+      license:
+        - /usr/share/licenses/json-c/**
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libjson-c.so.* /usr/lib/libjson-c.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: json-c-devel
+    summary: Development files for json-c
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/json-c-devel/**
+      license:
+        - /usr/share/licenses/json-c-devel/**
+    dependencies:
+      run:
+        - json-c = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: link
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            cat > /tmp/json-test.c <<'EOF'
+            #include <json-c/json.h>
+            int main(void) {
+                struct json_object *obj = json_tokener_parse("{\"ok\":true}");
+                return json_object_get_boolean(json_object_object_get(obj, "ok")) ? 0 : 1;
+            }
+            EOF
+            gcc /tmp/json-test.c $(pkg-config --cflags --libs json-c) -o /tmp/json-test
+            /tmp/json-test
+
+  - name: json-c-static
+    summary: Static json-c library
+    files:
+      include:
+        - /usr/lib*/libjson-c.a
+        - /usr/share/licenses/json-c-static/**
+      license:
+        - /usr/share/licenses/json-c-static/**
+    dependencies:
+      run:
+        - json-c-devel = ${package.version}-${package.release}
+        - filesystem
