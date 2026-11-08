@@ -19,7 +19,7 @@ builder:
   image: registry.fedoraproject.org/fedora:44
 repositories:
   - id: eternal
-    baseurl: https://rsturla.github.io/eternal-os/rolling/$basearch
+    baseurl: https://packages.eternal.sturla.tech/rolling/$basearch
     # Only the userland packages that have completed the self-hosting switch
     # are consumed from here. Keep the seed compiler and C library out until
     # their exact-release dependencies are stable.
