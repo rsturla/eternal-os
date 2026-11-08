@@ -1,0 +1,118 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# The Eternal filesystem layout. This package replaces the distribution-owned
+# FHS package: it owns the top-level directories and the merged-/usr symlinks.
+# Subdirectories that belong to a specific component stay with that component.
+#
+# This bootstrap variant exists because the ladder hides the seed filesystem
+# provider while a stage builds this package. The production recipe is in
+# packages/filesystem/package.yaml.
+schema: 1
+
+package:
+  name: filesystem
+  version: "3.18"
+  release: 1
+  summary: Eternal Linux filesystem layout
+  description: |
+    The top-level directory layout and merged-/usr symlinks for Eternal Linux.
+    Kept deliberately small: packages own their own subdirectories.
+  license: MIT
+  upstream: https://github.com/rsturla/eternal-os
+
+context: files
+
+build:
+  root:
+    profile: ../../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [bash, coreutils]
+  pipeline:
+    - runs: |
+        install -d -m 0755 \
+          "$STAGE/boot" "$STAGE/dev" "$STAGE/etc" "$STAGE/home" \
+          "$STAGE/media" "$STAGE/mnt" "$STAGE/opt" "$STAGE/root" \
+          "$STAGE/run" "$STAGE/srv" "$STAGE/tmp" \
+          "$STAGE/usr" "$STAGE/usr/bin" "$STAGE/usr/include" \
+          "$STAGE/usr/lib" "$STAGE/usr/lib64" "$STAGE/usr/libexec" \
+          "$STAGE/usr/sbin" "$STAGE/usr/share" "$STAGE/usr/local" \
+          "$STAGE/usr/local/bin" "$STAGE/usr/local/include" \
+          "$STAGE/usr/local/lib" "$STAGE/usr/local/lib64" \
+          "$STAGE/usr/local/sbin" "$STAGE/usr/local/share" \
+          "$STAGE/var" "$STAGE/var/cache" "$STAGE/var/lib" \
+          "$STAGE/var/log" "$STAGE/var/spool" "$STAGE/var/tmp"
+        install -d -m 0555 "$STAGE/proc" "$STAGE/sys"
+        install -d -m 0700 "$STAGE/root"
+        install -d -m 1777 "$STAGE/tmp" "$STAGE/var/tmp"
+        ln -s usr/bin "$STAGE/bin"
+        ln -s usr/sbin "$STAGE/sbin"
+        ln -s usr/lib "$STAGE/lib"
+        ln -s usr/lib64 "$STAGE/lib64"
+        ln -s ../run "$STAGE/var/run"
+        ln -s ../run/lock "$STAGE/var/lock"
+        install -d -m 0755 "$STAGE/usr/share/licenses/filesystem"
+        install -m 0644 LICENSE "$STAGE/usr/share/licenses/filesystem/LICENSE"
+
+outputs:
+  - name: filesystem
+    summary: Eternal Linux filesystem layout
+    arch: noarch
+    files:
+      license:
+        - /usr/share/licenses/filesystem/LICENSE
+      directories:
+        - { path: /boot, mode: "0755", user: root, group: root }
+        - { path: /dev, mode: "0755", user: root, group: root }
+        - { path: /etc, mode: "0755", user: root, group: root }
+        - { path: /home, mode: "0755", user: root, group: root }
+        - { path: /media, mode: "0755", user: root, group: root }
+        - { path: /mnt, mode: "0755", user: root, group: root }
+        - { path: /opt, mode: "0755", user: root, group: root }
+        - { path: /proc, mode: "0555", user: root, group: root }
+        - { path: /root, mode: "0700", user: root, group: root }
+        - { path: /run, mode: "0755", user: root, group: root }
+        - { path: /srv, mode: "0755", user: root, group: root }
+        - { path: /sys, mode: "0555", user: root, group: root }
+        - { path: /tmp, mode: "1777", user: root, group: root }
+        - { path: /usr, mode: "0755", user: root, group: root }
+        - { path: /usr/bin, mode: "0755", user: root, group: root }
+        - { path: /usr/include, mode: "0755", user: root, group: root }
+        - { path: /usr/lib, mode: "0755", user: root, group: root }
+        - { path: /usr/lib64, mode: "0755", user: root, group: root }
+        - { path: /usr/libexec, mode: "0755", user: root, group: root }
+        - { path: /usr/local, mode: "0755", user: root, group: root }
+        - { path: /usr/local/bin, mode: "0755", user: root, group: root }
+        - { path: /usr/local/include, mode: "0755", user: root, group: root }
+        - { path: /usr/local/lib, mode: "0755", user: root, group: root }
+        - { path: /usr/local/lib64, mode: "0755", user: root, group: root }
+        - { path: /usr/local/sbin, mode: "0755", user: root, group: root }
+        - { path: /usr/local/share, mode: "0755", user: root, group: root }
+        - { path: /usr/sbin, mode: "0755", user: root, group: root }
+        - { path: /usr/share, mode: "0755", user: root, group: root }
+        - { path: /var, mode: "0755", user: root, group: root }
+        - { path: /var/cache, mode: "0755", user: root, group: root }
+        - { path: /var/lib, mode: "0755", user: root, group: root }
+        - { path: /var/log, mode: "0755", user: root, group: root }
+        - { path: /var/spool, mode: "0755", user: root, group: root }
+        - { path: /var/tmp, mode: "1777", user: root, group: root }
+    dependencies:
+      provides:
+        - filesystem(merged-sbin) = 1
+        - filesystem(unmerged-sbin-symlinks) = 1
+      conflicts:
+        - filesystem < 3.18
+
+tests:
+  - name: layout
+    stage: build
+    argv:
+      - sh
+      - -c
+      - |
+        test -L "$STAGE/bin" && test "$(readlink "$STAGE/bin")" = usr/bin
+        test -L "$STAGE/sbin" && test "$(readlink "$STAGE/sbin")" = usr/sbin
+        test -L "$STAGE/lib" && test "$(readlink "$STAGE/lib")" = usr/lib
+        test -L "$STAGE/lib64" && test "$(readlink "$STAGE/lib64")" = usr/lib64
+        test -d "$STAGE/usr/bin" && test -d "$STAGE/usr/lib64"
+        test "$(stat -c %a "$STAGE/tmp")" = 1777
+        test "$(stat -c %a "$STAGE/root")" = 700
