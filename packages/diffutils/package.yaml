@@ -1,0 +1,83 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# GNU diff utilities. Part of the minimal Eternal userland and the
+# bootstrap tool set. The source is the upstream release tarball.
+schema: 1
+
+package:
+  name: diffutils
+  version: "3.12"
+  release: 1
+  summary: GNU diff utilities
+  description: |
+    GNU Diffutils compares files and directories and produces patches.
+  license: GPL-3.0-or-later
+  upstream: https://www.gnu.org/software/diffutils/
+  cpe:
+    vendor: gnu
+    product: diffutils
+
+sources:
+  - name: diffutils-3.12.tar.xz
+    kind: archive
+    digest: "sha512:10b17cf1dcdfa9ca0e5db91d62c4a079ebe9fd7eafa3aaebd4eb7e6206e4d753f348496622aa281e1bd7f7fcde65ce4a886dcc4acbb59332ef980f224197b4e4"
+    locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/diffutils/diffutils-3.12.tar.xz
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/diffutils/diffutils-3.12.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils]
+  environment:
+    FORCE_UNSAFE_CONFIGURE: "1"
+  pipeline:
+    - uses: autotools/configure
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [diffutils, diffutils-doc]
+    - uses: strip
+
+outputs:
+  - name: diffutils
+    summary: GNU diff utilities
+    files:
+      license:
+        - /usr/share/licenses/diffutils/COPYING
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            printf 'a\n' > a
+            printf 'b\n' > b
+            if diff a b > /dev/null; then exit 1; fi
+            printf 'a\n' > b
+            diff a b
+
+  - name: diffutils-doc
+    summary: GNU diff utilities documentation
+    files:
+      include:
+        - "@man"
+        - "@info"
+        - "@doc"
+        - /usr/share/licenses/diffutils-doc/COPYING
+      license:
+        - /usr/share/licenses/diffutils-doc/COPYING
+    dependencies:
+      run:
+        - filesystem
