@@ -86,6 +86,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        packages: [bash-binsh, grep]
         argv:
           - sh
           - -c
