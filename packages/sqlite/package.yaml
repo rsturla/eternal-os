@@ -49,8 +49,8 @@ build:
           - --enable-rtree
           - --enable-session
           - --soname=legacy
-    - uses: autotools/build
-    - uses: autotools/install
+    - uses: make/build
+    - uses: make/install
     - uses: license/copy
       with:
         files: [README.txt]

@@ -102,10 +102,10 @@ build:
           - --enable-gnu-unique-object
           - --with-system-zlib
           - --with-linker-hash-style=gnu
-    - uses: autotools/build
+    - uses: make/build
       with:
         dir: build
-    - uses: autotools/install
+    - uses: make/install
       with:
         dir: build
     - runs: |

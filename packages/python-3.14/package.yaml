@@ -72,8 +72,8 @@ build:
           - --with-system-expat
           - --with-platlibdir=lib
           - --enable-loadable-sqlite-extensions
-    - uses: autotools/build
-    - uses: autotools/install
+    - uses: make/build
+    - uses: make/install
     - runs: |
         set -eu
         # The unversioned interpreter name belongs to the -default output.

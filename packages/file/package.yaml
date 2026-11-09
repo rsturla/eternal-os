@@ -43,8 +43,8 @@ build:
       - --disable-xzlib
       - --disable-zstdlib
       - --disable-lzlib
-  - uses: autotools/build
-  - uses: autotools/install
+  - uses: make/build
+  - uses: make/install
   - runs: |
       find "$STAGE" -name "*.la" -delete
       rm -f "$STAGE/usr/share/info/dir"

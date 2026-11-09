@@ -42,8 +42,8 @@ build:
       - --disable-static
       - --without-python
       - --without-crypto
-  - uses: autotools/build
-  - uses: autotools/install
+  - uses: make/build
+  - uses: make/install
   - runs: |
       find "$STAGE" -name "*.la" -delete
       rm -f "$STAGE/usr/share/info/dir"

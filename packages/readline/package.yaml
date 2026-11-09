@@ -59,8 +59,8 @@ build:
           # symbols and only works when the caller happens to link ncurses.
           - --with-shared-termcap-library
           - --disable-static
-    - uses: autotools/build
-    - uses: autotools/install
+    - uses: make/build
+    - uses: make/install
     - runs: |
         rm -f "$STAGE/usr/share/info/dir"
     - uses: license/copy

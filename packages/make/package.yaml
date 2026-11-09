@@ -44,8 +44,8 @@ build:
     tools: [gcc, make, bash, coreutils]
   pipeline:
     - uses: autotools/configure
-    - uses: autotools/build
-    - uses: autotools/install
+    - uses: make/build
+    - uses: make/install
     - uses: license/copy
       with:
         files: [COPYING]

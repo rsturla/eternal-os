@@ -91,9 +91,9 @@ Rules that matter:
   `vendor: eternal`; omit it for Eternal-owned packages with no upstream CPE.
 - `build.dependencies.tools` lists **package names**, not commands: `bash`, not
   `sh`; `gcc`, not `cc`.
-- Use the reusable build steps (`autotools/configure`, `autotools/build`,
-  `autotools/install`, `make/build`, `make/install`, `cmake/configure`, ...)
-  instead of copying the configure/make shell sequence into every recipe.
+- Use the reusable build steps (`autotools/configure` followed by
+  `make/build`/`make/install`, or `cmake/configure` and its siblings) instead
+  of copying the configure/make shell sequence into every recipe.
 - Use `$STAGE` for the install root and `$PREFIX`/`$LIBDIR` for layout.
 - Include a test. `rpmx build` runs tests by default, so a green build means
   tested.

@@ -75,8 +75,8 @@ build:
         args:
           - --with-bash-malloc=no
           - --with-afs
-    - uses: autotools/build
-    - uses: autotools/install
+    - uses: make/build
+    - uses: make/install
     - runs: |
         ln -sfn bash "$STAGE/usr/bin/sh"
     - uses: license/copy

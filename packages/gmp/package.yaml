@@ -48,8 +48,8 @@ build:
           - --with-pic
           - --enable-shared
           - --disable-static
-    - uses: autotools/build
-    - uses: autotools/install
+    - uses: make/build
+    - uses: make/install
     - runs: |
         rm -f "$STAGE/usr/share/info/dir"
     - uses: license/copy

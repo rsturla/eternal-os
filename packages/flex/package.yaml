@@ -59,8 +59,8 @@ build:
           # libfl is a scanner runtime, not a general purpose library; keep
           # the shared object and drop the static archive.
           - --disable-static
-    - uses: autotools/build
-    - uses: autotools/install
+    - uses: make/build
+    - uses: make/install
     - runs: |
         set -eu
         rm -f "$STAGE/usr/share/info/dir"

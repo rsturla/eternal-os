@@ -44,8 +44,8 @@ build:
         args:
           - --localstatedir=/var/lib/locatedb
           - --libexecdir=/usr/libexec/findutils
-    - uses: autotools/build
-    - uses: autotools/install
+    - uses: make/build
+    - uses: make/install
     - runs: |
         rm -f "$STAGE/usr/share/info/dir"
     - uses: license/copy
