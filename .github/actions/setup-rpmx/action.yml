@@ -1,6 +1,14 @@
 name: Setup rpmx
 description: Install the pinned rpmx revision and the host tools it needs.
 
+inputs:
+  artifact:
+    description: >-
+      Name of an uploaded rpmx artifact to unpack instead of building the
+      pinned revision. The `rpmx` job in _build-packages.yml produces it.
+    required: false
+    default: ""
+
 runs:
   using: composite
   steps:
@@ -15,11 +23,13 @@ runs:
         sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
 
     - name: Install Rust
+      if: inputs.artifact == ''
       uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
       with:
         toolchain: stable
 
     - name: Cache cargo and rpmx
+      if: inputs.artifact == ''
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
@@ -29,10 +39,29 @@ runs:
         key: rpmx-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.rpmx-revision') }}
 
     - name: Install rpmx
+      if: inputs.artifact == ''
       shell: bash
       run: |
         root="$HOME/.local/share/rpmx"
         if [ ! -x "$root/bin/rpmx" ]; then
           ./scripts/install-rpmx.sh --root "$root"
         fi
-        echo "$root/bin" >> "$GITHUB_PATH"
+
+    - name: Download rpmx
+      if: inputs.artifact != ''
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: ${{ inputs.artifact }}
+        path: ${{ runner.temp }}/rpmx
+
+    - name: Unpack rpmx
+      if: inputs.artifact != ''
+      shell: bash
+      run: |
+        install -d "$HOME/.local/share/rpmx"
+        tar -xzf "$RUNNER_TEMP/rpmx/rpmx.tar.gz" \
+          -C "$HOME/.local/share/rpmx"
+
+    - name: Add rpmx to PATH
+      shell: bash
+      run: echo "$HOME/.local/share/rpmx/bin" >> "$GITHUB_PATH"

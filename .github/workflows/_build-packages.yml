@@ -1,8 +1,15 @@
 name: Build packages
 
-# Fan-out workflow: the prepare job computes the package plan and content
-# hashes, the matrix builds each selected package in parallel, and the caller's
-# fan-in assembles a repository from the uploaded artifacts.
+# Fan-out workflow. The configure job reads the target architectures without
+# rpmx; the rpmx matrix builds the pinned revision once per architecture and
+# uploads it; prepare uses the x86_64 build to compute the package plan and
+# content hashes; and the package matrix downloads the matching rpmx build
+# before building each selected package in parallel. The caller's fan-in
+# assembles a repository from the uploaded package artifacts.
+#
+# Sharing one rpmx build per architecture keeps the plan and build stages from
+# compiling the same revision independently, including every aarch64 matrix
+# cell.
 #
 # GitHub's matrix job outputs merge cells into a map, but only for statically
 # declared output names. A dynamic package matrix cannot name one output per
@@ -33,7 +40,7 @@ on:
         value: ${{ jobs.prepare.outputs.packages }}
       arches:
         description: JSON array of target architectures.
-        value: ${{ jobs.prepare.outputs.arches }}
+        value: ${{ jobs.configure.outputs.arches }}
       hashes:
         description: JSON object mapping package name to content hash.
         value: ${{ jobs.prepare.outputs.hashes }}
@@ -42,10 +49,10 @@ on:
         value: ${{ jobs.prepare.outputs.skip }}
       signed:
         description: "1 when a signing key is available, otherwise 0."
-        value: ${{ jobs.prepare.outputs.signed }}
+        value: ${{ jobs.configure.outputs.signed }}
       build_release:
         description: UTC Unix timestamp used as the rolling release counter.
-        value: ${{ jobs.prepare.outputs.build_release }}
+        value: ${{ jobs.configure.outputs.build_release }}
     secrets:
       RPMX_SIGNING_KEY:
         required: false
@@ -54,18 +61,75 @@ permissions:
   contents: read
 
 jobs:
+  configure:
+    name: Configure
+    runs-on: ubuntu-26.04
+    outputs:
+      arches: ${{ steps.configure.outputs.arches }}
+      signed: ${{ steps.configure.outputs.signed }}
+      build_release: ${{ steps.configure.outputs.build_release }}
+    env:
+      RPMX_SIGNING_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Read build configuration
+        id: configure
+        run: |
+          arches=$(./scripts/list-arches.sh)
+          build_release=$(date -u +%s)
+          echo "arches=$arches" >>"$GITHUB_OUTPUT"
+          echo "build_release=$build_release" >>"$GITHUB_OUTPUT"
+          echo "arches: $arches"
+          echo "build release: $build_release"
+
+          if [ -n "${RPMX_SIGNING_KEY:-}" ]; then
+            echo "signed=1" >>"$GITHUB_OUTPUT"
+          else
+            echo "signed=0" >>"$GITHUB_OUTPUT"
+          fi
+
+  rpmx:
+    name: rpmx (${{ matrix.arch }})
+    needs: configure
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: ${{ fromJSON(needs.configure.outputs.arches) }}
+        include:
+          - arch: x86_64
+            runner: ubuntu-26.04
+          - arch: aarch64
+            runner: ubuntu-26.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup rpmx
+        uses: ./.github/actions/setup-rpmx
+
+      - name: Package rpmx
+        run: |
+          tar -czf "$RUNNER_TEMP/rpmx.tar.gz" \
+            -C "$HOME/.local/share/rpmx" .
+
+      - name: Upload rpmx
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rpmx-${{ matrix.arch }}
+          path: ${{ runner.temp }}/rpmx.tar.gz
+          if-no-files-found: error
+
   prepare:
     name: Plan
+    needs: [configure, rpmx]
     runs-on: ubuntu-26.04
     outputs:
       packages: ${{ steps.plan.outputs.packages }}
-      arches: ${{ steps.plan.outputs.arches }}
       hashes: ${{ steps.plan.outputs.hashes }}
       skip: ${{ steps.plan.outputs.skip }}
-      signed: ${{ steps.plan.outputs.signed }}
-      build_release: ${{ steps.plan.outputs.build_release }}
-    env:
-      RPMX_SIGNING_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -74,6 +138,8 @@ jobs:
 
       - name: Setup rpmx
         uses: ./.github/actions/setup-rpmx
+        with:
+          artifact: rpmx-x86_64
 
       - name: Plan
         id: plan
@@ -83,12 +149,6 @@ jobs:
         run: |
           graph=$(mktemp)
           ./scripts/package-graph.sh >"$graph"
-          arches=$(./scripts/list-arches.sh)
-          build_release=$(date -u +%s)
-          echo "arches=$arches" >>"$GITHUB_OUTPUT"
-          echo "build_release=$build_release" >>"$GITHUB_OUTPUT"
-          echo "arches: $arches"
-          echo "build release: $build_release"
 
           if [ "$SELECTION" = "affected" ]; then
             args=(--json --graph "$graph")
@@ -121,21 +181,15 @@ jobs:
             echo "hashes: $hashes"
           fi
 
-          if [ -n "${RPMX_SIGNING_KEY:-}" ]; then
-            echo "signed=1" >>"$GITHUB_OUTPUT"
-          else
-            echo "signed=0" >>"$GITHUB_OUTPUT"
-          fi
-
   build:
     name: Build ${{ matrix.package }} (${{ matrix.arch }})
-    needs: prepare
+    needs: [configure, rpmx, prepare]
     if: needs.prepare.outputs.skip != 'true'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        arch: ${{ fromJSON(needs.prepare.outputs.arches) }}
+        arch: ${{ fromJSON(needs.configure.outputs.arches) }}
         package: ${{ fromJSON(needs.prepare.outputs.packages) }}
         include:
           - arch: x86_64
@@ -150,6 +204,8 @@ jobs:
 
       - name: Setup rpmx
         uses: ./.github/actions/setup-rpmx
+        with:
+          artifact: rpmx-${{ matrix.arch }}
 
       - name: Package hash
         id: hash
@@ -172,7 +228,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: out/
-          key: rpm-${{ runner.os }}-${{ matrix.arch }}-${{ matrix.package }}-${{ steps.hash.outputs.hash }}-signed${{ needs.prepare.outputs.signed }}-${{ inputs.sign && 'release' || 'pr' }}-${{ hashFiles('.cache-generation') }}
+          key: rpm-${{ runner.os }}-${{ matrix.arch }}-${{ matrix.package }}-${{ steps.hash.outputs.hash }}-signed${{ needs.configure.outputs.signed }}-${{ inputs.sign && 'release' || 'pr' }}-${{ hashFiles('.cache-generation') }}
 
       - name: Restore build root cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -208,7 +264,7 @@ jobs:
 
       - name: Build
         env:
-          BUILD_RELEASE: ${{ inputs.sign && needs.prepare.outputs.build_release || '' }}
+          BUILD_RELEASE: ${{ inputs.sign && needs.configure.outputs.build_release || '' }}
         run: |
           args=(--package "${{ matrix.package }}" --arch "${{ matrix.arch }}" --output out)
           if [ -f "$RUNNER_TEMP/signing/rpmx.asc" ]; then

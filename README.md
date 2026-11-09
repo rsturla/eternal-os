@@ -159,7 +159,7 @@ There is no CI-only build logic. Every workflow step calls a script in
 
 | Local | CI |
 | --- | --- |
-| `make bootstrap` | `./.github/actions/setup-rpmx` calls `scripts/install-rpmx.sh` |
+| `make bootstrap` | `setup-rpmx` builds the pinned revision or unpacks the CI artifact |
 | `make check` | `_lint.yml` calls `scripts/lint-all.sh` + `pre-commit` |
 | `make build` / `build-affected` | `_build-packages.yml` calls `scripts/build-all.sh` |
 | `make repo` | `scripts/publish-repo.sh` |
@@ -184,16 +184,20 @@ the files and environment directly:
 
 ## How a release works
 
-`ci.yml` runs on pull requests and on demand. A `prepare` job computes the
-package plan and hashes, then a matrix builds only the affected packages in
-parallel and uploads each package's artifacts. Lint runs first as a reusable
-workflow, and the commits are checked against the
-[git workflow](docs/git-workflow.md) before anything is built.
+`ci.yml` runs on pull requests and on demand. A `configure` job reads the
+target architectures, an `rpmx` job builds the pinned revision once per
+architecture, and `prepare` uses that binary to compute the package plan and
+hashes. A matrix then builds only the affected packages in parallel and
+uploads each package's artifacts; every cell unpacks the same rpmx artifact
+instead of compiling it. Lint runs first as a reusable workflow, and the
+commits are checked against the [git workflow](docs/git-workflow.md) before
+anything is built.
 
 `release.yml` runs on `main`, on `v*` tags and on demand:
 
-1. lint, then build **every** package in a matrix. Content-addressed caches
-   mean only changed packages execute `rpmx build`.
+1. lint, then build rpmx once per architecture, then build **every** package in
+   a matrix. Each build cell reuses the rpmx artifact, and content-addressed
+   caches mean only changed packages execute `rpmx build`.
 2. A fan-in job downloads the per-package artifacts, verifies that the plan is
    complete, and rebuilds `repodata` into `site/rolling/<arch>/` plus
    `site/rolling/SRPMS/`. When a key is configured it signs the RPMs and
