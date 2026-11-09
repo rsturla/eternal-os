@@ -148,8 +148,6 @@ outputs:
       perl:
         requires: false
     dependencies:
-      run:
-        - filesystem
       provides:
         - perl-5.44 = ${package.version}-${package.release}
         # A core `.pm` records the interpreter it needs as
@@ -185,7 +183,6 @@ outputs:
     dependencies:
       run:
         - perl-5.44 = ${package.version}-${package.release}
-        - filesystem
       provides:
         - perl = ${package.version}-${package.release}
         - perl-interpreter = ${package.version}-${package.release}
@@ -217,7 +214,6 @@ outputs:
     dependencies:
       run:
         - perl-5.44 = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -272,7 +268,6 @@ outputs:
     dependencies:
       run:
         - perl-5.44 = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -305,7 +300,6 @@ outputs:
     dependencies:
       run:
         - perl-5.44 = ${package.version}-${package.release}
-        - filesystem
 
 tests:
   - name: hardening

@@ -66,7 +66,6 @@ outputs:
   dependencies:
     run:
     - libxslt-libs = ${package.version}-${package.release}
-    - filesystem
   tests:
   - name: transform
     stage: installed
@@ -90,7 +89,6 @@ outputs:
     - /usr/share/licenses/libxslt-libs/**
   dependencies:
     run:
-    - filesystem
     - libxml2
   tests:
   - name: load
@@ -115,7 +113,6 @@ outputs:
   dependencies:
     run:
     - libxslt-libs = ${package.version}-${package.release}
-    - filesystem
   tests:
   - name: compile-and-run
     stage: installed
@@ -144,9 +141,6 @@ outputs:
     - '@info'
     - /usr/share/licenses/libxslt-doc/**
     - /usr/share/gtk-doc/**
-  dependencies:
-    run:
-    - filesystem
 tests:
 - name: hardening
   stage: build

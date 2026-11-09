@@ -82,7 +82,6 @@ outputs:
       run:
         - flex-libs = ${package.version}-${package.release}
         - m4
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -114,9 +113,6 @@ outputs:
         - /usr/share/licenses/flex-libs/COPYING
       license:
         - /usr/share/licenses/flex-libs/COPYING
-    dependencies:
-      run:
-        - filesystem
 
   - name: flex-devel
     summary: Development files for flex
@@ -130,7 +126,6 @@ outputs:
     dependencies:
       run:
         - flex-libs = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: link
         stage: installed
@@ -158,9 +153,6 @@ outputs:
         - /usr/share/licenses/flex-doc/COPYING
       license:
         - /usr/share/licenses/flex-doc/COPYING
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: hardening

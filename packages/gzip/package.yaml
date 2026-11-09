@@ -87,6 +87,3 @@ outputs:
         - /usr/share/licenses/gzip-doc/COPYING
       license:
         - /usr/share/licenses/gzip-doc/COPYING
-    dependencies:
-      run:
-        - filesystem

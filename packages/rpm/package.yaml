@@ -101,7 +101,6 @@ outputs:
         - rpm-libs = ${package.version}-${package.release}
         - rpm-build-libs = ${package.version}-${package.release}
         - popt
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -140,7 +139,6 @@ outputs:
         - xz-libs
         - zlib
         - libzstd
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -165,7 +163,6 @@ outputs:
     dependencies:
       run:
         - rpm-libs = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -201,7 +198,6 @@ outputs:
         - xz-devel
         - zlib-devel
         - libzstd-devel
-        - filesystem
     tests:
       - name: link
         stage: installed
@@ -223,6 +219,3 @@ outputs:
         - /usr/share/licenses/rpm-doc/**
       license:
         - /usr/share/licenses/rpm-doc/**
-    dependencies:
-      run:
-        - filesystem

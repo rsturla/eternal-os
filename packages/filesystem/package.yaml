@@ -93,6 +93,9 @@ outputs:
         - { path: /var/spool, mode: "0755", user: root, group: root }
         - { path: /var/tmp, mode: "1777", user: root, group: root }
     dependencies:
+      # The layout package cannot require itself; the repository default
+      # would otherwise apply to it like every other output.
+      exclude: [filesystem]
       provides:
         - filesystem(merged-sbin) = 1
         - filesystem(unmerged-sbin-symlinks) = 1

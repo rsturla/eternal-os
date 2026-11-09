@@ -109,7 +109,6 @@ outputs:
       run:
         - ncurses-base = ${package.version}-${package.release}
         - ncurses-libs = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -168,9 +167,6 @@ outputs:
         - /usr/share/licenses/ncurses-base/**
       license:
         - /usr/share/licenses/ncurses-base/**
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -231,7 +227,6 @@ outputs:
     dependencies:
       run:
         - ncurses-base = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -256,7 +251,6 @@ outputs:
     dependencies:
       run:
         - ncurses-base = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -282,7 +276,6 @@ outputs:
     dependencies:
       run:
         - ncurses-libs = ${package.version}-${package.release}
-        - filesystem
 
   - name: ncurses-doc
     summary: Documentation for ncurses
@@ -293,6 +286,3 @@ outputs:
         - /usr/share/licenses/ncurses-doc/**
       license:
         - /usr/share/licenses/ncurses-doc/**
-    dependencies:
-      run:
-        - filesystem

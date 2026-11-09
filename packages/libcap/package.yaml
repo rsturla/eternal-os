@@ -61,9 +61,6 @@ outputs:
         - /usr/share/licenses/libcap/**
       license:
         - /usr/share/licenses/libcap/**
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -91,7 +88,6 @@ outputs:
     dependencies:
       run:
         - libcap = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -115,7 +111,6 @@ outputs:
     dependencies:
       run:
         - libcap = ${package.version}-${package.release}
-        - filesystem
 
   - name: libcap-static
     summary: Static libraries for libcap
@@ -128,7 +123,6 @@ outputs:
     dependencies:
       run:
         - libcap-devel = ${package.version}-${package.release}
-        - filesystem
 
   - name: libcap-doc
     summary: Documentation for libcap
@@ -139,6 +133,3 @@ outputs:
         - /usr/share/licenses/libcap-doc/**
       license:
         - /usr/share/licenses/libcap-doc/**
-    dependencies:
-      run:
-        - filesystem

@@ -77,9 +77,6 @@ outputs:
         - /usr/share/licenses/coreutils-doc/COPYING
       license:
         - /usr/share/licenses/coreutils-doc/COPYING
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: build

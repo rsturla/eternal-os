@@ -74,6 +74,3 @@ outputs:
         - /usr/share/licenses/sed-doc/COPYING
       license:
         - /usr/share/licenses/sed-doc/COPYING
-    dependencies:
-      run:
-        - filesystem

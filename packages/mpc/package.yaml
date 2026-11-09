@@ -61,7 +61,6 @@ outputs:
       run:
         - mpfr
         - gmp
-        - filesystem
       provides:
         - libmpc = ${package.version}-${package.release}
     tests:
@@ -90,7 +89,6 @@ outputs:
         - mpc = ${package.version}-${package.release}
         - gmp-devel
         - mpfr-devel
-        - filesystem
       provides:
         - libmpc-devel = ${package.version}-${package.release}
 
@@ -104,9 +102,6 @@ outputs:
         - /usr/share/licenses/mpc-doc/COPYING.LESSER
       license:
         - /usr/share/licenses/mpc-doc/COPYING.LESSER
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: link

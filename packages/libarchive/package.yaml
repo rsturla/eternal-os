@@ -76,7 +76,6 @@ outputs:
   dependencies:
     run:
     - libarchive-libs = ${package.version}-${package.release}
-    - filesystem
   tests:
   - name: round-trip
     stage: installed
@@ -100,7 +99,6 @@ outputs:
     - /usr/share/licenses/libarchive-libs/**
   dependencies:
     run:
-    - filesystem
     - libacl
     - bzip2-libs
     - xz-libs
@@ -128,7 +126,6 @@ outputs:
   dependencies:
     run:
     - libarchive-libs = ${package.version}-${package.release}
-    - filesystem
   tests:
   - name: compile-and-run
     stage: installed
@@ -156,9 +153,6 @@ outputs:
     - '@man'
     - '@info'
     - /usr/share/licenses/libarchive-doc/**
-  dependencies:
-    run:
-    - filesystem
 tests:
 - name: hardening
   stage: build

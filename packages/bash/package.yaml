@@ -89,6 +89,9 @@ outputs:
       license:
         - /usr/share/licenses/bash/COPYING
     dependencies:
+      # The merged-/usr symlinks need filesystem 3 or newer; the repository
+      # default only says `filesystem`.
+      exclude: [filesystem]
       run:
         - filesystem >= 3
       provides:
@@ -114,7 +117,6 @@ outputs:
     dependencies:
       run:
         - bash = ${package.version}-${package.release}
-        - filesystem
       provides:
         - /bin/sh
     tests:
@@ -139,9 +141,6 @@ outputs:
         - /usr/share/licenses/bash-doc/COPYING
       license:
         - /usr/share/licenses/bash-doc/COPYING
-    dependencies:
-      run:
-        - filesystem
 
   - name: bash-devel
     summary: Bash development headers and bashbug
@@ -155,7 +154,6 @@ outputs:
     dependencies:
       run:
         - bash = ${package.version}-${package.release}
-        - filesystem
 
   - name: bash-builtins
     summary: Bash loadable builtins
@@ -168,7 +166,6 @@ outputs:
     dependencies:
       run:
         - bash = ${package.version}-${package.release}
-        - filesystem
 
 tests:
   - name: build

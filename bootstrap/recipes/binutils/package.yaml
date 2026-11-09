@@ -90,9 +90,6 @@ outputs:
       license:
         - /usr/share/licenses/binutils/COPYING3
         - /usr/share/licenses/binutils/COPYING3.LIB
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -118,7 +115,6 @@ outputs:
     dependencies:
       run:
         - binutils = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -140,9 +136,6 @@ outputs:
       license:
         - /usr/share/licenses/binutils-doc/COPYING3
         - /usr/share/licenses/binutils-doc/COPYING3.LIB
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: build

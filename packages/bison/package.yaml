@@ -69,7 +69,6 @@ outputs:
         - /usr/share/licenses/bison/COPYING
     dependencies:
       run:
-        - filesystem
         - m4
     tests:
       - name: installed
@@ -101,9 +100,6 @@ outputs:
         - /usr/share/licenses/bison-doc/COPYING
       license:
         - /usr/share/licenses/bison-doc/COPYING
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: hardening

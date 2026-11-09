@@ -65,9 +65,6 @@ outputs:
     files:
       license:
         - /usr/share/licenses/kernel-headers/COPYING
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: headers

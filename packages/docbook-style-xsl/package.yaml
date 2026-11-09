@@ -47,9 +47,6 @@ outputs:
   files:
     license:
     - /usr/share/licenses/docbook-style-xsl/**
-  dependencies:
-    run:
-    - filesystem
   arch: noarch
   tests:
   - name: transform
@@ -72,9 +69,6 @@ outputs:
     include:
     - '@doc'
     - /usr/share/licenses/docbook-style-xsl-doc/**
-  dependencies:
-    run:
-    - filesystem
 patches:
 - file: patches/docbook-xsl-non-constant-expressions.patch
   strip: 1

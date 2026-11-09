@@ -58,9 +58,6 @@ outputs:
     files:
       license:
         - /usr/share/licenses/tzdata/**
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed

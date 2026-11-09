@@ -67,9 +67,6 @@ outputs:
         - /usr/share/licenses/make-devel/COPYING
       license:
         - /usr/share/licenses/make-devel/COPYING
-    dependencies:
-      run:
-        - filesystem
 
   - name: make-doc
     summary: GNU Make documentation
@@ -80,9 +77,6 @@ outputs:
         - /usr/share/licenses/make-doc/COPYING
       license:
         - /usr/share/licenses/make-doc/COPYING
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: build

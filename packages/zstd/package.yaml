@@ -61,7 +61,6 @@ outputs:
     dependencies:
       run:
         - zstd-libs = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -85,9 +84,6 @@ outputs:
       license:
         - /usr/share/licenses/zstd-libs/COPYING
         - /usr/share/licenses/zstd-libs/LICENSE
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -116,7 +112,6 @@ outputs:
     dependencies:
       run:
         - zstd-libs = ${package.version}-${package.release}
-        - filesystem
       provides:
         - libzstd-devel = ${package.version}-${package.release}
 
@@ -133,7 +128,6 @@ outputs:
     dependencies:
       run:
         - zstd-devel = ${package.version}-${package.release}
-        - filesystem
       provides:
         - libzstd-static = ${package.version}-${package.release}
     tests:
@@ -160,9 +154,6 @@ outputs:
       license:
         - /usr/share/licenses/zstd-doc/COPYING
         - /usr/share/licenses/zstd-doc/LICENSE
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: link

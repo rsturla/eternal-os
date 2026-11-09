@@ -72,6 +72,3 @@ outputs:
         - /usr/share/licenses/m4-doc/COPYING
       license:
         - /usr/share/licenses/m4-doc/COPYING
-    dependencies:
-      run:
-        - filesystem

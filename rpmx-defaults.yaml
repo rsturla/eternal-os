@@ -16,3 +16,8 @@ build:
     # The compiler policy package installs its wrappers under /usr/libexec.
     # Put that directory before /usr/bin so every build sees the policy.
     PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+dependencies:
+  # Every package installs into the layout, so every output requires it. An
+  # output that ships no files drops it with `dependencies.exclude`.
+  run: [filesystem]

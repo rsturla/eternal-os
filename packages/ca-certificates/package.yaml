@@ -64,9 +64,6 @@ outputs:
         - /usr/share/licenses/ca-certificates/**
       config:
         - /etc/ca-certificates.conf
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -89,9 +86,6 @@ outputs:
         - /usr/share/licenses/ca-certificates-bundle/**
       license:
         - /usr/share/licenses/ca-certificates-bundle/**
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed

@@ -72,7 +72,6 @@ outputs:
     dependencies:
       run:
         - bzip2-libs = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -97,9 +96,6 @@ outputs:
         - /usr/share/licenses/bzip2-libs/**
       license:
         - /usr/share/licenses/bzip2-libs/**
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -124,7 +120,6 @@ outputs:
     dependencies:
       run:
         - bzip2-libs = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: link
         stage: installed
@@ -148,7 +143,6 @@ outputs:
     dependencies:
       run:
         - bzip2-devel = ${package.version}-${package.release}
-        - filesystem
 
   - name: bzip2-doc
     summary: Documentation for bzip2
@@ -159,6 +153,3 @@ outputs:
         - /usr/share/licenses/bzip2-doc/**
       license:
         - /usr/share/licenses/bzip2-doc/**
-    dependencies:
-      run:
-        - filesystem

@@ -42,6 +42,8 @@ outputs:
       license:
         - /usr/share/licenses/eternal-base/LICENSE
     dependencies:
+      # A metapackage installs no files, so it needs no layout package.
+      exclude: [filesystem]
       run:
         - eternal-release
         - eternal-baselayout

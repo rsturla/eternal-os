@@ -65,7 +65,6 @@ outputs:
   dependencies:
     run:
     - file-libs = ${package.version}-${package.release}
-    - filesystem
   tests:
   - name: identify
     stage: installed
@@ -84,9 +83,6 @@ outputs:
     - /usr/lib*/libmagic.so.*
     - /usr/share/misc/magic*
     - /usr/share/licenses/file-libs/**
-  dependencies:
-    run:
-    - filesystem
   tests:
   - name: load
     stage: installed
@@ -108,7 +104,6 @@ outputs:
   dependencies:
     run:
     - file-libs = ${package.version}-${package.release}
-    - filesystem
   tests:
   - name: compile-and-run
     stage: installed
@@ -135,9 +130,6 @@ outputs:
     - '@man'
     - '@info'
     - /usr/share/licenses/file-doc/**
-  dependencies:
-    run:
-    - filesystem
 tests:
 - name: hardening
   stage: build

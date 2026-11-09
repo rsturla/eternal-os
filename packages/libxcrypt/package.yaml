@@ -57,9 +57,6 @@ outputs:
   files:
     license:
     - /usr/share/licenses/libxcrypt/**
-  dependencies:
-    run:
-    - filesystem
   tests:
   - name: load
     stage: installed
@@ -81,7 +78,6 @@ outputs:
   dependencies:
     run:
     - libxcrypt = ${package.version}-${package.release}
-    - filesystem
   tests:
   - name: compile-and-run
     stage: installed
@@ -110,9 +106,6 @@ outputs:
     - '@man'
     - '@info'
     - /usr/share/licenses/libxcrypt-doc/**
-  dependencies:
-    run:
-    - filesystem
 tests:
 - name: hardening
   stage: build

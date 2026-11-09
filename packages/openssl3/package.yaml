@@ -67,7 +67,6 @@ outputs:
   dependencies:
     run:
     - openssl3-libs = ${package.version}-${package.release}
-    - filesystem
     provides:
     - openssl = ${package.version}-${package.release}
   tests:
@@ -98,8 +97,6 @@ outputs:
     - /etc/ssl/openssl.cnf
     - /etc/ssl/ct_log_list.cnf
   dependencies:
-    run:
-    - filesystem
     provides:
     - openssl-libs = ${package.version}-${package.release}
   tests:
@@ -123,7 +120,6 @@ outputs:
   dependencies:
     run:
     - openssl3-libs = ${package.version}-${package.release}
-    - filesystem
     provides:
     - openssl-devel = ${package.version}-${package.release}
   tests:

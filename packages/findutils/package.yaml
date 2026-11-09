@@ -85,7 +85,6 @@ outputs:
     dependencies:
       run:
         - findutils = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -108,6 +107,3 @@ outputs:
         - /usr/share/licenses/findutils-doc/COPYING
       license:
         - /usr/share/licenses/findutils-doc/COPYING
-    dependencies:
-      run:
-        - filesystem

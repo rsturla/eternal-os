@@ -60,7 +60,6 @@ outputs:
     dependencies:
       run:
         - gmp
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -86,7 +85,6 @@ outputs:
       run:
         - mpfr = ${package.version}-${package.release}
         - gmp-devel
-        - filesystem
 
   - name: mpfr-doc
     summary: MPFR documentation
@@ -98,9 +96,6 @@ outputs:
         - /usr/share/licenses/mpfr-doc/COPYING.LESSER
       license:
         - /usr/share/licenses/mpfr-doc/COPYING.LESSER
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: link

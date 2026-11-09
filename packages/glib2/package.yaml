@@ -84,7 +84,6 @@ outputs:
         - libmount
         - pcre2
         - zlib
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -111,7 +110,6 @@ outputs:
     dependencies:
       run:
         - glib2 = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: link
         stage: installed

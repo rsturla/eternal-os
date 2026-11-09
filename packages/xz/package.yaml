@@ -67,7 +67,6 @@ outputs:
     dependencies:
       run:
         - xz-libs = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -96,9 +95,6 @@ outputs:
         - /usr/share/licenses/xz-libs/COPYING.0BSD
         - /usr/share/licenses/xz-libs/COPYING.GPLv2
         - /usr/share/licenses/xz-libs/COPYING.LGPLv2.1
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -129,7 +125,6 @@ outputs:
     dependencies:
       run:
         - xz-libs = ${package.version}-${package.release}
-        - filesystem
 
   - name: xz-doc
     summary: XZ documentation
@@ -147,9 +142,6 @@ outputs:
         - /usr/share/licenses/xz-doc/COPYING.0BSD
         - /usr/share/licenses/xz-doc/COPYING.GPLv2
         - /usr/share/licenses/xz-doc/COPYING.LGPLv2.1
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: link

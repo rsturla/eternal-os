@@ -77,9 +77,6 @@ outputs:
   files:
     license:
     - /usr/share/licenses/libsepol/**
-  dependencies:
-    run:
-    - filesystem
   tests:
   - name: load
     stage: installed
@@ -101,7 +98,6 @@ outputs:
   dependencies:
     run:
     - libsepol = ${package.version}-${package.release}
-    - filesystem
   tests:
   - name: compile-and-run
     stage: installed
@@ -129,7 +125,6 @@ outputs:
   dependencies:
     run:
     - libsepol-devel = ${package.version}-${package.release}
-    - filesystem
 - name: libsepol-doc
   files:
     license:
@@ -137,9 +132,6 @@ outputs:
     include:
     - '@man'
     - /usr/share/licenses/libsepol-doc/**
-  dependencies:
-    run:
-    - filesystem
 tests:
 - name: hardening
   stage: build

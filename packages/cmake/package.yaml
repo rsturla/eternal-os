@@ -87,7 +87,6 @@ outputs:
     - /usr/share/licenses/cmake/**
   dependencies:
     run:
-    - filesystem
     - bash-binsh
     - libarchive
     - libcurl
@@ -127,9 +126,6 @@ outputs:
     - /usr/share/emacs/**
     - /usr/share/vim/**
     - /usr/share/licenses/cmake-doc/**
-  dependencies:
-    run:
-    - filesystem
 tests:
 - name: hardening
   stage: build

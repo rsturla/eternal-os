@@ -50,9 +50,6 @@ outputs:
   files:
     license:
     - /usr/share/licenses/toml11-devel/**
-  dependencies:
-    run:
-    - filesystem
   arch: noarch
   tests:
   - name: compile-and-run

@@ -346,12 +346,17 @@ outputs:
     dependencies:
       run:
         - binutils
-        - filesystem
         - glibc-2.44-devel
 ```
 
 Rules:
 
+- Do not list `filesystem`. `rpmx-defaults.yaml` gives every output that
+  dependency, because every package installs into the layout. An output that
+  ships no files, such as a metapackage or the `filesystem` package itself,
+  drops it with `dependencies.exclude: [filesystem]`. A recipe need not repeat
+  a repository-wide default; when it needs a stronger form, exclude the plain
+  entry and declare the bound (`exclude: [filesystem]`, `run: [filesystem >= 3]`).
 - List package names, not commands: `bash`, not `sh`; `gcc`, not `cc`.
 - Prefer capabilities (`glibc`, `gcc`) when the stream is not part of the
   interface. Depend on the versioned package name when mixing streams would be

@@ -71,7 +71,6 @@ outputs:
     - perl
     - gcc
     - make
-    - filesystem
   tests:
   - name: link-library
     stage: installed
@@ -93,9 +92,6 @@ outputs:
     include:
     - /usr/lib*/libltdl.so.*
     - /usr/share/licenses/libtool-libs/**
-  dependencies:
-    run:
-    - filesystem
   tests:
   - name: load
     stage: installed
@@ -119,7 +115,6 @@ outputs:
   dependencies:
     run:
     - libtool-libs = ${package.version}-${package.release}
-    - filesystem
   tests:
   - name: compile-and-run
     stage: installed
@@ -146,9 +141,6 @@ outputs:
     - '@man'
     - '@info'
     - /usr/share/licenses/libtool-doc/**
-  dependencies:
-    run:
-    - filesystem
 tests:
 - name: hardening
   stage: build

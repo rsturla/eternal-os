@@ -53,7 +53,6 @@ outputs:
     dependencies:
       run:
         - pkgconf-libs = ${package.version}-${package.release}
-        - filesystem
       provides:
         - pkg-config = ${package.version}-${package.release}
         - pkgconfig = ${package.version}-${package.release}
@@ -77,9 +76,6 @@ outputs:
         - /usr/share/licenses/pkgconf-libs/COPYING
       license:
         - /usr/share/licenses/pkgconf-libs/COPYING
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -104,7 +100,6 @@ outputs:
     dependencies:
       run:
         - pkgconf-libs = ${package.version}-${package.release}
-        - filesystem
 
   - name: pkgconf-static
     summary: pkgconf static libraries
@@ -117,7 +112,6 @@ outputs:
     dependencies:
       run:
         - pkgconf-devel = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -138,6 +132,3 @@ outputs:
         - /usr/share/licenses/pkgconf-doc/COPYING
       license:
         - /usr/share/licenses/pkgconf-doc/COPYING
-    dependencies:
-      run:
-        - filesystem
