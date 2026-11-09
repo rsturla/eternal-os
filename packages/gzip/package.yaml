@@ -45,8 +45,8 @@ build:
     DEFS: "NO_ASM"
   pipeline:
     - uses: autotools/configure
-    - uses: autotools/build
-    - uses: autotools/install
+    - uses: make/build
+    - uses: make/install
     - runs: |
         rm -f "$STAGE/usr/share/info/dir"
         ln -sf gunzip "$STAGE/usr/bin/uncompress"

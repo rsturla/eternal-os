@@ -48,8 +48,8 @@ build:
       with:
         args:
           - --disable-nls
-    - uses: autotools/build
-    - uses: autotools/install
+    - uses: make/build
+    - uses: make/install
     - runs: |
         set -eu
         rm -f "$STAGE/usr/share/info/dir"

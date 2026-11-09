@@ -94,10 +94,10 @@ build:
           - --disable-werror
           - --disable-crypt
           - --enable-kernel=4.9
-    - uses: autotools/build
+    - uses: make/build
       with:
         dir: build
-    - uses: autotools/install
+    - uses: make/install
       with:
         dir: build
     - runs: |

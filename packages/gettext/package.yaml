@@ -64,8 +64,8 @@ build:
           - --without-git
           - --without-bzr
           - --without-cvs
-    - uses: autotools/build
-    - uses: autotools/install
+    - uses: make/build
+    - uses: make/install
     - runs: |
         rm -f "$STAGE/usr/share/info/dir"
         find "$STAGE" -name '*.la' -delete

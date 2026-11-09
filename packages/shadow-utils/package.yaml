@@ -76,8 +76,8 @@ build:
           - --without-group-name-max-length
           - --bindir=/usr/bin
           - --sbindir=/usr/bin
-    - uses: autotools/build
-    - uses: autotools/install
+    - uses: make/build
+    - uses: make/install
     - runs: |
         find "$STAGE" -name '*.la' -delete
         # rpmx does not permit setuid/setgid payloads in packages.  Account

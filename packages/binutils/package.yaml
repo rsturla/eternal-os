@@ -68,10 +68,10 @@ build:
           - --disable-gprofng
           - --disable-nls
           - --disable-shared
-    - uses: autotools/build
+    - uses: make/build
       with:
         args: [tooldir=/usr]
-    - uses: autotools/install
+    - uses: make/install
       with:
         args: [tooldir=/usr]
     - runs: |

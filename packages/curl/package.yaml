@@ -65,8 +65,8 @@ build:
       - --enable-ipv6
       - --enable-unix-sockets
       - --enable-hsts
-  - uses: autotools/build
-  - uses: autotools/install
+  - uses: make/build
+  - uses: make/install
   - runs: |
       find "$STAGE" -name "*.la" -delete
       rm -f "$STAGE/usr/share/info/dir"

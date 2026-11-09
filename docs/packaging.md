@@ -383,8 +383,8 @@ build:
         args:
           - --with-bash-malloc=no
           - --with-afs
-    - uses: autotools/build
-    - uses: autotools/install
+    - uses: make/build
+    - uses: make/install
     - uses: strip
 ```
 
@@ -398,17 +398,20 @@ environment and adds `--host`/`--build` in a cross build. Use `dir` and
         dir: build
         configure: ../configure
         args: [--disable-werror]
-    - uses: autotools/build
+    - uses: make/build
       with:
         dir: build
-    - uses: autotools/install
+    - uses: make/install
       with:
         dir: build
 ```
 
-The same pattern applies to `make/build`, `make/install`, `cmake/configure`,
-`meson/setup` and their siblings. List them with `rpmx steps list` and inspect
-one with `rpmx steps show autotools/configure`.
+A step is named after the command it runs, so a command has exactly one step.
+`autotools/configure` only configures; the Makefile it writes is built and
+installed by `make/build` and `make/install`, which a plain Makefile package
+uses too. CMake and Meson drive their own build and install, so they keep
+`cmake/*` and `meson/*`. List the steps with `rpmx steps list` and inspect one
+with `rpmx steps show autotools/configure`.
 
 Do not inline `./configure`, `make` or `make install` when a step already does
 it. If a sequence is repeated and no built-in fits, add a reusable step rather

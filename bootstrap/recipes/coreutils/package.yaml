@@ -46,8 +46,8 @@ build:
       with:
         args:
           - --enable-no-install-program=groups,hostname,kill,uptime
-    - uses: autotools/build
-    - uses: autotools/install
+    - uses: make/build
+    - uses: make/install
     - uses: license/copy
       with:
         files: [COPYING]

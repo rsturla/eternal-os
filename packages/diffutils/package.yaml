@@ -40,8 +40,8 @@ build:
     FORCE_UNSAFE_CONFIGURE: "1"
   pipeline:
     - uses: autotools/configure
-    - uses: autotools/build
-    - uses: autotools/install
+    - uses: make/build
+    - uses: make/install
     - runs: |
         rm -f "$STAGE/usr/share/info/dir"
     - uses: license/copy
