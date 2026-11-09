@@ -1,0 +1,84 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# scdoc.pc locates the generator. It is runtime metadata, not a library interface.
+schema: 1
+package:
+  name: scdoc
+  version: 1.11.5
+  release: 1
+  summary: Man page generator with a simple markup language
+  description: Man page generator with a simple markup language.
+  license: MIT
+  upstream: https://git.sr.ht/~sircmpwn/scdoc
+sources:
+- name: scdoc-1.11.5.tar.gz
+  kind: archive
+  digest: sha512:643209f9b5783d1792eeec2d1cf9ec0838d51adb1b507110aa10bf8963f1df816f6832cb0912a9e9ac698292f1a211dc99368e754636104f0f43f37fa61c179f
+  locators:
+  - kind: https
+    url: https://git.sr.ht/~sircmpwn/scdoc/archive/1.11.5.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools:
+    - gcc
+    - make
+    - bash
+    - coreutils
+  pipeline:
+  - uses: make/build
+    with:
+      args:
+      - PREFIX="$PREFIX"
+  - uses: make/install
+    with:
+      args:
+      - PREFIX="$PREFIX"
+  - uses: license/copy
+    with:
+      files:
+      - COPYING
+      outputs:
+      - scdoc
+      - scdoc-doc
+  - uses: strip
+outputs:
+- name: scdoc
+  files:
+    license:
+    - /usr/share/licenses/scdoc/**
+  dependencies:
+    run:
+    - filesystem
+  tests:
+  - name: render
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - grep
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      printf 'SMOKE(1)\n\n# NAME\nsmoke - test\n' | scdoc > /tmp/smoke.1
+      grep -q '^.TH' /tmp/smoke.1
+- name: scdoc-doc
+  files:
+    license:
+    - /usr/share/licenses/scdoc-doc/**
+    include:
+    - '@man'
+    - /usr/share/licenses/scdoc-doc/**
+  dependencies:
+    run:
+    - filesystem
+tests:
+- name: hardening
+  stage: build
+  pipeline:
+  - uses: test/hardening-check
