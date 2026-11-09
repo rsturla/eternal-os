@@ -32,9 +32,8 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools: [gcc, make, bash, coreutils, pkgconf]
-    host: [zlib-devel]
+  packages: [gcc, make, bash, coreutils, pkgconf]
+  sysroot: [zlib-devel]
   pipeline:
     - uses: autotools/configure
       with:
@@ -73,9 +72,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
+        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
         argv:
           - sh
           - -c
@@ -98,9 +95,7 @@ outputs:
     tests:
       - name: link
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
+        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
         argv:
           - sh
           - -c

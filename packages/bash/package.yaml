@@ -52,20 +52,19 @@ patches:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools:
-      - gcc
-      - make
-      - bash
-      - coreutils
-      - bison
-      - texinfo
-      - ncurses-devel
-      - gettext
-      - gawk
-      - sed
-      - grep
-      - diffutils
+  packages:
+    - gcc
+    - make
+    - bash
+    - coreutils
+    - bison
+    - texinfo
+    - ncurses-devel
+    - gettext
+    - gawk
+    - sed
+    - grep
+    - diffutils
   pipeline:
     - uses: autotools/configure
       with:
@@ -97,9 +96,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [grep]
+        packages: [grep]
         argv:
           - bash
           - -c
@@ -123,9 +120,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [grep]
+        packages: [grep]
         argv:
           - sh
           - -c

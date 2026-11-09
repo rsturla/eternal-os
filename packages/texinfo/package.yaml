@@ -49,9 +49,8 @@ build:
   # finds into the texi2any shebang, so pin it to the path Perl actually owns.
   environment:
     PERL: /usr/bin/perl
-  dependencies:
-    tools: [gcc, make, bash, coreutils, perl, gawk, sed, grep, diffutils, findutils]
-    host: [ncurses-devel]
+  packages: [gcc, make, bash, coreutils, perl, gawk, sed, grep, diffutils, findutils]
+  sysroot: [ncurses-devel]
   pipeline:
     - uses: autotools/configure
       with:
@@ -90,9 +89,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils, perl, gcc]
+        packages: [bash-binsh, coreutils, perl, gcc]
         argv:
           - sh
           - -c

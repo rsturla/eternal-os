@@ -25,8 +25,7 @@ context: files
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools: [bash, coreutils]
+  packages: [bash, coreutils]
   pipeline:
     - runs: |
         install -d -m 0755 "$STAGE/etc/eternal"

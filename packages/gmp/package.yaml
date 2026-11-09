@@ -33,8 +33,7 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools: [gcc, make, bash, coreutils, m4]
+  packages: [gcc, make, bash, coreutils, m4]
   environment:
     # GMP 6.3.0 was written for C17. GCC 15 and newer default to C23, where
     # "void f()" is a prototype and GMP's configure compiler probe fails.
@@ -67,9 +66,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh]
+        packages: [bash-binsh]
         argv:
           - sh
           - -c
@@ -113,9 +110,7 @@ outputs:
 tests:
   - name: link
     stage: installed
-    environment:
-      contents:
-        packages: [gcc, glibc-devel, bash-binsh]
+    packages: [gcc, glibc-devel, bash-binsh]
     argv:
       - sh
       - -c

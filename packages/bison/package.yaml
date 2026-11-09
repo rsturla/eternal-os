@@ -40,8 +40,7 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools: [gcc, make, bash, coreutils, m4, sed, grep, diffutils]
+  packages: [gcc, make, bash, coreutils, m4, sed, grep, diffutils]
   pipeline:
     - uses: autotools/configure
       with:
@@ -75,9 +74,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils, gcc, m4]
+        packages: [bash-binsh, coreutils, gcc, m4]
         argv:
           - sh
           - -c

@@ -38,17 +38,16 @@ patches:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools: [gcc, make, bash, coreutils, pkgconf, pkgconf-devel, autoconf, automake, gettext, gettext-devel, libtool]
-    host:
-      - audit-libs-devel
-      - libcap-devel
-      - libselinux-devel
-      - libsemanage-devel
-      - libxcrypt-devel
-      - libxslt
-      - docbook-style-xsl
-      - pam-devel
+  packages: [gcc, make, bash, coreutils, pkgconf, pkgconf-devel, autoconf, automake, gettext, gettext-devel, libtool]
+  sysroot:
+    - audit-libs-devel
+    - libcap-devel
+    - libselinux-devel
+    - libsemanage-devel
+    - libxcrypt-devel
+    - libxslt
+    - docbook-style-xsl
+    - pam-devel
   pipeline:
     - runs: |
         autoreconf -fi
@@ -121,9 +120,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils, gcc]
+        packages: [bash-binsh, coreutils, gcc]
         argv:
           - sh
           - -c
@@ -149,9 +146,7 @@ outputs:
     tests:
       - name: link
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils, gcc]
+        packages: [bash-binsh, coreutils, gcc]
         argv:
           - sh
           - -c

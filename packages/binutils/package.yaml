@@ -41,20 +41,19 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools:
-      - gcc
-      - make
-      - bash
-      - coreutils
-      - texinfo
-      - bison
-      - flex
-      - zlib-devel
-      - gawk
-      - sed
-      - grep
-      - diffutils
+  packages:
+    - gcc
+    - make
+    - bash
+    - coreutils
+    - texinfo
+    - bison
+    - flex
+    - zlib-devel
+    - gawk
+    - sed
+    - grep
+    - diffutils
   pipeline:
     - uses: autotools/configure
       with:
@@ -95,9 +94,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, grep]
+        packages: [bash-binsh, grep]
         argv:
           - sh
           - -c
@@ -126,9 +123,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, grep]
+        packages: [bash-binsh, grep]
         argv:
           - sh
           - -c
@@ -151,9 +146,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, grep]
+        packages: [bash-binsh, grep]
         argv:
           - sh
           - -c

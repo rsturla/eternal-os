@@ -33,8 +33,7 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools: [gcc, make, bash, coreutils]
+  packages: [gcc, make, bash, coreutils]
   environment:
     FORCE_UNSAFE_CONFIGURE: "1"
   pipeline:
@@ -58,9 +57,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils]
+        packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c

@@ -26,8 +26,7 @@ context: files
 build:
   root:
     profile: ../../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools: [bash, coreutils]
+  packages: [bash, coreutils]
   pipeline:
     - runs: |
         install -d "$STAGE/usr/share/licenses/basesystem"

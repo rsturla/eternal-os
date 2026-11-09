@@ -26,20 +26,19 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools:
-    - gcc
-    - meson
-    - ninja
-    - bash
-    - coreutils
-    - pkgconf
-    - bison
-    - flex
-    host:
-    - libxcrypt-devel
-    - audit-libs-devel
-    - libselinux-devel
+  packages:
+  - gcc
+  - meson
+  - ninja
+  - bash
+  - coreutils
+  - pkgconf
+  - bison
+  - flex
+  sysroot:
+  - libxcrypt-devel
+  - audit-libs-devel
+  - libselinux-devel
   pipeline:
   - uses: meson/setup
     with:
@@ -112,10 +111,8 @@ outputs:
   tests:
   - name: load
     stage: installed
-    environment:
-      contents:
-        packages:
-        - python3
+    packages:
+      - python3
     argv:
     - bash
     - -eu
@@ -138,12 +135,10 @@ outputs:
   tests:
   - name: compile-and-run
     stage: installed
-    environment:
-      contents:
-        packages:
-        - gcc
-        - glibc-devel
-        - pkgconf
+    packages:
+      - gcc
+      - glibc-devel
+      - pkgconf
     argv:
     - bash
     - -eu
@@ -166,11 +161,9 @@ tests:
       - /usr/lib/libpam.so.0.85.1
 - name: authenticate-with-permit-module
   stage: installed
-  environment:
-    contents:
-      packages:
-      - gcc
-      - glibc-devel
+  packages:
+    - gcc
+    - glibc-devel
   argv:
   - bash
   - -eu

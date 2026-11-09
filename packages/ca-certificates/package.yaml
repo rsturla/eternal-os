@@ -36,8 +36,7 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools: [python3, bash, coreutils]
+  packages: [python3, bash, coreutils]
   pipeline:
     - runs: |
         mkdir -p "$STAGE"/usr/share/ca-certificates/mozilla
@@ -71,9 +70,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils]
+        packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c
@@ -98,9 +95,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils]
+        packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c

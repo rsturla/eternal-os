@@ -23,13 +23,12 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools:
-    - gcc-c++
-    - cmake
-    - make
-    - bash
-    - coreutils
+  packages:
+  - gcc-c++
+  - cmake
+  - make
+  - bash
+  - coreutils
   pipeline:
   - uses: cmake/configure
     with:
@@ -58,11 +57,9 @@ outputs:
   tests:
   - name: compile-and-run
     stage: installed
-    environment:
-      contents:
-        packages:
-        - gcc-c++
-        - glibc-devel
+    packages:
+      - gcc-c++
+      - glibc-devel
     argv:
     - bash
     - -eu

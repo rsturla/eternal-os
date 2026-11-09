@@ -45,8 +45,7 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools: [gcc, make, bash, coreutils, m4, bison, flex, sed, grep, diffutils]
+  packages: [gcc, make, bash, coreutils, m4, bison, flex, sed, grep, diffutils]
   pipeline:
     - runs: |
         set -eu
@@ -135,9 +134,7 @@ outputs:
     tests:
       - name: link
         stage: installed
-        environment:
-          contents:
-            packages: [gcc, gcc-c++, glibc-devel, bash-binsh, coreutils, grep, m4]
+        packages: [gcc, gcc-c++, glibc-devel, bash-binsh, coreutils, grep, m4]
         argv:
           - sh
           - -c
