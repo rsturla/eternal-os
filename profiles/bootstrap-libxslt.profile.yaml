@@ -1,0 +1,66 @@
+# The build root for libxslt.
+#
+# libxslt 1.1.45 requires libxml2 >= 2.15.1. The shared bootstrap root still
+# uses Fedora's libxml2 because Fedora libarchive links libxml2.so.2, while
+# Eternal libxml2 2.15 provides libxml2.so.16; mixing both breaks the offline
+# root transaction for the rpm stack. This profile consumes only the Eternal
+# libxml2 stream, and exists only until libarchive and that stack are built
+# against it too.
+document: rpmx-profile
+version: 1
+name: bootstrap-libxslt
+releasever: "44"
+dist-tag: .eternal
+archs: [x86_64, aarch64]
+builder:
+  image: registry.fedoraproject.org/fedora:44
+repositories:
+  - id: eternal
+    baseurl: https://packages.eternal.sturla.tech/rolling/$basearch
+    # Only the userland packages that have completed the self-hosting switch
+    # are consumed from here. Keep the seed compiler and C library out until
+    # their exact-release dependencies are stable.
+    #
+    # util-linux and lua stay on the Fedora side until their consumers are
+    # in-tree too: the Fedora util-linux packages require the matching
+    # libsmartcols/libuuid release, and Fedora rpm/lua consumers expect the
+    # unversioned lua-devel/lua-libs layout. Mixing both providers makes the
+    # offline root transaction fail with file and version conflicts. libxml2
+    # is the exception here and comes from Eternal for libxslt.
+    exclude: [filesystem, basesystem, eternal-release, eternal-base, eternal-baselayout, glibc-*, gcc-*, ld-linux-*, libc-bin-*, libstdc++-*, libatomic-*, nss-db-*, expat*, zstd*, util-linux*, libblkid*, libfdisk*, libmount*, libsmartcols*, libuuid*, lua*]
+  - id: fedora
+    metalink: https://mirrors.fedoraproject.org/metalink?repo=fedora-$releasever&arch=$basearch
+    # These package names are already produced by Eternal. Hiding the Fedora
+    # copies is what makes the build root consume the published Eternal
+    # repository instead of only using it for metadata.
+    exclude: [bash, bash-binsh, binutils, coreutils, coreutils-single, make, pkgconf, pkgconf-m4, pkgconf-pkg-config, libpkgconf, zlib, zlib-devel, zlib-static, zlib-ng-compat, zlib-ng-compat-devel, zlib-ng-compat-static, libxml2*]
+  - id: updates
+    metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch
+    exclude: [bash, bash-binsh, binutils, coreutils, coreutils-single, make, pkgconf, pkgconf-m4, pkgconf-pkg-config, libpkgconf, zlib, zlib-devel, zlib-static, zlib-ng-compat, zlib-ng-compat-devel, zlib-ng-compat-static, libxml2*]
+  - id: eternal-toolchain
+    baseurl: file://../.work/toolchain-repo
+packages:
+  install:
+    - openssf-compiler-options
+    - bash
+    - bash-binsh
+    - binutils
+    - coreutils
+    - findutils
+    - gcc
+    - make
+    - patch
+    - tar
+    - gzip
+    - sed
+    - grep
+    - gawk
+    - diffutils
+    - pkgconf
+sbom: true
+options:
+  weak_deps: false
+  docs: false
+paths:
+  prefix: /usr
+  libdir: /usr/lib64
