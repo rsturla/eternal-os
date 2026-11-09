@@ -1,0 +1,158 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Use the supported 3.5 LTS series to retain the libssl.so.3 ABI.
+# Install the software and configuration without the optional documentation.
+schema: 1
+package:
+  name: openssl3
+  version: 3.5.9
+  release: 1
+  summary: TLS tools and cryptographic libraries
+  description: TLS tools and cryptographic libraries.
+  license: Apache-2.0
+  upstream: https://openssl-library.org/
+  cpe:
+    vendor: openssl
+    product: openssl
+sources:
+- name: openssl-3.5.9.tar.gz
+  kind: archive
+  digest: sha512:c4c8136fd2c98d13bb85a57bfb0def25c906f47f1fe97675cd114594944eab957b5b81a3e0f48826e1a0f093afff5e83766b539d49768f6db68310fd678d7de6
+  locators:
+  - kind: https
+    url: https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz
+  - kind: https
+    url: https://www.openssl.org/source/openssl-3.5.9.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools:
+    - gcc
+    - make
+    - bash
+    - coreutils
+    - perl
+  pipeline:
+  - runs: |
+      perl ./Configure --prefix="$PREFIX" --libdir="$LIBDIR" --openssldir=/etc/ssl shared no-comp no-zlib no-ssl3 no-weak-ssl-ciphers enable-pie
+  - uses: make/build
+  - uses: make/build
+    with:
+      args:
+      - DESTDIR="$STAGE"
+      - install_sw
+      - install_ssldirs
+  - runs: |
+      rm -f "$STAGE/usr/bin/c_rehash"
+      rm -rf "$STAGE/etc/ssl/misc"
+      rm -f "$STAGE"/usr/lib*/libssl.a "$STAGE"/usr/lib*/libcrypto.a
+      rm -rf "$STAGE$LIBDIR/engines-3"
+      rm -f "$STAGE$LIBDIR/ossl-modules/legacy.so"
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE.txt
+      outputs:
+      - openssl3
+      - openssl3-libs
+      - openssl3-devel
+  - uses: strip
+outputs:
+- name: openssl3
+  files:
+    license:
+    - /usr/share/licenses/openssl3/**
+  dependencies:
+    run:
+    - openssl3-libs = ${package.version}-${package.release}
+    - filesystem
+    provides:
+    - openssl = ${package.version}-${package.release}
+  tests:
+  - name: digest
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - grep
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      printf abc | openssl dgst -sha256 > /tmp/digest
+      grep -q ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad /tmp/digest
+- name: openssl3-libs
+  files:
+    license:
+    - /usr/share/licenses/openssl3-libs/**
+    include:
+    - /usr/lib*/libssl.so.*
+    - /usr/lib*/libcrypto.so.*
+    - /etc/ssl/**
+    - /usr/share/licenses/openssl3-libs/**
+    config:
+    - /etc/ssl/openssl.cnf
+    - /etc/ssl/ct_log_list.cnf
+    noreplace:
+    - /etc/ssl/openssl.cnf
+    - /etc/ssl/ct_log_list.cnf
+  dependencies:
+    run:
+    - filesystem
+    provides:
+    - openssl-libs = ${package.version}-${package.release}
+  tests:
+  - name: load
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - python3
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      python3 -c 'import ctypes; ctypes.CDLL("libssl.so.3")'
+- name: openssl3-devel
+  files:
+    license:
+    - /usr/share/licenses/openssl3-devel/**
+    include:
+    - '@dev'
+    - /usr/share/licenses/openssl3-devel/**
+  dependencies:
+    run:
+    - openssl3-libs = ${package.version}-${package.release}
+    - filesystem
+    provides:
+    - openssl-devel = ${package.version}-${package.release}
+  tests:
+  - name: compile-and-run
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - gcc
+        - glibc-devel
+        - pkgconf
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      cat > /tmp/test.c <<'EOF'
+      #include <openssl/ssl.h>
+      int main(void) { SSL_CTX *ctx = SSL_CTX_new(TLS_method()); if (!ctx) return 1; SSL_CTX_free(ctx); return 0; }
+      EOF
+      gcc /tmp/test.c $(pkg-config --cflags --libs openssl) -o /tmp/test
+      /tmp/test
+tests:
+- name: hardening
+  stage: build
+  pipeline:
+  - uses: test/hardening-check
