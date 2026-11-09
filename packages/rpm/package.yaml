@@ -133,6 +133,8 @@ outputs:
         - libarchive
         - libcap
         - libselinux
+        - libstdc++
+        - lua-libs
         - openssl-libs
         - popt
         - sqlite-libs
