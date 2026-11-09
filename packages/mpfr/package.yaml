@@ -59,6 +59,10 @@ outputs:
     files:
       license:
         - /usr/share/licenses/mpfr/COPYING.LESSER
+    dependencies:
+      run:
+        - gmp
+        - filesystem
     tests:
       - name: installed
         stage: installed
