@@ -86,7 +86,10 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        packages: [bash-binsh, grep]
+        # The built RPMs link libgomp, libstdc++, libunistring and libxml2, and
+        # a test root does not resolve shared-library requirements by soname,
+        # so the packages that provide them are named here.
+        packages: [bash-binsh, grep, libgomp, libstdc++, libunistring, libxml2]
         argv:
           - sh
           - -c
