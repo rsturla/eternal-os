@@ -43,6 +43,11 @@ build:
   - runs: |
       find "$STAGE" -name "*.la" -delete
       rm -f "$STAGE/usr/share/info/dir"
+      # configure picks /usr/sbin/perl when /usr/sbin precedes /usr/bin in
+      # PATH. That path only resolves through the merged-/usr symlink, and the
+      # generated RPM dependency names it literally, so normalize the installed
+      # scripts to the canonical interpreter path.
+      find "$STAGE/usr/bin" -type f -exec sed -i 's|/usr/sbin/perl|/usr/bin/perl|g' {} +
   - uses: license/copy
     with:
       files:
