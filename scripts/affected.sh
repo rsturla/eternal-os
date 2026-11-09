@@ -3,9 +3,14 @@
 #
 # A package is affected when:
 #   - a file under packages/<name>/ changed, or
-#   - a profile, a build script or the pinned rpmx revision changed (all
+#   - a profile, a build script or the repository defaults changed (all
 #     packages), or
 #   - one of its in-tree build dependencies is affected (transitively).
+#
+# A change to the pinned rpmx revision is not a recipe change: it swaps the
+# builder, so it selects one canary package instead of every package. One
+# end-to-end build proves the new revision still assembles roots and emits
+# RPMs; the content hash still invalidates everything else on release.
 #
 # Runtime dependents are not rebuilt by default: their NEVRA does not embed the
 # dependency. Use --with-runtime-dependents when a change also breaks the ABI
@@ -72,6 +77,12 @@ for name in "${names[@]}"; do
   known[$name]=1
 done
 
+# The canary built when only the builder changed. Keep it cheap and
+# self-contained: a shell pipeline over files shipped in the recipe, with no
+# sources and no in-tree build dependencies, so the build cannot fail for a
+# reason unrelated to rpmx.
+canary=eternal-release
+
 emit() {
   if (($# == 0)); then
     ((json)) && echo '[]'
@@ -132,6 +143,7 @@ trap 'rm -f "$changed"' EXIT
 declare -A changed_package
 changed_count=0
 global=0
+builder=0
 while IFS= read -r -d '' path; do
   [[ -n $path ]] || continue
   case "$path" in
@@ -139,9 +151,13 @@ while IFS= read -r -d '' path; do
       # This file only decides which packages to select; changing it does not
       # change package output. The commit and lint checks still run.
       ;;
-    profiles/* | scripts/* | .rpmx-revision | rpmx-defaults.yaml)
+    profiles/* | scripts/* | rpmx-defaults.yaml)
       global=1
       break
+      ;;
+    .rpmx-revision)
+      # The builder changed, not a recipe: a canary build is enough.
+      builder=1
       ;;
     packages/openssf-compiler-options/*)
       # Every C/C++ build installs this package through the bootstrap profile.
@@ -162,7 +178,15 @@ if ((global)); then
 fi
 
 if ((changed_count == 0)); then
-  emit
+  if ((builder)); then
+    if [[ -z ${known[$canary]:-} ]]; then
+      echo "canary package '$canary' does not exist" >&2
+      exit 1
+    fi
+    emit "$canary"
+  else
+    emit
+  fi
   exit 0
 fi
 

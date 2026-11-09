@@ -140,9 +140,13 @@ a new release-counter format without touching individual recipes.
 
 `scripts/affected.sh` walks the package graph from `rpmx plan --json`: a
 recipe change rebuilds that package plus everything that builds against it;
-a profile, script or rpmx revision change rebuilds everything. Runtime
-dependents are only followed with `--with-runtime-dependents`, because a
-version-only change does not alter their NEVRA.
+a profile, script or `rpmx-defaults.yaml` change rebuilds everything. A
+`.rpmx-revision` bump swaps the builder rather than a recipe, so it selects a
+single canary package (`eternal-release`) instead of the whole repository:
+one end-to-end build proves the new revision still assembles roots and emits
+RPMs, and the content hash rebuilds the rest on release. Runtime dependents
+are only followed with `--with-runtime-dependents`, because a version-only
+change does not alter their NEVRA.
 
 CI uses the same hash as a cache key. The release matrix still covers every
 package so the published repository is complete, but unchanged packages are
