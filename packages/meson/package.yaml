@@ -1,0 +1,93 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+schema: 1
+package:
+  name: meson
+  version: 1.12.1
+  release: 1
+  summary: Python build system generator
+  description: Python build system generator.
+  license: Apache-2.0
+  upstream: https://mesonbuild.com/
+  cpe:
+    vendor: mesonbuild
+    product: meson
+sources:
+- name: meson-1.12.1.tar.gz
+  kind: archive
+  digest: sha512:64c75f9e4165e35059d560c8bb1e13f61893e391396974bf7b8b229491cd712f81e69d8ccabc55e2b49b1268d957ac8d365c258fce3e2c65c7634d140612da02
+  locators:
+  - kind: https
+    url: https://github.com/mesonbuild/meson/releases/download/1.12.1/meson-1.12.1.tar.gz
+  - kind: https
+    url: https://files.pythonhosted.org/packages/source/m/meson/meson-1.12.1.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools:
+    - bash
+    - coreutils
+    - python3
+    - python3-build
+    - python3-setuptools
+    - python3-wheel
+    - python3-pip
+  pipeline:
+  - uses: python/build-wheel
+    with:
+      python: /usr/bin/python3
+  - uses: python/install-wheel
+    with:
+      python: /usr/bin/python3
+  - uses: license/copy
+    with:
+      files:
+      - COPYING
+      outputs:
+      - meson
+      - meson-doc
+outputs:
+- name: meson
+  files:
+    license:
+    - /usr/share/licenses/meson/**
+  dependencies:
+    run:
+    - python3
+    - ninja-build
+    - filesystem
+  tests:
+  - name: build-project
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - gcc
+        - glibc-devel
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      mkdir /tmp/meson-test
+      cd /tmp/meson-test
+      printf "project('smoke', 'c')\nexecutable('smoke', 'main.c')\n" > meson.build
+      printf 'int main(void) { return 0; }\n' > main.c
+      meson setup build --wrap-mode=nodownload
+      meson compile -C build
+      ./build/smoke
+- name: meson-doc
+  files:
+    license:
+    - /usr/share/licenses/meson-doc/**
+    include:
+    - '@man'
+    - '@doc'
+    - /usr/share/polkit-1/**
+    - /usr/share/licenses/meson-doc/**
+  dependencies:
+    run:
+    - filesystem
