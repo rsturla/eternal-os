@@ -1,0 +1,90 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+schema: 1
+package:
+  name: autoconf
+  version: '2.73'
+  release: 1
+  summary: GNU configure script generator
+  description: GNU configure script generator.
+  license: GPL-2.0-or-later AND GPL-3.0-or-later AND GPL-3.0-or-later WITH Autoconf-exception-generic-3.0
+    AND GFDL-1.3-or-later AND FSFAP AND X11 AND LicenseRef-Public-Domain
+  upstream: https://www.gnu.org/software/autoconf/
+  cpe:
+    vendor: gnu
+    product: autoconf
+sources:
+- name: autoconf-2.73.tar.xz
+  kind: archive
+  digest: sha512:be051d542f9bd93752eccbdc9b1f3cf1fa4069a153ef34edd5303bfdf162e24d56e33e70df1b978cebb8d1139a82417bb8299cfe6c38cff8613040a829cc624f
+  locators:
+  - kind: https
+    url: https://ftp.gnu.org/gnu/autoconf/autoconf-2.73.tar.xz
+  - kind: https
+    url: https://mirrors.kernel.org/gnu/autoconf/autoconf-2.73.tar.xz
+  extract:
+    format: tar.xz
+    strip-components: 1
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools:
+    - bash
+    - coreutils
+    - make
+    - m4
+    - perl
+  pipeline:
+  - uses: autotools/configure
+  - uses: autotools/build
+  - uses: autotools/install
+  - runs: |
+      find "$STAGE" -name "*.la" -delete
+      rm -f "$STAGE/usr/share/info/dir"
+  - uses: license/copy
+    with:
+      files:
+      - COPYING
+      - COPYINGv3
+      - COPYING.EXCEPTION
+      outputs:
+      - autoconf
+      - autoconf-doc
+outputs:
+- name: autoconf
+  files:
+    license:
+    - /usr/share/licenses/autoconf/**
+  dependencies:
+    run:
+    - m4
+    - perl
+    - filesystem
+    - coreutils
+    - sed
+    - grep
+  tests:
+  - name: generate
+    stage: installed
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      mkdir /tmp/autoconf-test
+      cd /tmp/autoconf-test
+      printf 'AC_INIT([smoke], [1])\nAC_CONFIG_SRCDIR([configure.ac])\nAC_OUTPUT\n' > configure.ac
+      autoconf
+      ./configure
+- name: autoconf-doc
+  files:
+    license:
+    - /usr/share/licenses/autoconf-doc/**
+    include:
+    - '@doc'
+    - '@man'
+    - '@info'
+    - /usr/share/licenses/autoconf-doc/**
+  dependencies:
+    run:
+    - filesystem
