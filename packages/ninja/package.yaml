@@ -25,15 +25,14 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools:
-    - gcc
-    - gcc-c++
-    - make
-    - bash
-    - coreutils
-    - cmake
-    - python3
+  packages:
+  - gcc
+  - gcc-c++
+  - make
+  - bash
+  - coreutils
+  - cmake
+  - python3
   pipeline:
   - uses: cmake/configure
     with:

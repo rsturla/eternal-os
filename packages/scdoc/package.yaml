@@ -22,12 +22,11 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools:
-    - gcc
-    - make
-    - bash
-    - coreutils
+  packages:
+  - gcc
+  - make
+  - bash
+  - coreutils
   pipeline:
   - uses: make/build
     with:
@@ -56,10 +55,8 @@ outputs:
   tests:
   - name: render
     stage: installed
-    environment:
-      contents:
-        packages:
-        - grep
+    packages:
+      - grep
     argv:
     - bash
     - -eu

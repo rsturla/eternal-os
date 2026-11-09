@@ -37,9 +37,8 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools: [gcc, make, bash, coreutils]
-    host: [gmp-devel, libacl-devel, libattr-devel, libcap-devel, libselinux-devel]
+  packages: [gcc, make, bash, coreutils]
+  sysroot: [gmp-devel, libacl-devel, libattr-devel, libcap-devel, libselinux-devel]
   pipeline:
     - uses: autotools/configure
       with:

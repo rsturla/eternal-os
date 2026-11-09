@@ -26,20 +26,19 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools:
-    - gcc
-    - make
-    - bash
-    - coreutils
-    - pkgconf
-    host:
-    - zlib-devel
-    - bzip2-devel
-    - xz-devel
-    - libzstd-devel
-    - openssl-devel
-    - libacl-devel
+  packages:
+  - gcc
+  - make
+  - bash
+  - coreutils
+  - pkgconf
+  sysroot:
+  - zlib-devel
+  - bzip2-devel
+  - xz-devel
+  - libzstd-devel
+  - openssl-devel
+  - libacl-devel
   pipeline:
   - uses: autotools/configure
     with:
@@ -111,10 +110,8 @@ outputs:
   tests:
   - name: load
     stage: installed
-    environment:
-      contents:
-        packages:
-        - python3
+    packages:
+      - python3
     argv:
     - bash
     - -eu
@@ -135,12 +132,10 @@ outputs:
   tests:
   - name: compile-and-run
     stage: installed
-    environment:
-      contents:
-        packages:
-        - gcc
-        - glibc-devel
-        - pkgconf
+    packages:
+      - gcc
+      - glibc-devel
+      - pkgconf
     argv:
     - bash
     - -eu

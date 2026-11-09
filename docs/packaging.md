@@ -323,23 +323,20 @@ Do not point two outputs at the same license path.
 
 ## 3. Dependencies
 
-There are three build dependency lists:
+There are two build package lists:
 
 ```yaml
 build:
-  dependencies:
-    tools: [gcc, make, bash, coreutils]
-    host: [glibc-devel, gmp-devel]
-    target: []
+  packages: [gcc, make, bash, coreutils]
+  sysroot: [glibc-devel, gmp-devel]
 ```
 
-- `tools` are root packages needed by the pipeline: compiler, make, awk,
-  generators. They are not runtime dependencies.
-- `host` and `target` describe cross-build headers/libraries. For native
-  builds they join the build root, but they still do not become runtime
-  dependencies.
+- `packages` are build-root packages needed by the pipeline: compiler, make,
+  awk, generators. They are not runtime dependencies.
+- `sysroot` describes cross-build headers/libraries. For native builds they
+  join the build root, but they still do not become runtime dependencies.
 - Test-root packages are not a build dependency: they belong to the test that
-  needs them, in that test's `environment.contents.packages`.
+  needs them, in that test's `packages`.
 
 Runtime dependencies belong under the output:
 
@@ -573,8 +570,7 @@ outputs:
         argv: ["sh", "-c", "gcc --version && cc --version"]
 ```
 
-Only add `environment.contents.packages` when the test actually invokes those
-packages. A simple binary smoke test usually needs no extra test packages.
+Only add `packages` to a test when the test actually invokes those packages. A simple binary smoke test usually needs no extra test packages.
 
 Tests must not rely on the network.
 

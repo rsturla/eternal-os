@@ -33,8 +33,7 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools: [cmake, make, gcc, bash, coreutils]
+  packages: [cmake, make, gcc, bash, coreutils]
   pipeline:
     - uses: cmake/configure
       with:
@@ -66,9 +65,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
+        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
         argv:
           - sh
           - -c
@@ -93,9 +90,7 @@ outputs:
     tests:
       - name: link
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
+        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
         argv:
           - sh
           - -c

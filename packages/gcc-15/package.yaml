@@ -41,34 +41,33 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools:
-      - gcc
-      - gcc-c++
-      - make
-      - bash
-      - coreutils
-      - bison
-      - flex
-      - gawk
-      - sed
-      - grep
-      - diffutils
-      - findutils
-      - gettext
-      - python3
-      - texinfo
-      - patch
-      - tar
-      - gzip
-    host:
-      - gmp-devel
-      - mpfr-devel
-      - libmpc-devel
-      - isl-devel
-      - zlib-devel
-      - kernel-headers
-      - glibc-devel
+  packages:
+    - gcc
+    - gcc-c++
+    - make
+    - bash
+    - coreutils
+    - bison
+    - flex
+    - gawk
+    - sed
+    - grep
+    - diffutils
+    - findutils
+    - gettext
+    - python3
+    - texinfo
+    - patch
+    - tar
+    - gzip
+  sysroot:
+    - gmp-devel
+    - mpfr-devel
+    - libmpc-devel
+    - isl-devel
+    - zlib-devel
+    - kernel-headers
+    - glibc-devel
   environment:
     # Build this compiler with the policy it will itself apply, but keep its
     # own diagnostics non-fatal. The wrapper applies the arch baseline too.

@@ -28,15 +28,14 @@ build:
     # libxslt 1.1.45 needs libxml2 >= 2.15.1; the shared root still uses
     # Fedora's libxml2 for the rpm stack.
     profile: ../../profiles/bootstrap-libxslt.profile.yaml
-  dependencies:
-    tools:
-    - gcc
-    - make
-    - bash
-    - coreutils
-    - pkgconf
-    host:
-    - libxml2-devel
+  packages:
+  - gcc
+  - make
+  - bash
+  - coreutils
+  - pkgconf
+  sysroot:
+  - libxml2-devel
   pipeline:
   - uses: autotools/configure
     with:
@@ -96,10 +95,8 @@ outputs:
   tests:
   - name: load
     stage: installed
-    environment:
-      contents:
-        packages:
-        - python3
+    packages:
+      - python3
     argv:
     - bash
     - -eu
@@ -122,12 +119,10 @@ outputs:
   tests:
   - name: compile-and-run
     stage: installed
-    environment:
-      contents:
-        packages:
-        - gcc
-        - glibc-devel
-        - pkgconf
+    packages:
+      - gcc
+      - glibc-devel
+      - pkgconf
     argv:
     - bash
     - -eu

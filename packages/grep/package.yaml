@@ -33,9 +33,8 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools: [gcc, make, bash, coreutils, pkgconf]
-    host: [pcre2-devel]
+  packages: [gcc, make, bash, coreutils, pkgconf]
+  sysroot: [pcre2-devel]
   pipeline:
     - uses: autotools/configure
     - uses: make/build
@@ -57,9 +56,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils]
+        packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c

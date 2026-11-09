@@ -58,11 +58,10 @@ build:
   environment:
     BUILD_ZLIB: "0"
     BUILD_BZIP2: "0"
-  dependencies:
-    tools: [gcc, make, bash, coreutils, sed, grep, diffutils, findutils, tar, gzip, m4, patch]
-    host: [zlib-devel, bzip2-devel]
-    # The interpreter links the system zlib and bzip2; a test root needs the
-    # packages that ship those libraries as well as the shell.
+  packages: [gcc, make, bash, coreutils, sed, grep, diffutils, findutils, tar, gzip, m4, patch]
+  sysroot: [zlib-devel, bzip2-devel]
+  # The interpreter links the system zlib and bzip2; a test root needs the
+  # packages that ship those libraries as well as the shell.
   pipeline:
     - runs: |
         set -eu
@@ -160,9 +159,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils, gcc, grep, bzip2-libs, zlib]
+        packages: [bash-binsh, coreutils, gcc, grep, bzip2-libs, zlib]
         argv:
           - sh
           - -c
@@ -195,9 +192,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils, gcc, grep, bzip2-libs, zlib]
+        packages: [bash-binsh, coreutils, gcc, grep, bzip2-libs, zlib]
         argv:
           - sh
           - -c
@@ -226,9 +221,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils, gcc, grep, bzip2-libs, zlib]
+        packages: [bash-binsh, coreutils, gcc, grep, bzip2-libs, zlib]
         argv:
           - sh
           - -c
@@ -283,9 +276,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils, gcc, grep, bzip2-libs, zlib]
+        packages: [bash-binsh, coreutils, gcc, grep, bzip2-libs, zlib]
         argv:
           - sh
           - -c

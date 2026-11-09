@@ -47,19 +47,18 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools: [gcc, make, bash, coreutils, pkgconf, sed, grep, diffutils, findutils]
-    host:
-      - bzip2-devel
-      - expat-devel
-      - libffi-devel
-      - libzstd-devel
-      - ncurses-devel
-      - openssl-devel
-      - readline-devel
-      - sqlite-devel
-      - xz-devel
-      - zlib-devel
+  packages: [gcc, make, bash, coreutils, pkgconf, sed, grep, diffutils, findutils]
+  sysroot:
+    - bzip2-devel
+    - expat-devel
+    - libffi-devel
+    - libzstd-devel
+    - ncurses-devel
+    - openssl-devel
+    - readline-devel
+    - sqlite-devel
+    - xz-devel
+    - zlib-devel
   pipeline:
     - uses: autotools/configure
       with:
@@ -103,9 +102,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bzip2-libs, expat, libffi, libzstd, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
+        packages: [bzip2-libs, expat, libffi, libzstd, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
         argv:
           - sh
           - -c
@@ -158,9 +155,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bzip2-libs, expat, libffi, libzstd, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
+        packages: [bzip2-libs, expat, libffi, libzstd, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
         argv:
           - sh
           - -c
@@ -185,9 +180,7 @@ outputs:
     tests:
       - name: embed
         stage: installed
-        environment:
-          contents:
-            packages: [gcc, glibc-devel, grep, sed, bash-binsh, coreutils]
+        packages: [gcc, glibc-devel, grep, sed, bash-binsh, coreutils]
         argv:
           - sh
           - -c

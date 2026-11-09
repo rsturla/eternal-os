@@ -26,26 +26,25 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools:
-    - gcc
-    - gcc-c++
-    - make
-    - bash
-    - coreutils
-    - cmake
-    - pkgconf
-    host:
-    - libcurl-devel
-    - libarchive-devel
-    - expat-devel
-    - zlib-devel
-    - bzip2-devel
-    - xz-devel
-    - libzstd-devel
-    - libuv-devel
-    - jsoncpp-devel
-    - rhash-devel
+  packages:
+  - gcc
+  - gcc-c++
+  - make
+  - bash
+  - coreutils
+  - cmake
+  - pkgconf
+  sysroot:
+  - libcurl-devel
+  - libarchive-devel
+  - expat-devel
+  - zlib-devel
+  - bzip2-devel
+  - xz-devel
+  - libzstd-devel
+  - libuv-devel
+  - jsoncpp-devel
+  - rhash-devel
   pipeline:
   - uses: cmake/configure
     with:
@@ -101,12 +100,10 @@ outputs:
   tests:
   - name: build-project
     stage: installed
-    environment:
-      contents:
-        packages:
-        - gcc
-        - glibc-devel
-        - make
+    packages:
+      - gcc
+      - glibc-devel
+      - make
     argv:
     - bash
     - -eu

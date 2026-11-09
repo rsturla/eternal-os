@@ -46,9 +46,8 @@ build:
   # the packaged metadata names the library that is really linked.
   environment:
     bash_cv_termcap_lib: libtinfo
-  dependencies:
-    tools: [gcc, make, bash, coreutils, sed, grep, diffutils]
-    host: [ncurses-devel]
+  packages: [gcc, make, bash, coreutils, sed, grep, diffutils]
+  sysroot: [ncurses-devel]
   pipeline:
     - uses: autotools/configure
       with:
@@ -110,9 +109,7 @@ outputs:
     tests:
       - name: link
         stage: installed
-        environment:
-          contents:
-            packages: [gcc, glibc-devel, pkgconf, grep, bash-binsh, coreutils]
+        packages: [gcc, glibc-devel, pkgconf, grep, bash-binsh, coreutils]
         argv:
           - sh
           - -c

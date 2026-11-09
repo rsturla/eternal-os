@@ -26,15 +26,14 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools:
-    - bash
-    - coreutils
-    - python3
-    - python3-build
-    - python3-setuptools
-    - python3-wheel
-    - python3-pip
+  packages:
+  - bash
+  - coreutils
+  - python3
+  - python3-build
+  - python3-setuptools
+  - python3-wheel
+  - python3-pip
   pipeline:
   - uses: python/build-wheel
     with:
@@ -63,11 +62,9 @@ outputs:
   tests:
   - name: build-project
     stage: installed
-    environment:
-      contents:
-        packages:
-        - gcc
-        - glibc-devel
+    packages:
+      - gcc
+      - glibc-devel
     argv:
     - bash
     - -eu

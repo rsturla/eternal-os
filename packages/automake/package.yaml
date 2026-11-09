@@ -28,14 +28,13 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools:
-    - bash
-    - coreutils
-    - make
-    - m4
-    - perl
-    - autoconf
+  packages:
+  - bash
+  - coreutils
+  - make
+  - m4
+  - perl
+  - autoconf
   pipeline:
   - uses: autotools/configure
   - uses: make/build
@@ -68,12 +67,10 @@ outputs:
   tests:
   - name: generate
     stage: installed
-    environment:
-      contents:
-        packages:
-        - make
-        - tar
-        - gzip
+    packages:
+      - make
+      - tar
+      - gzip
     argv:
     - bash
     - -eu

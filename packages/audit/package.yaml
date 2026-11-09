@@ -27,19 +27,18 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools:
-    - gcc
-    - make
-    - bash
-    - coreutils
-    - autoconf
-    - automake
-    - libtool
-    - pkgconf
-    host:
-    - libcap-ng-devel
-    - kernel-headers
+  packages:
+  - gcc
+  - make
+  - bash
+  - coreutils
+  - autoconf
+  - automake
+  - libtool
+  - pkgconf
+  sysroot:
+  - libcap-ng-devel
+  - kernel-headers
   pipeline:
   - runs: |
       autoreconf -fi
@@ -104,10 +103,8 @@ outputs:
   tests:
   - name: load
     stage: installed
-    environment:
-      contents:
-        packages:
-        - python3
+    packages:
+      - python3
     argv:
     - bash
     - -eu
@@ -116,10 +113,8 @@ outputs:
       python3 -c 'import ctypes; ctypes.CDLL("libaudit.so.1")'
   - name: load-auparse
     stage: installed
-    environment:
-      contents:
-        packages:
-        - python3
+    packages:
+      - python3
     argv:
     - bash
     - -eu
@@ -142,11 +137,9 @@ outputs:
   tests:
   - name: compile-and-run
     stage: installed
-    environment:
-      contents:
-        packages:
-        - gcc
-        - glibc-devel
+    packages:
+      - gcc
+      - glibc-devel
     argv:
     - bash
     - -eu

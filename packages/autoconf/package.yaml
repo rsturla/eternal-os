@@ -27,13 +27,12 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools:
-    - bash
-    - coreutils
-    - make
-    - m4
-    - perl
+  packages:
+  - bash
+  - coreutils
+  - make
+  - m4
+  - perl
   pipeline:
   - uses: autotools/configure
   - uses: make/build

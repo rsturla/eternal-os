@@ -34,22 +34,21 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools: [cmake, make, gcc, gcc-c++, bash, coreutils, pkgconf, python3, scdoc]
-    host:
-      - bzip2-devel
-      - file-devel
-      - libacl-devel
-      - libarchive-devel
-      - libcap-devel
-      - libselinux-devel
-      - lua-devel
-      - openssl-devel
-      - popt-devel
-      - sqlite-devel
-      - xz-devel
-      - zlib-devel
-      - libzstd-devel
+  packages: [cmake, make, gcc, gcc-c++, bash, coreutils, pkgconf, python3, scdoc]
+  sysroot:
+    - bzip2-devel
+    - file-devel
+    - libacl-devel
+    - libarchive-devel
+    - libcap-devel
+    - libselinux-devel
+    - lua-devel
+    - openssl-devel
+    - popt-devel
+    - sqlite-devel
+    - xz-devel
+    - zlib-devel
+    - libzstd-devel
   pipeline:
     - uses: cmake/configure
       with:
@@ -106,9 +105,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
+        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
         argv:
           - sh
           - -c
@@ -147,9 +144,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
+        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
         argv:
           - sh
           - -c
@@ -174,9 +169,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
+        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
         argv:
           - sh
           - -c
@@ -212,9 +205,7 @@ outputs:
     tests:
       - name: link
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
+        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
         argv:
           - sh
           - -c

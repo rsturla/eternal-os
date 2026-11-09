@@ -42,27 +42,26 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools:
-      - gcc
-      - make
-      - bash
-      - coreutils
-      - bison
-      - flex
-      - gawk
-      - sed
-      - grep
-      - diffutils
-      - findutils
-      - gettext
-      - python3
-      - texinfo
-      - patch
-      - tar
-      - gzip
-    host:
-      - kernel-headers
+  packages:
+    - gcc
+    - make
+    - bash
+    - coreutils
+    - bison
+    - flex
+    - gawk
+    - sed
+    - grep
+    - diffutils
+    - findutils
+    - gettext
+    - python3
+    - texinfo
+    - patch
+    - tar
+    - gzip
+  sysroot:
+    - kernel-headers
   environment:
     # glibc has its own fortify and stack-protector configuration. The
     # distribution spec would apply them to the bootstrap compiler as well.
@@ -288,12 +287,10 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages:
-              - binutils
-              - gcc
-              - grep
+        packages:
+          - binutils
+          - gcc
+          - grep
         argv:
           - sh
           - -c

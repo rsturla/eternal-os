@@ -36,9 +36,8 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools: [meson, ninja, gcc, bash, coreutils, pkgconf, python3]
-    host: [libffi-devel, libmount-devel, pcre2-devel, zlib-devel]
+  packages: [meson, ninja, gcc, bash, coreutils, pkgconf, python3]
+  sysroot: [libffi-devel, libmount-devel, pcre2-devel, zlib-devel]
   pipeline:
     - uses: meson/setup
       with:
@@ -89,9 +88,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils, gcc, pkgconf]
+        packages: [bash-binsh, coreutils, gcc, pkgconf]
         argv:
           - sh
           - -c
@@ -118,9 +115,7 @@ outputs:
     tests:
       - name: link
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils, gcc, pkgconf]
+        packages: [bash-binsh, coreutils, gcc, pkgconf]
         argv:
           - sh
           - -c

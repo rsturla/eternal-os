@@ -32,8 +32,7 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools: [gcc, make, bash, coreutils, gettext, libtool]
+  packages: [gcc, make, bash, coreutils, gettext, libtool]
   pipeline:
     - uses: autotools/configure
       with:
@@ -63,9 +62,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils]
+        packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c
@@ -89,9 +86,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils]
+        packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c
@@ -130,9 +125,7 @@ outputs:
 tests:
   - name: link
     stage: installed
-    environment:
-      contents:
-        packages: [gcc, glibc-devel, bash-binsh, coreutils]
+    packages: [gcc, glibc-devel, bash-binsh, coreutils]
     argv:
       - sh
       - -c

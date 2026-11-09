@@ -48,9 +48,8 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools: [gcc, gcc-c++, make, bash, coreutils, perl, sed, grep, diffutils, findutils, tar, gzip]
-    host: [libunistring-devel, libxml2-devel, ncurses-devel]
+  packages: [gcc, gcc-c++, make, bash, coreutils, perl, sed, grep, diffutils, findutils, tar, gzip]
+  sysroot: [libunistring-devel, libxml2-devel, ncurses-devel]
   pipeline:
     - uses: autotools/configure
       with:
@@ -150,9 +149,7 @@ outputs:
     tests:
       - name: link
         stage: installed
-        environment:
-          contents:
-            packages: [gcc, glibc-devel, pkgconf, grep, bash-binsh, coreutils, perl]
+        packages: [gcc, glibc-devel, pkgconf, grep, bash-binsh, coreutils, perl]
         argv:
           - sh
           - -c

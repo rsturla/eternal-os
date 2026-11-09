@@ -25,20 +25,19 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools:
-    - gcc
-    - make
-    - bash
-    - coreutils
-    - flex
-    - bison
-    - pkgconf
-    host:
-    - libselinux-devel
-    - libsepol-devel
-    - audit-libs-devel
-    - bzip2-devel
+  packages:
+  - gcc
+  - make
+  - bash
+  - coreutils
+  - flex
+  - bison
+  - pkgconf
+  sysroot:
+  - libselinux-devel
+  - libsepol-devel
+  - audit-libs-devel
+  - bzip2-devel
   pipeline:
   - uses: make/build
     with:
@@ -96,10 +95,8 @@ outputs:
   tests:
   - name: load
     stage: installed
-    environment:
-      contents:
-        packages:
-        - python3
+    packages:
+      - python3
     argv:
     - bash
     - -eu
@@ -120,11 +117,9 @@ outputs:
   tests:
   - name: compile-and-run
     stage: installed
-    environment:
-      contents:
-        packages:
-        - gcc
-        - glibc-devel
+    packages:
+      - gcc
+      - glibc-devel
     argv:
     - bash
     - -eu
@@ -152,12 +147,10 @@ outputs:
   tests:
   - name: link-archive
     stage: installed
-    environment:
-      contents:
-        packages:
-        - gcc
-        - glibc-devel
-        - pkgconf
+    packages:
+      - gcc
+      - glibc-devel
+      - pkgconf
     argv:
     - bash
     - -eu

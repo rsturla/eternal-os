@@ -26,12 +26,11 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools:
-    - gcc
-    - make
-    - bash
-    - coreutils
+  packages:
+  - gcc
+  - make
+  - bash
+  - coreutils
   pipeline:
   - uses: autotools/configure
     with:
@@ -91,10 +90,8 @@ outputs:
   tests:
   - name: load
     stage: installed
-    environment:
-      contents:
-        packages:
-        - python3
+    packages:
+      - python3
     argv:
     - bash
     - -eu
@@ -115,11 +112,9 @@ outputs:
   tests:
   - name: compile-and-run
     stage: installed
-    environment:
-      contents:
-        packages:
-        - gcc
-        - glibc-devel
+    packages:
+      - gcc
+      - glibc-devel
     argv:
     - bash
     - -eu

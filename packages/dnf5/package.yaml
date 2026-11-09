@@ -43,33 +43,32 @@ patches:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools: [cmake, make, gcc, gcc-c++, bash, coreutils, pkgconf, python3]
-    host:
-      - bzip2-devel
-      - file-devel
-      - fmt-devel
-      - glib2-devel
-      - json-c-devel
-      - libacl-devel
-      - libarchive-devel
-      - libcap-devel
-      - libcurl-devel
-      - librepo-devel
-      - libselinux-devel
-      - libsolv-devel
-      - libxml2-devel
-      - lua-devel
-      - openssl-devel
-      - popt-devel
-      - rpm-devel
-      - sqlite-devel
-      - toml11-devel
-      - libsmartcols-devel
-      - xz-devel
-      - zchunk-devel
-      - zlib-devel
-      - libzstd-devel
+  packages: [cmake, make, gcc, gcc-c++, bash, coreutils, pkgconf, python3]
+  sysroot:
+    - bzip2-devel
+    - file-devel
+    - fmt-devel
+    - glib2-devel
+    - json-c-devel
+    - libacl-devel
+    - libarchive-devel
+    - libcap-devel
+    - libcurl-devel
+    - librepo-devel
+    - libselinux-devel
+    - libsolv-devel
+    - libxml2-devel
+    - lua-devel
+    - openssl-devel
+    - popt-devel
+    - rpm-devel
+    - sqlite-devel
+    - toml11-devel
+    - libsmartcols-devel
+    - xz-devel
+    - zchunk-devel
+    - zlib-devel
+    - libzstd-devel
   pipeline:
     - uses: cmake/configure
       with:
@@ -124,9 +123,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils]
+        packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c
@@ -159,9 +156,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils]
+        packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c
@@ -204,9 +199,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        environment:
-          contents:
-            packages: [bash-binsh, coreutils]
+        packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c

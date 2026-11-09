@@ -22,10 +22,9 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  dependencies:
-    tools:
-    - bash
-    - coreutils
+  packages:
+  - bash
+  - coreutils
   pipeline:
   - runs: |
       dest="$STAGE/usr/share/sgml/docbook/xsl-stylesheets"
@@ -55,11 +54,9 @@ outputs:
   tests:
   - name: transform
     stage: installed
-    environment:
-      contents:
-        packages:
-        - libxslt
-        - grep
+    packages:
+      - libxslt
+      - grep
     argv:
     - bash
     - -eu
