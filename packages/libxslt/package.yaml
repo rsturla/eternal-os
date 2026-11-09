@@ -1,0 +1,166 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# libexslt has no fortifiable libc call. Check its other hardening properties.
+# Check all properties on xsltproc and libxslt.
+schema: 1
+package:
+  name: libxslt
+  version: 1.1.45
+  release: 1
+  summary: XSLT transformation tools and libraries
+  description: XSLT transformation tools and libraries.
+  license: MIT
+  upstream: https://gitlab.gnome.org/GNOME/libxslt
+  cpe:
+    vendor: xmlsoft
+    product: libxslt
+sources:
+- name: libxslt-1.1.45.tar.xz
+  kind: archive
+  digest: sha512:8f0608aad7250ccfe62808169d464a1641535b41a73b4fbbc1eeec9c9e785bbd8f4860d571eb567ee1e7abbd89ac3d707a5f3e3a9e836ecaf38155793ce47d78
+  locators:
+  - kind: https
+    url: https://download.gnome.org/sources/libxslt/1.1/libxslt-1.1.45.tar.xz
+  extract:
+    format: tar.xz
+    strip-components: 1
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools:
+    - gcc
+    - make
+    - bash
+    - coreutils
+    - pkgconf
+    host:
+    - libxml2-devel
+  pipeline:
+  - uses: autotools/configure
+    with:
+      args:
+      - --disable-static
+      - --without-python
+      - --without-crypto
+  - uses: autotools/build
+  - uses: autotools/install
+  - runs: |
+      find "$STAGE" -name "*.la" -delete
+      rm -f "$STAGE/usr/share/info/dir"
+  - uses: license/copy
+    with:
+      files:
+      - Copyright
+      outputs:
+      - libxslt
+      - libxslt-libs
+      - libxslt-devel
+      - libxslt-doc
+  - uses: strip
+outputs:
+- name: libxslt
+  files:
+    license:
+    - /usr/share/licenses/libxslt/**
+  dependencies:
+    run:
+    - libxslt-libs = ${package.version}-${package.release}
+    - filesystem
+  tests:
+  - name: transform
+    stage: installed
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      printf '<root>ok</root>\n' > /tmp/input.xml
+      cat > /tmp/style.xsl <<'EOF'
+      <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"><xsl:output method="text"/><xsl:template match="/"><xsl:value-of select="root"/></xsl:template></xsl:stylesheet>
+      EOF
+      test "$(xsltproc --nonet /tmp/style.xsl /tmp/input.xml)" = ok
+- name: libxslt-libs
+  files:
+    license:
+    - /usr/share/licenses/libxslt-libs/**
+    include:
+    - /usr/lib*/libxslt.so.*
+    - /usr/lib*/libexslt.so.*
+    - /usr/share/licenses/libxslt-libs/**
+  dependencies:
+    run:
+    - filesystem
+    - libxml2
+  tests:
+  - name: load
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - python3
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      python3 -c 'import ctypes; ctypes.CDLL("libxslt.so.1")'
+- name: libxslt-devel
+  files:
+    license:
+    - /usr/share/licenses/libxslt-devel/**
+    include:
+    - '@dev'
+    - /usr/bin/xslt-config
+    - /usr/lib*/xsltConf.sh
+    - /usr/share/licenses/libxslt-devel/**
+  dependencies:
+    run:
+    - libxslt-libs = ${package.version}-${package.release}
+    - filesystem
+  tests:
+  - name: compile-and-run
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - gcc
+        - glibc-devel
+        - pkgconf
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      cat > /tmp/test.c <<'EOF'
+      #include <libxslt/xslt.h>
+      int main(void) { xsltInit(); xsltCleanupGlobals(); return 0; }
+      EOF
+      gcc /tmp/test.c $(pkg-config --cflags --libs libxslt) -o /tmp/test
+      /tmp/test
+- name: libxslt-doc
+  files:
+    license:
+    - /usr/share/licenses/libxslt-doc/**
+    include:
+    - '@doc'
+    - '@man'
+    - '@info'
+    - /usr/share/licenses/libxslt-doc/**
+    - /usr/share/gtk-doc/**
+  dependencies:
+    run:
+    - filesystem
+tests:
+- name: hardening
+  stage: build
+  pipeline:
+  - uses: test/hardening-check
+    with:
+      skip:
+      - fortify
+  - uses: test/hardening-check
+    with:
+      paths:
+      - /usr/bin/xsltproc
+      - /usr/lib64/libxslt.so.${package.version}
+      - /usr/lib/libxslt.so.${package.version}
