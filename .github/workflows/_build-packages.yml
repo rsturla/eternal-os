@@ -56,6 +56,26 @@ on:
     secrets:
       RPMX_SIGNING_KEY:
         required: false
+  # Run the matrix directly from the Actions tab, without a pull request.
+  # This only builds and uploads artifacts; publishing stays in release.yml.
+  workflow_dispatch:
+    inputs:
+      selection:
+        description: Build all packages or only those affected by a diff.
+        required: false
+        type: choice
+        options: [all, affected]
+        default: all
+      base:
+        description: Base ref for --affected (empty uses origin/HEAD).
+        required: false
+        type: string
+        default: ""
+      sign:
+        description: Sign packages when RPMX_SIGNING_KEY is available.
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
