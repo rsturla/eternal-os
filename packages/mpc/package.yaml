@@ -60,6 +60,10 @@ outputs:
       license:
         - /usr/share/licenses/mpc/COPYING.LESSER
     dependencies:
+      run:
+        - mpfr
+        - gmp
+        - filesystem
       provides:
         - libmpc = ${package.version}-${package.release}
     tests:
