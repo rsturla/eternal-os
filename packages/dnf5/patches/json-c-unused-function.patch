@@ -1,0 +1,18 @@
+Do not promote json-c's unused static inline helpers to errors
+
+json-c 0.19 declares several static inline helpers in linkhash.h that most
+translation units do not use. dnf5 builds with a global -Werror, so including
+json.h now fails with -Wunused-function. Keep -Werror for dnf5's own code but
+leave this one warning as a warning.
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -88,7 +88,7 @@
+ add_compile_options("-fmacro-prefix-map=${PROJECT_SOURCE_DIR}/=")
+ 
+ # warnings
+-add_compile_options(-Wall -Wextra -Werror)
++add_compile_options(-Wall -Wextra -Werror -Wno-error=unused-function)
+ add_compile_options(-Wcast-align -Wformat-nonliteral -Wmissing-format-attribute -Wredundant-decls -Wsign-compare -Wsign-conversion -Wtype-limits -Wuninitialized -Wwrite-strings)
+ add_compile_options(-Werror=unused-result -Wodr)
+ 

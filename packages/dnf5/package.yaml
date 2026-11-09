@@ -36,6 +36,9 @@ patches:
   - file: patches/offline-plymouth-unused.patch
     strip: 1
     reason: "avoid -Werror=unused-parameter with -DWITH_SYSTEMD=OFF"
+  - file: patches/json-c-unused-function.patch
+    strip: 1
+    reason: "avoid -Werror=unused-function from json-c 0.19 headers"
 
 build:
   root:
