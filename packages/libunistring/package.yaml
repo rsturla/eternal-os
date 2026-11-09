@@ -1,0 +1,139 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# GNU libunistring. gettext's runtime and tools use it for Unicode string
+# handling, so it is imported with gettext rather than with the wider library
+# set. It has no dependencies of its own, which makes it the cheapest package
+# of the wave.
+schema: 1
+
+package:
+  name: libunistring
+  version: "1.5"
+  release: 1
+  summary: Library for manipulating Unicode strings
+  description: |
+    GNU libunistring provides functions for manipulating Unicode strings and
+    C strings, including normalization, word breaking, case mapping and
+    bidirectional classification.
+  license: LGPL-3.0-or-later OR GPL-2.0-or-later
+  upstream: https://www.gnu.org/software/libunistring/
+  cpe:
+    vendor: gnu
+    product: libunistring
+
+sources:
+  - name: libunistring-1.5.tar.xz
+    kind: archive
+    digest: "sha512:cbf6a1ddb8dbdd922d7650c110adef285133c303e69e943fbe240bc988954912f0fc7fbd205feacb3f6b98bda53df07ee2ad4e9ec241b8e78d0c52083a9f5c32"
+    locators:
+      - kind: https
+        url: https://ftp.gnu.org/gnu/libunistring/libunistring-1.5.tar.xz
+      - kind: https
+        url: https://mirrors.kernel.org/gnu/libunistring/libunistring-1.5.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, sed, grep, diffutils]
+    tests: [bash-binsh, coreutils, gcc]
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          - --disable-nls
+          - --disable-static
+    - uses: autotools/build
+    - uses: autotools/install
+    - runs: |
+        rm -f "$STAGE/usr/share/info/dir"
+        find "$STAGE" -name '*.la' -delete
+    - uses: license/copy
+      with:
+        files: [COPYING, COPYING.LIB]
+        outputs: [libunistring, libunistring-devel, libunistring-doc]
+    - uses: strip
+
+outputs:
+  - name: libunistring
+    summary: Library for manipulating Unicode strings
+    files:
+      license:
+        - /usr/share/licenses/libunistring/COPYING
+        - /usr/share/licenses/libunistring/COPYING.LIB
+    dependencies:
+      run:
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libunistring.so.* /usr/lib/libunistring.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: libunistring-devel
+    summary: Development files for libunistring
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/libunistring-devel/COPYING
+        - /usr/share/licenses/libunistring-devel/COPYING.LIB
+      license:
+        - /usr/share/licenses/libunistring-devel/COPYING
+        - /usr/share/licenses/libunistring-devel/COPYING.LIB
+    dependencies:
+      run:
+        - libunistring = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: link
+        stage: installed
+        environment:
+          contents:
+            packages: [gcc, glibc-devel]
+        argv:
+          - sh
+          - -c
+          - |
+            cat > /tmp/u8.c <<'EOF'
+            #include <unistr.h>
+            #include <unictype.h>
+            #include <stdio.h>
+            int main(void) {
+              const uint8_t text[] = "eternal";
+              printf("%zu\n", u8_strlen(text));
+              return 0;
+            }
+            EOF
+            gcc /tmp/u8.c -lunistring -o /tmp/u8
+            test "$(/tmp/u8)" = 7
+
+  - name: libunistring-doc
+    summary: Documentation for libunistring
+    files:
+      include:
+        - "@man"
+        - "@info"
+        - "@doc"
+        - /usr/share/licenses/libunistring-doc/COPYING
+        - /usr/share/licenses/libunistring-doc/COPYING.LIB
+      license:
+        - /usr/share/licenses/libunistring-doc/COPYING
+        - /usr/share/licenses/libunistring-doc/COPYING.LIB
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: hardening
+    stage: build
+    pipeline:
+      - uses: test/hardening-check
