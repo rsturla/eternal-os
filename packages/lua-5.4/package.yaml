@@ -35,7 +35,6 @@ build:
     profile: ../../profiles/bootstrap.profile.yaml
   dependencies:
     tools: [gcc, make, bash, coreutils, sed]
-    tests: [bash-binsh, coreutils, gcc, pkgconf, grep]
   pipeline:
     - runs: |
         make linux MYCFLAGS="-fPIC" MYLDFLAGS="-Wl,-E"
@@ -106,6 +105,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
         argv:
           - sh
           - -c
@@ -129,6 +131,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
         argv:
           - sh
           - -c
@@ -155,6 +160,9 @@ outputs:
     tests:
       - name: link
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
         argv:
           - sh
           - -c

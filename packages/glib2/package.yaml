@@ -39,7 +39,6 @@ build:
   dependencies:
     tools: [meson, ninja, gcc, bash, coreutils, pkgconf, python3]
     host: [libffi-devel, libmount-devel, pcre2-devel, zlib-devel]
-    tests: [bash-binsh, coreutils, gcc, pkgconf]
   pipeline:
     - uses: meson/setup
       with:
@@ -90,6 +89,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils, gcc, pkgconf]
         argv:
           - sh
           - -c
@@ -116,6 +118,9 @@ outputs:
     tests:
       - name: link
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils, gcc, pkgconf]
         argv:
           - sh
           - -c

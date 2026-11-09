@@ -35,7 +35,6 @@ build:
     profile: ../../profiles/bootstrap.profile.yaml
   dependencies:
     tools: [gcc, make, bash, coreutils, sed]
-    tests: [bash-binsh, coreutils, gcc, grep]
   pipeline:
     - runs: |
         sed -i \
@@ -78,6 +77,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils, gcc, grep]
         argv:
           - sh
           - -c
@@ -104,6 +106,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils, gcc, grep]
         argv:
           - sh
           - -c
@@ -128,6 +133,9 @@ outputs:
     tests:
       - name: link
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils, gcc, grep]
         argv:
           - sh
           - -c

@@ -51,7 +51,6 @@ build:
   dependencies:
     tools: [gcc, gcc-c++, make, bash, coreutils, perl, sed, grep, diffutils, findutils, tar, gzip]
     host: [libunistring-devel, libxml2-devel, ncurses-devel]
-    tests: [bash-binsh, coreutils, gcc, perl]
   pipeline:
     - uses: autotools/configure
       with:
@@ -153,7 +152,7 @@ outputs:
         stage: installed
         environment:
           contents:
-            packages: [gcc, glibc-devel, pkgconf, grep]
+            packages: [gcc, glibc-devel, pkgconf, grep, bash-binsh, coreutils, perl]
         argv:
           - sh
           - -c

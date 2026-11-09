@@ -44,7 +44,6 @@ build:
     profile: ../../profiles/bootstrap.profile.yaml
   dependencies:
     tools: [gcc, make, bash, coreutils, findutils, sed, gawk]
-    tests: [bash-binsh, coreutils, gcc]
   pipeline:
     # The tarball carries no configuration, so the tree is cleaned instead of
     # configured. `make headers` writes the sanitised UAPI tree to usr/include.
@@ -76,7 +75,7 @@ tests:
     stage: installed
     environment:
       contents:
-        packages: [gcc, glibc-devel]
+        packages: [gcc, glibc-devel, bash-binsh, coreutils]
     argv:
       - sh
       - -c

@@ -38,7 +38,6 @@ build:
   dependencies:
     tools: [gcc, make, bash, coreutils, pkgconf]
     host: [libselinux-devel, ncurses-devel, pam-devel, zlib-devel]
-    tests: [bash-binsh, coreutils]
   pipeline:
     - uses: autotools/configure
       with:
@@ -98,6 +97,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c
@@ -123,6 +125,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c
@@ -146,6 +151,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c
@@ -169,6 +177,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c
@@ -192,6 +203,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c
@@ -215,6 +229,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c

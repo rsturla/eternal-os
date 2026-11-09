@@ -70,7 +70,6 @@ build:
       - zchunk-devel
       - zlib-devel
       - libzstd-devel
-    tests: [bash-binsh, coreutils]
   pipeline:
     - uses: cmake/configure
       with:
@@ -125,6 +124,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c
@@ -157,6 +159,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c
@@ -199,6 +204,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c

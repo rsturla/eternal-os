@@ -33,7 +33,6 @@ build:
     profile: ../../profiles/bootstrap.profile.yaml
   dependencies:
     tools: [gcc, make, bash, coreutils]
-    tests: [bash-binsh, coreutils]
   pipeline:
     - uses: make/build
       with:
@@ -67,6 +66,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c
@@ -92,6 +94,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c
@@ -139,6 +144,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c
@@ -168,7 +176,7 @@ tests:
     stage: installed
     environment:
       contents:
-        packages: [gcc, glibc-devel]
+        packages: [gcc, glibc-devel, bash-binsh, coreutils]
     argv:
       - sh
       - -c

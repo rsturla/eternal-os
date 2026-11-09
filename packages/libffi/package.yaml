@@ -32,7 +32,6 @@ build:
     profile: ../../profiles/bootstrap.profile.yaml
   dependencies:
     tools: [gcc, make, bash, coreutils]
-    tests: [bash-binsh]
   pipeline:
     - uses: autotools/configure
       with:
@@ -56,6 +55,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh]
         argv:
           - sh
           - -c
@@ -97,7 +99,7 @@ tests:
     stage: installed
     environment:
       contents:
-        packages: [gcc, glibc-devel]
+        packages: [gcc, glibc-devel, bash-binsh]
     argv:
       - sh
       - -c
