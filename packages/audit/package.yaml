@@ -1,0 +1,165 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Upstream publishes source tags but no separate release tarball.
+# Build the client libraries only; containers do not need the audit daemon.
+# audit-devel provides the Fedora audit-libs-devel capability.
+schema: 1
+package:
+  name: audit
+  version: 4.2.1
+  release: 1
+  summary: Linux audit userspace libraries
+  description: Linux audit userspace libraries.
+  license: LGPL-2.1-or-later
+  upstream: https://github.com/linux-audit/audit-userspace
+  cpe:
+    vendor: linux_audit_project
+    product: linux_audit
+sources:
+- name: audit-4.2.1.tar.gz
+  kind: archive
+  digest: sha512:71c4ac50b471138da866a82a0fa45970cf26181962f005ae570bdbb76e7cd15b66f8ebeba75a075bf04e52b20d039f012e2bbf8b1055f44641c36897f132894d
+  locators:
+  - kind: https
+    url: https://github.com/linux-audit/audit-userspace/archive/refs/tags/v4.2.1.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools:
+    - gcc
+    - make
+    - bash
+    - coreutils
+    - autoconf
+    - automake
+    - libtool
+    - pkgconf
+    host:
+    - libcap-ng-devel
+    - kernel-headers
+  pipeline:
+  - runs: |
+      autoreconf -fi
+  - uses: autotools/configure
+    with:
+      args:
+      - --disable-static
+      - --without-python3
+      - --without-golang
+      - --disable-gssapi-krb5
+      - --disable-tls
+      - --with-aarch64
+      - --with-arm
+      - --disable-zos-remote
+      - --disable-listener
+      - --with-libcap-ng=yes
+  - uses: make/build
+    with:
+      dir: common
+  - uses: make/build
+    with:
+      dir: lib
+  - uses: make/build
+    with:
+      dir: auparse
+  - uses: make/build
+    with:
+      dir: audisp
+      args:
+      - libqueue.la
+  - uses: make/build
+    with:
+      dir: auplugin
+  - uses: make/install
+    with:
+      dir: lib
+  - uses: make/install
+    with:
+      dir: auparse
+  - uses: make/install
+    with:
+      dir: auplugin
+  - runs: |
+      find "$STAGE" -name "*.la" -delete
+      rm -f "$STAGE/usr/share/info/dir"
+  - uses: license/copy
+    with:
+      files:
+      - COPYING.LIB
+      outputs:
+      - audit-libs
+      - audit-devel
+  - uses: strip
+outputs:
+- name: audit-libs
+  files:
+    license:
+    - /usr/share/licenses/audit-libs/**
+  dependencies:
+    run:
+    - filesystem
+  tests:
+  - name: load
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - python3
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      python3 -c 'import ctypes; ctypes.CDLL("libaudit.so.1")'
+  - name: load-auparse
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - python3
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      python3 -c 'import ctypes; ctypes.CDLL("libauparse.so.0")'
+- name: audit-devel
+  files:
+    license:
+    - /usr/share/licenses/audit-devel/**
+    include:
+    - '@dev'
+    - /usr/share/licenses/audit-devel/**
+  dependencies:
+    run:
+    - audit-libs = ${package.version}-${package.release}
+    - filesystem
+    provides:
+    - audit-libs-devel = ${package.version}-${package.release}
+  tests:
+  - name: compile-and-run
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - gcc
+        - glibc-devel
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      cat > /tmp/test.c <<'EOF'
+      #include <libaudit.h>
+      int main(void) { return audit_name_to_msg_type("SYSCALL") != AUDIT_SYSCALL; }
+      EOF
+      gcc /tmp/test.c -laudit -o /tmp/test
+      /tmp/test
+tests:
+- name: hardening
+  stage: build
+  pipeline:
+  - uses: test/hardening-check
