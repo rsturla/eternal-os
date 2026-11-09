@@ -23,7 +23,13 @@ repositories:
     # Only the userland packages that have completed the self-hosting switch
     # are consumed from here. Keep the seed compiler and C library out until
     # their exact-release dependencies are stable.
-    exclude: [filesystem, basesystem, eternal-release, eternal-base, eternal-baselayout, glibc-*, gcc-*, ld-linux-*, libc-bin-*, libstdc++-*, libatomic-*, nss-db-*, expat*, zstd*]
+    #
+    # util-linux and libxml2 stay on the Fedora side until their consumers are
+    # in-tree too. Fedora's libarchive still links libxml2.so.2, while Eternal
+    # libxml2 2.15 provides libxml2.so.16; the Fedora util-linux packages also
+    # require the matching libsmartcols/libuuid release. Mixing both providers
+    # makes the offline root transaction fail with file and version conflicts.
+    exclude: [filesystem, basesystem, eternal-release, eternal-base, eternal-baselayout, glibc-*, gcc-*, ld-linux-*, libc-bin-*, libstdc++-*, libatomic-*, nss-db-*, expat*, zstd*, libxml2*, util-linux*, libblkid*, libfdisk*, libmount*, libsmartcols*, libuuid*, lua*]
   - id: fedora
     metalink: https://mirrors.fedoraproject.org/metalink?repo=fedora-$releasever&arch=$basearch
     # These package names are already produced by Eternal. Hiding the Fedora
