@@ -1,0 +1,200 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Disable optional host services and install private helpers under libexec/pam.
+# Keep PAM modules separate from the linkable runtime libraries.
+schema: 1
+package:
+  name: pam
+  version: 1.7.3
+  release: 1
+  summary: Pluggable authentication modules
+  description: Pluggable authentication modules.
+  license: BSD-3-Clause AND GPL-2.0-or-later
+  upstream: https://github.com/linux-pam/linux-pam
+  cpe:
+    vendor: linux-pam
+    product: linux-pam
+sources:
+- name: pam-1.7.3.tar.xz
+  kind: archive
+  digest: sha512:1f0946461b879886ecade76793377d97d6a3036960196e37bb4fb05d6e30552e17fe1e652c6b0e7b7b1ce159d75c00f35df1c197cfd6b0012e7e3bb1bd42f144
+  locators:
+  - kind: https
+    url: https://github.com/linux-pam/linux-pam/releases/download/v1.7.3/Linux-PAM-1.7.3.tar.xz
+  extract:
+    format: tar.xz
+    strip-components: 1
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools:
+    - gcc
+    - meson
+    - ninja
+    - bash
+    - coreutils
+    - pkgconf
+    - bison
+    - flex
+    host:
+    - libxcrypt-devel
+    - audit-libs-devel
+    - libselinux-devel
+  pipeline:
+  - uses: meson/setup
+    with:
+      args:
+      - -Di18n=disabled
+      - -Ddocs=disabled
+      - -Dexamples=false
+      - -Daudit=enabled
+      - -Dselinux=enabled
+      - -Deconf=disabled
+      - -Dlogind=disabled
+      - -Delogind=disabled
+      - -Dnis=disabled
+      - -Dpam_userdb=disabled
+      - -Dpwaccess=disabled
+      - --sbindir=libexec/pam
+      - --sysconfdir=/etc
+  - uses: meson/compile
+  - uses: meson/install
+  - runs: |
+      install -d "$STAGE/usr/bin"
+      mv "$STAGE/usr/libexec/pam/faillock" "$STAGE/usr/bin/faillock"
+      mv "$STAGE/usr/libexec/pam/pam_timestamp_check" "$STAGE/usr/bin/pam_timestamp_check"
+      rm -f "$STAGE/usr/lib/systemd/system/pam_namespace.service"
+  - uses: license/copy
+    with:
+      files:
+      - Copyright
+      - COPYING
+      outputs:
+      - pam
+      - pam-libs
+      - pam-devel
+  - uses: strip
+outputs:
+- name: pam
+  files:
+    license:
+    - /usr/share/licenses/pam/**
+  dependencies:
+    run:
+    - pam-libs = ${package.version}-${package.release}
+    - filesystem
+    - bash-binsh
+    - audit-libs
+    - libselinux
+    - libxcrypt
+  tests:
+  - name: modules
+    stage: installed
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      test -f /usr/lib/security/pam_permit.so || test -f /usr/lib64/security/pam_permit.so
+      test -x /usr/libexec/pam/unix_chkpwd
+- name: pam-libs
+  files:
+    license:
+    - /usr/share/licenses/pam-libs/**
+    include:
+    - /usr/lib*/libpam.so.*
+    - /usr/lib*/libpam_misc.so.*
+    - /usr/lib*/libpamc.so.*
+    - /usr/share/licenses/pam-libs/**
+  dependencies:
+    run:
+    - filesystem
+  tests:
+  - name: load
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - python3
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      python3 -c 'import ctypes; ctypes.CDLL("libpam.so.0")'
+- name: pam-devel
+  files:
+    license:
+    - /usr/share/licenses/pam-devel/**
+    include:
+    - '@dev'
+    - /usr/share/licenses/pam-devel/**
+    exclude:
+    - /usr/lib*/security/**
+  dependencies:
+    run:
+    - pam-libs = ${package.version}-${package.release}
+    - filesystem
+  tests:
+  - name: compile-and-run
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - gcc
+        - glibc-devel
+        - pkgconf
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      cat > /tmp/test.c <<'EOF'
+      #include <security/pam_appl.h>
+      int main(void) { return pam_strerror(0, PAM_SUCCESS) == 0; }
+      EOF
+      gcc /tmp/test.c $(pkg-config --cflags --libs pam) -o /tmp/test
+      /tmp/test
+tests:
+- name: hardening
+  stage: build
+  pipeline:
+  - uses: test/hardening-check
+    with:
+      paths:
+      - /usr/lib64/libpam.so.0.85.1
+      - /usr/lib/libpam.so.0.85.1
+- name: authenticate-with-permit-module
+  stage: installed
+  environment:
+    contents:
+      packages:
+      - gcc
+      - glibc-devel
+  argv:
+  - bash
+  - -eu
+  - -c
+  - |
+    mkdir -p /tmp/pam.d
+    printf 'auth required pam_permit.so\naccount required pam_permit.so\n' > /tmp/pam.d/eternal-test
+    cat > /tmp/pam-test.c <<'EOF'
+    #include <security/pam_appl.h>
+    static int converse(int n, const struct pam_message **m,
+                        struct pam_response **r, void *data) {
+        (void)n; (void)m; (void)r; (void)data;
+        return PAM_CONV_ERR;
+    }
+    int main(void) {
+        pam_handle_t *handle = 0;
+        struct pam_conv conv = { converse, 0 };
+        int status = pam_start_confdir("eternal-test", "root", &conv, "/tmp/pam.d", &handle);
+        if (status != PAM_SUCCESS) return 1;
+        status = pam_authenticate(handle, 0);
+        if (status == PAM_SUCCESS) status = pam_acct_mgmt(handle, 0);
+        int end = pam_end(handle, status);
+        return status != PAM_SUCCESS || end != PAM_SUCCESS;
+    }
+    EOF
+    gcc /tmp/pam-test.c -lpam -o /tmp/pam-test
+    /tmp/pam-test
