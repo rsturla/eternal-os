@@ -1,0 +1,161 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# libtoolize needs the aclocal macros at runtime; keep them with the tools.
+schema: 1
+package:
+  name: libtool
+  version: 2.6.2
+  release: 1
+  summary: GNU shared library build tools
+  description: GNU shared library build tools.
+  license: GPL-2.0-or-later AND GPL-2.0-or-later WITH Autoconf-exception-generic AND GPL-2.0-or-later
+    WITH Libtool-exception AND LGPL-2.0-or-later WITH Libtool-exception AND GPL-3.0-or-later WITH Autoconf-exception-generic-3.0
+    AND MIT AND FSFAP AND FSFULLR AND FSFULLRWD AND GFDL-1.3-or-later AND X11 AND LicenseRef-Public-Domain
+  upstream: https://www.gnu.org/software/libtool/
+  cpe:
+    vendor: gnu
+    product: libtool
+sources:
+- name: libtool-2.6.2.tar.xz
+  kind: archive
+  digest: sha512:7517648aaa704a87a35ce23c47dd6415c1ac81056aadb076960cd93c0ee31c431ab95aa85a4cc1eaaee1dcf860a90898fb6514f0bb4aa70b940757c8301260cf
+  locators:
+  - kind: https
+    url: https://ftp.gnu.org/gnu/libtool/libtool-2.6.2.tar.xz
+  - kind: https
+    url: https://mirrors.kernel.org/gnu/libtool/libtool-2.6.2.tar.xz
+  extract:
+    format: tar.xz
+    strip-components: 1
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools:
+    - gcc
+    - make
+    - bash
+    - coreutils
+    - m4
+    - perl
+  pipeline:
+  - uses: autotools/configure
+    with:
+      args:
+      - --disable-static
+  - uses: autotools/build
+  - uses: autotools/install
+  - runs: |
+      find "$STAGE" -name "*.la" -delete
+      rm -f "$STAGE/usr/share/info/dir"
+  - uses: license/copy
+    with:
+      files:
+      - COPYING
+      - libltdl/COPYING.LIB
+      outputs:
+      - libtool
+      - libtool-libs
+      - libtool-devel
+      - libtool-doc
+  - uses: strip
+outputs:
+- name: libtool
+  files:
+    license:
+    - /usr/share/licenses/libtool/**
+  dependencies:
+    run:
+    - libtool-libs = ${package.version}-${package.release}
+    - autoconf
+    - automake
+    - m4
+    - perl
+    - gcc
+    - make
+    - filesystem
+  tests:
+  - name: link-library
+    stage: installed
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      mkdir /tmp/libtool-test
+      cd /tmp/libtool-test
+      printf 'int answer(void) { return 42; }\n' > answer.c
+      libtool --mode=compile gcc -c answer.c -o answer.lo
+      libtool --mode=link gcc -shared -o libanswer.la answer.lo -rpath /usr/lib
+       test -f .libs/libanswer.so
+- name: libtool-libs
+  files:
+    license:
+    - /usr/share/licenses/libtool-libs/**
+    include:
+    - /usr/lib*/libltdl.so.*
+    - /usr/share/licenses/libtool-libs/**
+  dependencies:
+    run:
+    - filesystem
+  tests:
+  - name: load
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - python3
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      python3 -c 'import ctypes; ctypes.CDLL("libltdl.so.7")'
+- name: libtool-devel
+  files:
+    license:
+    - /usr/share/licenses/libtool-devel/**
+    include:
+    - '@dev'
+    - /usr/share/licenses/libtool-devel/**
+    exclude:
+    - /usr/share/aclocal/**
+  dependencies:
+    run:
+    - libtool-libs = ${package.version}-${package.release}
+    - filesystem
+  tests:
+  - name: compile-and-run
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - gcc
+        - glibc-devel
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      cat > /tmp/test.c <<'EOF'
+      #include <ltdl.h>
+      int main(void) { if (lt_dlinit()) return 1; return lt_dlexit(); }
+      EOF
+      gcc /tmp/test.c -lltdl -o /tmp/test
+      /tmp/test
+- name: libtool-doc
+  files:
+    license:
+    - /usr/share/licenses/libtool-doc/**
+    include:
+    - '@doc'
+    - '@man'
+    - '@info'
+    - /usr/share/licenses/libtool-doc/**
+  dependencies:
+    run:
+    - filesystem
+tests:
+- name: hardening
+  stage: build
+  pipeline:
+  - uses: test/hardening-check
