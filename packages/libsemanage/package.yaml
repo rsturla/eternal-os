@@ -1,0 +1,199 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Omit the migration script, which needs optional Python bindings.
+schema: 1
+package:
+  name: libsemanage
+  version: '3.11'
+  release: 1
+  summary: SELinux policy management library
+  description: SELinux policy management library.
+  license: LGPL-2.1-or-later
+  upstream: https://github.com/SELinuxProject/selinux
+  cpe:
+    vendor: selinuxproject
+    product: libsemanage
+sources:
+- name: libsemanage-3.11.tar.gz
+  kind: archive
+  digest: sha512:cafcdac9ba9a65f7940929f3e36e7e35ece6ef5cb97723e459ba7fdaaf937708873cb1c273733830f7fc54679c4cf6ae0189322231748d318a6db2851db1d11a
+  locators:
+  - kind: https
+    url: https://github.com/SELinuxProject/selinux/releases/download/3.11/libsemanage-3.11.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools:
+    - gcc
+    - make
+    - bash
+    - coreutils
+    - flex
+    - bison
+    - pkgconf
+    host:
+    - libselinux-devel
+    - libsepol-devel
+    - audit-libs-devel
+    - bzip2-devel
+  pipeline:
+  - uses: make/build
+    with:
+      args:
+      - PREFIX="$PREFIX"
+      - LIBDIR="$LIBDIR"
+      - SHLIBDIR="$LIBDIR"
+  - uses: make/install
+    with:
+      args:
+      - PREFIX="$PREFIX"
+      - LIBDIR="$LIBDIR"
+      - SHLIBDIR="$LIBDIR"
+      dir: include
+  - uses: make/install
+    with:
+      args:
+      - PREFIX="$PREFIX"
+      - LIBDIR="$LIBDIR"
+      - SHLIBDIR="$LIBDIR"
+      dir: src
+  - uses: make/install
+    with:
+      args:
+      - PREFIX="$PREFIX"
+      - LIBDIR="$LIBDIR"
+      - SHLIBDIR="$LIBDIR"
+      dir: man
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE
+      outputs:
+      - libsemanage
+      - libsemanage-devel
+      - libsemanage-static
+      - libsemanage-doc
+  - uses: strip
+outputs:
+- name: libsemanage
+  files:
+    license:
+    - /usr/share/licenses/libsemanage/**
+    config:
+    - /etc/selinux/semanage.conf
+    noreplace:
+    - /etc/selinux/semanage.conf
+  dependencies:
+    run:
+    - filesystem
+    - libselinux
+    - libsepol
+    - audit-libs
+    - bzip2-libs
+  tests:
+  - name: load
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - python3
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      python3 -c 'import ctypes; ctypes.CDLL("libsemanage.so.2")'
+- name: libsemanage-devel
+  files:
+    license:
+    - /usr/share/licenses/libsemanage-devel/**
+    include:
+    - '@dev'
+    - /usr/share/licenses/libsemanage-devel/**
+  dependencies:
+    run:
+    - libsemanage = ${package.version}-${package.release}
+    - filesystem
+  tests:
+  - name: compile-and-run
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - gcc
+        - glibc-devel
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      cat > /tmp/test.c <<'EOF'
+      #include <semanage/handle.h>
+      int main(void) { semanage_handle_t *h = semanage_handle_create(); if (!h) return 1; semanage_handle_destroy(h); return 0; }
+      EOF
+      gcc /tmp/test.c -lsemanage -o /tmp/test
+      /tmp/test
+- name: libsemanage-static
+  files:
+    license:
+    - /usr/share/licenses/libsemanage-static/**
+    include:
+    - '@static'
+    - /usr/share/licenses/libsemanage-static/**
+  dependencies:
+    run:
+    - libsemanage-devel = ${package.version}-${package.release}
+    - filesystem
+    - audit-libs-devel
+    - bzip2-devel
+  tests:
+  - name: link-archive
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - gcc
+        - glibc-devel
+        - pkgconf
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      cat > /tmp/static-test.c <<'EOF'
+      #include <semanage/handle.h>
+      int main(void) {
+          semanage_handle_t *h = semanage_handle_create();
+          if (!h) return 1;
+          semanage_handle_destroy(h);
+          return 0;
+      }
+      EOF
+      archive=/usr/lib/libsemanage.a
+      if test -f /usr/lib64/libsemanage.a; then archive=/usr/lib64/libsemanage.a; fi
+      gcc /tmp/static-test.c -Wl,--whole-archive "$archive" -Wl,--no-whole-archive \
+          $(pkg-config --libs --static libsemanage) -o /tmp/static-test
+      /tmp/static-test
+- name: libsemanage-doc
+  files:
+    license:
+    - /usr/share/licenses/libsemanage-doc/**
+    include:
+    - '@man'
+    - /usr/share/licenses/libsemanage-doc/**
+  dependencies:
+    run:
+    - filesystem
+tests:
+- name: hardening
+  stage: build
+  pipeline:
+  - uses: test/hardening-check
+patches:
+- file: patches/0001-reject-relative-home-directories.patch
+  strip: 2
+  reason: Backport upstream ed3001e29f66ce63ccdbd21420c1447522fe2f83 from Fedora; reject invalid home
+    directories before policy generation
