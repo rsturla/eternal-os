@@ -117,6 +117,9 @@ materialization, artifact transfer between jobs and object-storage credentials.
 - check the commits against the conventions in
   [`git-workflow.md`](git-workflow.md) (`scripts/check-commits.sh`);
 - lint every recipe with `rpmx lint` (`make check` also runs pre-commit);
+- an `rpmx` matrix builds the pinned revision once per architecture and uploads
+  it; `prepare` and every build cell unpack that artifact instead of
+  recompiling it;
 - `prepare` computes the affected package list and content hashes from the
   recipe graph (`scripts/affected.sh`, `scripts/package-graph.sh`);
 - a matrix builds only the affected packages in parallel, which runs the
@@ -124,7 +127,8 @@ materialization, artifact transfer between jobs and object-storage credentials.
 
 `release.yml` runs on `main`, on `v*` tags and on demand:
 
-1. lint, then run the full package matrix. Each package restores its
+1. lint, then build rpmx once per architecture, then run the full package
+   matrix. Each build cell reuses the rpmx artifact and restores its
    content-addressed cache, so only changed packages execute `rpmx build`.
    Signing is applied when `RPMX_SIGNING_KEY` is set;
 2. the fan-in verifies that every package in the plan produced artifacts, then
@@ -159,8 +163,9 @@ artifacts and the `+build<timestamp>` release counter.
 GitHub's matrix job outputs merge cells into a map, but only for statically
 declared output names. With a dynamic package matrix, the plan and hashes are
 produced once by `prepare` and exposed as reusable-workflow outputs; the RPMs
-travel as artifacts. A future persistent repository or OCI registry can
-replace the artifact hop without changing the recipe model.
+travel as artifacts. The plan and build stages share one rpmx artifact per
+architecture for the same reason. A future persistent repository or OCI
+registry can replace the artifact hop without changing the recipe model.
 
 The image package set is the `eternal-base` recipe, consumed by the image
 repository. An image is built from a published repository, so a bad package
