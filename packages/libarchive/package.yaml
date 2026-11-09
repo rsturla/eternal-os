@@ -1,0 +1,171 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+schema: 1
+package:
+  name: libarchive
+  version: 3.8.11
+  release: 1
+  summary: Archive reading and writing library and tools
+  description: Archive reading and writing library and tools.
+  license: BSD-2-Clause AND BSD-3-Clause AND CC0-1.0 AND LicenseRef-Public-Domain
+  upstream: https://www.libarchive.org/
+  cpe:
+    vendor: libarchive
+    product: libarchive
+sources:
+- name: libarchive-3.8.11.tar.xz
+  kind: archive
+  digest: sha512:7e9145c51d389ae5fa4e64c9a791dcbe4960ae064ebefa40d73d6079180af17795d7d0f9dffc939f9d050b9be2669f45115bb89a9466f43617e731edab57ccf1
+  locators:
+  - kind: https
+    url: https://www.libarchive.org/downloads/libarchive-3.8.11.tar.xz
+  - kind: https
+    url: https://github.com/libarchive/libarchive/releases/download/v3.8.11/libarchive-3.8.11.tar.xz
+  extract:
+    format: tar.xz
+    strip-components: 1
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools:
+    - gcc
+    - make
+    - bash
+    - coreutils
+    - pkgconf
+    host:
+    - zlib-devel
+    - bzip2-devel
+    - xz-devel
+    - libzstd-devel
+    - openssl-devel
+    - libacl-devel
+  pipeline:
+  - uses: autotools/configure
+    with:
+      args:
+      - --disable-static
+      - --without-xml2
+      - --without-expat
+      - --without-lzo2
+      - --without-lz4
+      - --without-nettle
+      - --without-mbedtls
+      - --with-openssl
+      - --enable-acl
+      - --enable-xattr
+  - uses: autotools/build
+  - uses: autotools/install
+  - runs: |
+      find "$STAGE" -name "*.la" -delete
+      rm -f "$STAGE/usr/share/info/dir"
+  - uses: license/copy
+    with:
+      files:
+      - COPYING
+      outputs:
+      - libarchive
+      - libarchive-libs
+      - libarchive-devel
+      - libarchive-doc
+  - uses: strip
+outputs:
+- name: libarchive
+  files:
+    license:
+    - /usr/share/licenses/libarchive/**
+  dependencies:
+    run:
+    - libarchive-libs = ${package.version}-${package.release}
+    - filesystem
+  tests:
+  - name: round-trip
+    stage: installed
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      mkdir /tmp/archive-test
+      printf "payload\n" > /tmp/archive-test/payload
+      bsdtar -cf /tmp/test.tar -C /tmp/archive-test payload
+      rm /tmp/archive-test/payload
+      bsdtar -xf /tmp/test.tar -C /tmp/archive-test
+      test "$(cat /tmp/archive-test/payload)" = payload
+- name: libarchive-libs
+  files:
+    license:
+    - /usr/share/licenses/libarchive-libs/**
+    include:
+    - /usr/lib*/libarchive.so.*
+    - /usr/share/licenses/libarchive-libs/**
+  dependencies:
+    run:
+    - filesystem
+    - libacl
+    - bzip2-libs
+    - xz-libs
+    - openssl-libs
+    - zlib
+    - libzstd
+  tests:
+  - name: load
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - python3
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      python3 -c 'import ctypes; ctypes.CDLL("libarchive.so.13")'
+- name: libarchive-devel
+  files:
+    license:
+    - /usr/share/licenses/libarchive-devel/**
+    include:
+    - '@dev'
+    - /usr/share/licenses/libarchive-devel/**
+  dependencies:
+    run:
+    - libarchive-libs = ${package.version}-${package.release}
+    - filesystem
+  tests:
+  - name: compile-and-run
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - gcc
+        - glibc-devel
+        - pkgconf
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      cat > /tmp/test.c <<'EOF'
+      #include <archive.h>
+      int main(void) { struct archive *a = archive_read_new(); return !a || archive_read_free(a); }
+      EOF
+      gcc /tmp/test.c $(pkg-config --cflags --libs libarchive) -o /tmp/test
+      /tmp/test
+- name: libarchive-doc
+  files:
+    license:
+    - /usr/share/licenses/libarchive-doc/**
+    include:
+    - '@doc'
+    - '@man'
+    - '@info'
+    - /usr/share/licenses/libarchive-doc/**
+  dependencies:
+    run:
+    - filesystem
+tests:
+- name: hardening
+  stage: build
+  pipeline:
+  - uses: test/hardening-check
