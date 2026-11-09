@@ -1,0 +1,328 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# Perl 5.44, the stream Eternal builds its GNU documentation tools with.
+# `makeinfo`, `texi2any`, `autoconf`, `automake`, `libtool` and a long tail of
+# build scripts are Perl programs, so the interpreter has to be owned before
+# the toolchain can be self-hosting.
+#
+# The version is part of the package name, like every other stream in this
+# repository, and every installed path carries it: the core library lives in
+# `/usr/share/perl5/5.44`, the arch library in `$LIBDIR/perl5/5.44`, and the
+# vendor and site directories carry the same suffix. Two Perl streams can
+# therefore be installed at once without sharing a module tree.
+#
+# `perl-5.44-default` owns the unversioned `/usr/bin/perl` and the `perl`
+# capability. It is the only output that provides them, so a second stream has
+# to add its own `-default` output and declare the conflict.
+#
+# The build links the system zlib and bzip2 instead of the copies bundled in
+# `cpan/`: the vendored trees are removed before configuration, which is what
+# Fedora and Wolfi do, and it keeps the compression modules on the same
+# libraries as the rest of the distribution.
+schema: 1
+
+package:
+  name: perl-5.44
+  version: "5.44.0"
+  release: 1
+  summary: Practical Extraction and Report Language (version 5.44)
+  description: |
+    Perl is a general-purpose programming language originally developed for
+    text manipulation. This package provides the 5.44 language stream with
+    versioned interpreter, library and module paths so several Perl versions
+    can be installed side by side.
+  license: Artistic-1.0-Perl OR GPL-1.0-or-later
+  upstream: https://www.perl.org/
+  cpe:
+    vendor: perl
+    product: perl
+
+sources:
+  - name: perl-5.44.0.tar.xz
+    kind: archive
+    digest: "sha512:734d00d00678add11544e8f483bf953e61ae391aa6a2bba61ec4e7727275e243cc411525d30e6a73f70ccc0603ebe85bc0c6dd69b0106a6162e21a4595d11075"
+    locators:
+      - kind: https
+        url: https://www.cpan.org/src/5.0/perl-5.44.0.tar.xz
+      - kind: https
+        url: https://cpan.metacpan.org/src/5.0/perl-5.44.0.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  # The Compress::Raw modules read these while they build, not while they
+  # configure, so they have to be in the environment of every build step.
+  environment:
+    BUILD_ZLIB: "0"
+    BUILD_BZIP2: "0"
+  dependencies:
+    tools: [gcc, make, bash, coreutils, sed, grep, diffutils, findutils, tar, gzip, m4, patch]
+    host: [zlib-devel, bzip2-devel]
+    # The interpreter links the system zlib and bzip2; a test root needs the
+    # packages that ship those libraries as well as the shell.
+    tests:
+      - bash-binsh
+      - coreutils
+      - gcc
+      - grep
+      - bzip2-libs
+      - zlib
+  pipeline:
+    - runs: |
+        set -eu
+        # Build against the system compression libraries, not the vendored
+        # copies that ship inside the CPAN modules.
+        rm -rf cpan/Compress-Raw-Zlib/zlib-src cpan/Compress-Raw-Bzip2/bzip2-src
+        sed -i '/\(bzip2\|zlib\)-src/d' MANIFEST
+    - runs: |
+        set -eu
+        case "$LIBDIR" in
+          /usr/lib64) sitearch=/usr/local/lib64/perl5/site_perl/5.44 ;;
+          *) sitearch=/usr/local/lib/perl5/site_perl/5.44 ;;
+        esac
+        ./Configure -des \
+          -Dcc=gcc \
+          -Dcccdlflags='-fPIC' \
+          -Dccdlflags='-rdynamic' \
+          -Dprefix=/usr \
+          -Dprivlib=/usr/share/perl5/5.44 \
+          -Darchlib="$LIBDIR/perl5/5.44" \
+          -Dvendorprefix=/usr \
+          -Dvendorlib=/usr/share/perl5/vendor_perl/5.44 \
+          -Dvendorarch="$LIBDIR/perl5/vendor_perl/5.44" \
+          -Dsiteprefix=/usr/local \
+          -Dsitelib=/usr/local/share/perl5/site_perl/5.44 \
+          -Dsitearch="$sitearch" \
+          -Dlocincpth=' ' \
+          -Duselargefiles \
+          -Dusethreads \
+          -Duseshrplib \
+          -Dlibperl=libperl.so.5.44.0 \
+          -Dd_semctl_semun \
+          -Dman1dir=/usr/share/man/man1 \
+          -Dman3dir=/usr/share/man/man3 \
+          -Dinstallman1dir=/usr/share/man/man1 \
+          -Dinstallman3dir=/usr/share/man/man3 \
+          -Dman1ext='1' \
+          -Dman3ext='3pm' \
+          -Dcf_by='Eternal Linux' \
+          -Dcf_email='maintainers@eternal.sturla.tech' \
+          -Ud_csh
+    - runs: |
+        set -eu
+        # Perl links libperl without a soname, so the interpreter records a
+        # NEEDED entry that nothing provides. Name the library in the link
+        # line, as Fedora does, so the dependency resolves and two streams do
+        # not both claim the unversioned name.
+        sed -i 's|^\(\t\$(LD) -o \$@\) \$(SHRPLDFLAGS)|\1 -Wl,-soname,$(LIBPERL) $(SHRPLDFLAGS)|' Makefile
+        grep -q 'soname' Makefile
+    - uses: make/build
+      with:
+        args: [libperl.so.5.44.0]
+    - uses: make/build
+    - uses: make/install
+    - runs: |
+        set -eu
+        find "$STAGE" -name '.*' -delete
+        # The unversioned interpreter belongs to the -default output.
+        ln -sfn perl5.44.0 "$STAGE/usr/bin/perl"
+        # Upstream installs the library under the name Configure was given, so
+        # there is nothing for `-lperl` to find. The unversioned link is a
+        # development file and belongs to -devel, beside the headers.
+        ln -sfn libperl.so.5.44.0 "$STAGE$LIBDIR/perl5/5.44/CORE/libperl.so"
+    - uses: license/copy
+      with:
+        files: [Artistic, Copying]
+        outputs: [perl-5.44, perl-5.44-default, perl-5.44-devel, perl-5.44-utils, perl-5.44-doc]
+    - uses: strip
+
+outputs:
+  - name: perl-5.44
+    summary: Practical Extraction and Report Language (version 5.44)
+    files:
+      license:
+        - /usr/share/licenses/perl-5.44/Artistic
+        - /usr/share/licenses/perl-5.44/Copying
+    # The interpreter ships every core module, so a requirement its own files
+    # record is either satisfied by those provides or names a module no
+    # distribution carries: other systems' helpers (Win32, VMS, Mac), optional
+    # back ends, and imports only the test suite makes. Publishing them makes
+    # the interpreter's own metadata unresolvable, so keep the provides that
+    # describe the package and drop the requires.
+    generators:
+      perl:
+        requires: false
+    dependencies:
+      run:
+        - filesystem
+      provides:
+        - perl-5.44 = ${package.version}-${package.release}
+        # A core `.pm` records the interpreter it needs as
+        # `perl(:VERSION) >= 5.00x`; Fedora's perl-libs publishes the same
+        # capability so the requirement resolves to the interpreter.
+        - perl(:VERSION) = ${package.version}
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            perl5.44.0 -V:version | grep -q '5\.44\.0'
+            perl5.44.0 -e 'use strict; use warnings; print "ok\n"' | grep -qx ok
+            perl5.44.0 -MIO::Socket::INET -e 'print "core modules load\n"'
+            perl5.44.0 -MCompress::Raw::Zlib -e 'print "zlib module loads\n"'
+            perl5.44.0 -MCompress::Raw::Bzip2 -e 'print "bzip2 module loads\n"'
+            # pod2man has no --version; it prints its usage instead.
+            pod2man --help | grep -q 'pod2man \[--center'
+
+  - name: perl-5.44-default
+    summary: Unversioned Perl 5.44 command names
+    files:
+      include:
+        - /usr/bin/perl
+        - /usr/share/licenses/perl-5.44-default/Artistic
+        - /usr/share/licenses/perl-5.44-default/Copying
+      license:
+        - /usr/share/licenses/perl-5.44-default/Artistic
+        - /usr/share/licenses/perl-5.44-default/Copying
+    dependencies:
+      run:
+        - perl-5.44 = ${package.version}-${package.release}
+        - filesystem
+      provides:
+        - perl = ${package.version}-${package.release}
+        - perl-interpreter = ${package.version}-${package.release}
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            perl --version | grep -q 'v5\.44'
+            perl -e 'print "ok\n"' | grep -qx ok
+
+  - name: perl-5.44-devel
+    summary: Development files for Perl 5.44
+    files:
+      include:
+        - "@dev"
+        # Headers and the unversioned link; the library itself stays in the
+        # runtime output because the interpreter's binaries link it.
+        - /usr/lib*/perl5/5.44/CORE/*.h
+        - /usr/lib*/perl5/5.44/CORE/libperl.so
+        - /usr/share/licenses/perl-5.44-devel/Artistic
+        - /usr/share/licenses/perl-5.44-devel/Copying
+      license:
+        - /usr/share/licenses/perl-5.44-devel/Artistic
+        - /usr/share/licenses/perl-5.44-devel/Copying
+    dependencies:
+      run:
+        - perl-5.44 = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            for header in /usr/lib64/perl5/5.44/CORE/perl.h /usr/lib/perl5/5.44/CORE/perl.h; do
+              test -e "$header" && break
+            done
+            test -e "$header"
+            # libperl lives in the versioned CORE directory, which is not on the
+            # loader's default path; an embedder has to record the rpath.
+            cc -I"$(dirname "$header")" -L"$(dirname "$header")" \
+               -Wl,-rpath,"$(dirname "$header")" -x c - -o /tmp/ext -lperl <<'EOF'
+            #include <EXTERN.h>
+            #include <perl.h>
+            int main(void) { return 0; }
+            EOF
+            /tmp/ext
+
+  - name: perl-5.44-utils
+    summary: Utilities distributed with Perl 5.44
+    # The bundled scripts use core modules only; the dependency on the
+    # interpreter covers them, and the requires the scanner derives name
+    # `perl(:VERSION)` spellings that no 5.x release satisfies.
+    generators:
+      perl:
+        requires: false
+    files:
+      include:
+        - /usr/bin/instmodsh
+        - /usr/bin/json_pp
+        - /usr/bin/libnetcfg
+        - /usr/bin/perlbug
+        - /usr/bin/perlthanks
+        - /usr/bin/piconv
+        - /usr/bin/pl2pm
+        - /usr/bin/prove
+        - /usr/bin/ptar
+        - /usr/bin/ptardiff
+        - /usr/bin/ptargrep
+        - /usr/bin/shasum
+        - /usr/bin/splain
+        - /usr/bin/zipdetails
+        - /usr/share/licenses/perl-5.44-utils/Artistic
+        - /usr/share/licenses/perl-5.44-utils/Copying
+      license:
+        - /usr/share/licenses/perl-5.44-utils/Artistic
+        - /usr/share/licenses/perl-5.44-utils/Copying
+    dependencies:
+      run:
+        - perl-5.44 = ${package.version}-${package.release}
+        - filesystem
+    tests:
+      - name: installed
+        stage: installed
+        argv:
+          - sh
+          - -c
+          - |
+            corelist --version | head -1 | grep -q '5\.44'
+            prove --version
+            shasum --version | head -1
+            cat > /tmp/t.pl <<'EOF'
+            use Test::More tests => 1;
+            ok(1, 'prove runs');
+            EOF
+            prove -v /tmp/t.pl
+
+  - name: perl-5.44-doc
+    summary: Documentation for Perl 5.44
+    files:
+      include:
+        - "@man"
+        - "@doc"
+        - /usr/share/perl5/5.44/pod/**
+        - /usr/share/licenses/perl-5.44-doc/Artistic
+        - /usr/share/licenses/perl-5.44-doc/Copying
+      license:
+        - /usr/share/licenses/perl-5.44-doc/Artistic
+        - /usr/share/licenses/perl-5.44-doc/Copying
+    dependencies:
+      run:
+        - perl-5.44 = ${package.version}-${package.release}
+        - filesystem
+
+tests:
+  - name: hardening
+    stage: build
+    pipeline:
+      # The launcher is the interpreter's shim around libperl: it has no stack
+      # buffer and no libc call to fortify, so those two properties cannot
+      # appear in it. They are checked on the library, where the code lives.
+      - uses: test/hardening-check
+        with:
+          paths: [/usr/bin/perl5.44.0]
+          skip: [stack-protector, fortify]
+      - uses: test/hardening-check
+        with:
+          paths: [/usr/lib64/perl5/5.44/CORE/libperl.so.5.44.0]
+          skip: [pie]
