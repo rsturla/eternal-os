@@ -1,0 +1,97 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+#
+# Linux userspace API headers. glibc and GCC both need a kernel header set to
+# build, and several libraries (audit, libcap) include the UAPI headers
+# directly, so this is the first package of the toolchain wave: it has no
+# dependency of its own.
+#
+# Only `usr/include` is packaged. The kernel build tree, the arch-specific
+# `asm` links and the internal headers are not installed; `make headers`
+# performs the UAPI sanitising that upstream requires.
+schema: 1
+
+package:
+  name: kernel-headers
+  version: "7.3.3"
+  release: 1
+  summary: Linux kernel userspace API headers
+  description: |
+    The Linux kernel userspace API headers. They declare the system calls,
+    ioctls and structures that user space programs share with the kernel, and
+    are required to build the C library and anything that talks to the kernel
+    directly.
+  license: GPL-2.0-only WITH Linux-syscall-note
+  upstream: https://www.kernel.org/
+  cpe:
+    vendor: linux
+    product: linux_kernel
+
+sources:
+  - name: linux-7.3.3.tar.xz
+    kind: archive
+    digest: "sha512:6308b031942c3c147d6ff0d81611800078eb1de3383206e745b5c3e6a2f3b3cf812c4e7697017bfdb7c5b3dcd96cc15e0e082123b6130fc736a74cf38c81e672"
+    locators:
+      - kind: https
+        url: https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.3.3.tar.xz
+      - kind: https
+        url: https://mirrors.edge.kernel.org/pub/linux/kernel/v7.x/linux-7.3.3.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools: [gcc, make, bash, coreutils, findutils, sed, gawk]
+    tests: [bash-binsh, coreutils, gcc]
+  pipeline:
+    # The tarball carries no configuration, so the tree is cleaned instead of
+    # configured. `make headers` writes the sanitised UAPI tree to usr/include.
+    - runs: |
+        set -eu
+        make mrproper
+        make headers
+        find usr/include -name '.*' -delete
+        rm -f usr/include/Makefile
+        install -d "$STAGE/usr/include"
+        cp -a usr/include/. "$STAGE/usr/include/"
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [kernel-headers]
+
+outputs:
+  - name: kernel-headers
+    summary: Linux kernel userspace API headers
+    files:
+      license:
+        - /usr/share/licenses/kernel-headers/COPYING
+    dependencies:
+      run:
+        - filesystem
+
+tests:
+  - name: headers
+    stage: installed
+    environment:
+      contents:
+        packages: [gcc, glibc-devel]
+    argv:
+      - sh
+      - -c
+      - |
+        for header in linux/types.h linux/ioctl.h linux/fs.h asm/types.h; do
+          test -f "/usr/include/$header"
+        done
+        cat > /tmp/uapi.c <<'EOF'
+        #include <linux/types.h>
+        #include <linux/ioctl.h>
+        #include <linux/fs.h>
+        int main(void) {
+          __u32 value = 0;
+          return (int)value;
+        }
+        EOF
+        gcc /tmp/uapi.c -o /tmp/uapi
+        /tmp/uapi
