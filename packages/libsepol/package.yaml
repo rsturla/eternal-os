@@ -1,0 +1,156 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Build only the policy library. Container library consumers do not need the policy tools.
+schema: 1
+package:
+  name: libsepol
+  version: '3.11'
+  release: 1
+  summary: SELinux policy library
+  description: SELinux policy library.
+  license: LGPL-2.1-or-later
+  upstream: https://github.com/SELinuxProject/selinux
+  cpe:
+    vendor: selinuxproject
+    product: libsepol
+sources:
+- name: libsepol-3.11.tar.gz
+  kind: archive
+  digest: sha512:38335292be8b8ce8b22bb2a0e481f92e2bbf532d9a2ee5319ada0b3fd294df487e5eba8041bac2a09ef7b048fee13ca0520c34cb3283fea1f95fcc5752f66b81
+  locators:
+  - kind: https
+    url: https://github.com/SELinuxProject/selinux/releases/download/3.11/libsepol-3.11.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  dependencies:
+    tools:
+    - gcc
+    - make
+    - bash
+    - coreutils
+    - flex
+    - bison
+    - pkgconf
+  pipeline:
+  - uses: make/build
+    with:
+      args:
+      - PREFIX="$PREFIX"
+      - LIBDIR="$LIBDIR"
+      - SHLIBDIR="$LIBDIR"
+      dir: src
+  - uses: make/install
+    with:
+      dir: include
+      args:
+      - PREFIX="$PREFIX"
+      - LIBDIR="$LIBDIR"
+      - SHLIBDIR="$LIBDIR"
+  - uses: make/install
+    with:
+      dir: src
+      args:
+      - PREFIX="$PREFIX"
+      - LIBDIR="$LIBDIR"
+      - SHLIBDIR="$LIBDIR"
+  - uses: make/install
+    with:
+      dir: man
+      args:
+      - PREFIX="$PREFIX"
+      - LIBDIR="$LIBDIR"
+      - SHLIBDIR="$LIBDIR"
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE
+      outputs:
+      - libsepol
+      - libsepol-devel
+      - libsepol-static
+      - libsepol-doc
+  - uses: strip
+outputs:
+- name: libsepol
+  files:
+    license:
+    - /usr/share/licenses/libsepol/**
+  dependencies:
+    run:
+    - filesystem
+  tests:
+  - name: load
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - python3
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      python3 -c 'import ctypes; ctypes.CDLL("libsepol.so.2")'
+- name: libsepol-devel
+  files:
+    license:
+    - /usr/share/licenses/libsepol-devel/**
+    include:
+    - '@dev'
+    - /usr/share/licenses/libsepol-devel/**
+  dependencies:
+    run:
+    - libsepol = ${package.version}-${package.release}
+    - filesystem
+  tests:
+  - name: compile-and-run
+    stage: installed
+    environment:
+      contents:
+        packages:
+        - gcc
+        - glibc-devel
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      cat > /tmp/test.c <<'EOF'
+      #include <sepol/handle.h>
+      int main(void) { sepol_handle_t *h = sepol_handle_create(); if (!h) return 1; sepol_handle_destroy(h); return 0; }
+      EOF
+      gcc /tmp/test.c -lsepol -o /tmp/test
+      /tmp/test
+- name: libsepol-static
+  files:
+    license:
+    - /usr/share/licenses/libsepol-static/**
+    include:
+    - '@static'
+    - /usr/share/licenses/libsepol-static/**
+  dependencies:
+    run:
+    - libsepol-devel = ${package.version}-${package.release}
+    - filesystem
+- name: libsepol-doc
+  files:
+    license:
+    - /usr/share/licenses/libsepol-doc/**
+    include:
+    - '@man'
+    - /usr/share/licenses/libsepol-doc/**
+  dependencies:
+    run:
+    - filesystem
+tests:
+- name: hardening
+  stage: build
+  pipeline:
+  - uses: test/hardening-check
+    with:
+      paths:
+      - /usr/lib64/libsepol.so.2
+      - /usr/lib/libsepol.so.2
