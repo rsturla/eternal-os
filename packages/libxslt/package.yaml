@@ -25,7 +25,9 @@ sources:
     strip-components: 1
 build:
   root:
-    profile: ../../profiles/bootstrap.profile.yaml
+    # libxslt 1.1.45 needs libxml2 >= 2.15.1; the shared root still uses
+    # Fedora's libxml2 for the rpm stack.
+    profile: ../../profiles/bootstrap-libxslt.profile.yaml
   dependencies:
     tools:
     - gcc
