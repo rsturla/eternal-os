@@ -52,7 +52,6 @@ build:
   dependencies:
     tools: [gcc, make, bash, coreutils, perl, gawk, sed, grep, diffutils, findutils]
     host: [ncurses-devel]
-    tests: [bash-binsh, coreutils, perl, gcc]
   pipeline:
     - uses: autotools/configure
       with:
@@ -91,6 +90,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils, perl, gcc]
         argv:
           - sh
           - -c

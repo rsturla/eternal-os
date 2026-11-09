@@ -35,7 +35,6 @@ build:
   dependencies:
     tools: [cmake, make, gcc, bash, coreutils, pkgconf]
     host: [bzip2-devel, expat-devel, xz-devel, zchunk-devel, zlib-devel, libzstd-devel, rpm-devel]
-    tests: [bash-binsh, coreutils, gcc, pkgconf, grep]
   pipeline:
     - uses: cmake/configure
       with:
@@ -88,6 +87,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
         argv:
           - sh
           - -c
@@ -113,6 +115,9 @@ outputs:
     tests:
       - name: link
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
         argv:
           - sh
           - -c
@@ -136,6 +141,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
         argv:
           - sh
           - -c

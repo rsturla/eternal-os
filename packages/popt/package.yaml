@@ -33,7 +33,6 @@ build:
     profile: ../../profiles/bootstrap.profile.yaml
   dependencies:
     tools: [gcc, make, bash, coreutils, pkgconf, autoconf, automake, libtool, gettext]
-    tests: [bash-binsh, coreutils, gcc, pkgconf]
   pipeline:
     - runs: |
         autoreconf -fi
@@ -67,6 +66,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils, gcc, pkgconf]
         argv:
           - sh
           - -c
@@ -91,6 +93,9 @@ outputs:
     tests:
       - name: link
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils, gcc, pkgconf]
         argv:
           - sh
           - -c

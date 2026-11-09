@@ -49,7 +49,6 @@ build:
       - libxslt
       - docbook-style-xsl
       - pam-devel
-    tests: [bash-binsh, coreutils, gcc]
   pipeline:
     - runs: |
         autoreconf -fi
@@ -122,6 +121,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils, gcc]
         argv:
           - sh
           - -c
@@ -147,6 +149,9 @@ outputs:
     tests:
       - name: link
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils, gcc]
         argv:
           - sh
           - -c

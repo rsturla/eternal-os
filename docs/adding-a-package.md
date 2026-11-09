@@ -106,19 +106,18 @@ See the rpmx recipe reference for the full schema:
 - `stage: build` runs in the build sandbox with the source tree. Use it for
   unit tests and checks that need the compiler or build tools.
 - `stage: installed` gets its own disposable root filesystem. That root
-  contains `bash`, `coreutils`, `build.dependencies.tests`, the packages in
-  that test's `environment.contents.packages`, and the built RPMs. It does not
-  reuse the build root.
+  contains `bash`, `coreutils`, the packages in that test's
+  `environment.contents.packages`, and the built RPMs. It does not reuse the
+  build root.
 - A test under an output installs only that output and the sibling outputs that
   provide its runtime dependencies. A recipe-level installed test installs
   every output and is useful for integration coverage.
 
-`test.environment.contents.packages` lists packages needed only by that test.
-Tests with the same output and package set share one root; a different set gets
-its own disposable root. `build.dependencies.tests` is the package-wide list
-applied to every installed test; use it only for tools that every installed
-test needs. `test.environment.environment` sets variables for that test's
-steps; a step's own `env` wins.
+`test.environment.contents.packages` is the only place test-root packages go;
+there is no recipe-wide list. Tests with the same output and package set share
+one root; a different set gets its own disposable root.
+`test.environment.environment` sets variables for that test's steps; a step's
+own `env` wins.
 
 When several outputs reuse a test name, select one with
 `rpmx test --test <output>/<name>`.

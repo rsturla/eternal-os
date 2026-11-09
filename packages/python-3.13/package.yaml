@@ -62,7 +62,6 @@ build:
       - sqlite-devel
       - xz-devel
       - zlib-devel
-    tests: [bash-binsh, coreutils, gcc, grep]
   pipeline:
     - uses: autotools/configure
       with:
@@ -108,7 +107,7 @@ outputs:
         stage: installed
         environment:
           contents:
-            packages: [bzip2-libs, expat, libffi, libzstd, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib]
+            packages: [bzip2-libs, expat, libffi, libzstd, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
         argv:
           - sh
           - -c
@@ -163,7 +162,7 @@ outputs:
         stage: installed
         environment:
           contents:
-            packages: [bzip2-libs, expat, libffi, libzstd, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib]
+            packages: [bzip2-libs, expat, libffi, libzstd, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
         argv:
           - sh
           - -c
@@ -190,7 +189,7 @@ outputs:
         stage: installed
         environment:
           contents:
-            packages: [gcc, glibc-devel, grep, sed]
+            packages: [gcc, glibc-devel, grep, sed, bash-binsh, coreutils]
         argv:
           - sh
           - -c

@@ -68,7 +68,6 @@ build:
       - sed
       - grep
       - diffutils
-    tests: [grep]
   pipeline:
     - uses: autotools/configure
       with:
@@ -100,6 +99,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [grep]
         argv:
           - bash
           - -c
@@ -123,6 +125,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [grep]
         argv:
           - sh
           - -c

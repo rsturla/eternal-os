@@ -323,7 +323,7 @@ Do not point two outputs at the same license path.
 
 ## 3. Dependencies
 
-There are four build dependency lists:
+There are three build dependency lists:
 
 ```yaml
 build:
@@ -331,7 +331,6 @@ build:
     tools: [gcc, make, bash, coreutils]
     host: [glibc-devel, gmp-devel]
     target: []
-    tests: [grep]
 ```
 
 - `tools` are root packages needed by the pipeline: compiler, make, awk,
@@ -339,7 +338,8 @@ build:
 - `host` and `target` describe cross-build headers/libraries. For native
   builds they join the build root, but they still do not become runtime
   dependencies.
-- `tests` is the package-wide list of packages every installed test needs.
+- Test-root packages are not a build dependency: they belong to the test that
+  needs them, in that test's `environment.contents.packages`.
 
 Runtime dependencies belong under the output:
 

@@ -40,7 +40,6 @@ build:
     profile: ../../profiles/bootstrap.profile.yaml
   dependencies:
     tools: [gcc, make, bash, coreutils]
-    tests: [bash-binsh, coreutils]
   environment:
     DEFS: "NO_ASM"
   pipeline:
@@ -65,6 +64,9 @@ outputs:
     tests:
       - name: installed
         stage: installed
+        environment:
+          contents:
+            packages: [bash-binsh, coreutils]
         argv:
           - sh
           - -c

@@ -26,7 +26,6 @@ build:
     profile: ../../profiles/bootstrap.profile.yaml
   dependencies:
     tools: [bash, coreutils]
-    tests: [bash-binsh]
   pipeline:
     - runs: |
         install -d "$STAGE/etc/yum.repos.d" \
@@ -87,6 +86,9 @@ tests:
 
   - name: installed
     stage: installed
+    environment:
+      contents:
+        packages: [bash-binsh]
     argv:
       - sh
       - -c
