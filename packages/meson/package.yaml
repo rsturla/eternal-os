@@ -51,6 +51,7 @@ build:
       - meson-doc
 outputs:
 - name: meson
+  arch: noarch
   files:
     license:
     - /usr/share/licenses/meson/**
@@ -80,6 +81,7 @@ outputs:
       meson compile -C build
       ./build/smoke
 - name: meson-doc
+  arch: noarch
   files:
     license:
     - /usr/share/licenses/meson-doc/**
