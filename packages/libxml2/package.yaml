@@ -68,7 +68,6 @@ outputs:
       run:
         - xz-libs
         - zlib
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -91,7 +90,6 @@ outputs:
     dependencies:
       run:
         - libxml2 = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: link
         stage: installed
@@ -113,6 +111,3 @@ outputs:
         - /usr/share/licenses/libxml2-doc/**
       license:
         - /usr/share/licenses/libxml2-doc/**
-    dependencies:
-      run:
-        - filesystem

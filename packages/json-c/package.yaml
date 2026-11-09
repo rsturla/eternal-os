@@ -59,9 +59,6 @@ outputs:
         - /usr/share/licenses/json-c/**
       license:
         - /usr/share/licenses/json-c/**
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -86,7 +83,6 @@ outputs:
     dependencies:
       run:
         - json-c = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: link
         stage: installed
@@ -116,4 +112,3 @@ outputs:
     dependencies:
       run:
         - json-c-devel = ${package.version}-${package.release}
-        - filesystem

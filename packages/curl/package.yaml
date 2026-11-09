@@ -88,7 +88,6 @@ outputs:
   dependencies:
     run:
     - curl-libs = ${package.version}-${package.release}
-    - filesystem
     recommends:
     - ca-certificates-bundle
   tests:
@@ -113,7 +112,6 @@ outputs:
     - /usr/share/licenses/curl-libs/**
   dependencies:
     run:
-    - filesystem
     - libidn2
     - libpsl
     - libnghttp2
@@ -144,7 +142,6 @@ outputs:
   dependencies:
     run:
     - curl-libs = ${package.version}-${package.release}
-    - filesystem
     provides:
     - libcurl-devel = ${package.version}-${package.release}
   tests:
@@ -174,9 +171,6 @@ outputs:
     - '@man'
     - '@info'
     - /usr/share/licenses/curl-doc/**
-  dependencies:
-    run:
-    - filesystem
 tests:
 - name: hardening
   stage: build

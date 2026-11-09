@@ -116,7 +116,6 @@ outputs:
         - libsemanage
         - libxcrypt
         - pam
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -142,7 +141,6 @@ outputs:
     dependencies:
       run:
         - shadow-utils = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: link
         stage: installed
@@ -164,6 +162,3 @@ outputs:
         - /usr/share/licenses/shadow-utils-doc/**
       license:
         - /usr/share/licenses/shadow-utils-doc/**
-    dependencies:
-      run:
-        - filesystem

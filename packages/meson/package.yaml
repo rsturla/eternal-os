@@ -58,7 +58,6 @@ outputs:
     run:
     - python3
     - ninja-build
-    - filesystem
   tests:
   - name: build-project
     stage: installed
@@ -87,6 +86,3 @@ outputs:
     - '@doc'
     - /usr/share/polkit-1/**
     - /usr/share/licenses/meson-doc/**
-  dependencies:
-    run:
-    - filesystem

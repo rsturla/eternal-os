@@ -75,7 +75,6 @@ outputs:
     dependencies:
       run:
         - libffi = ${package.version}-${package.release}
-        - filesystem
 
   - name: libffi-doc
     summary: libffi documentation
@@ -87,9 +86,6 @@ outputs:
         - /usr/share/licenses/libffi-doc/LICENSE
       license:
         - /usr/share/licenses/libffi-doc/LICENSE
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: link

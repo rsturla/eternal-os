@@ -74,9 +74,6 @@ outputs:
     files:
       license:
         - /usr/share/licenses/openssf-compiler-options/LICENSE
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: layout

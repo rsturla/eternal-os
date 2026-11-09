@@ -154,7 +154,6 @@ outputs:
         - /usr/share/licenses/glibc-2.44/COPYING.LIB
     dependencies:
       run:
-        - filesystem
         - ld-linux-2.44 = ${package.version}-${package.release}
       conflicts:
         - glibc-2.43
@@ -175,7 +174,6 @@ outputs:
         - /usr/share/licenses/ld-linux-2.44/COPYING.LIB
     dependencies:
       run:
-        - filesystem
         - glibc-2.44 = ${package.version}-${package.release}
       provides:
         - ld-linux = ${package.version}-${package.release}
@@ -197,7 +195,6 @@ outputs:
         - /usr/share/licenses/libc-bin-2.44/COPYING.LIB
     dependencies:
       run:
-        - filesystem
         - glibc-2.44 = ${package.version}-${package.release}
       provides:
         - libc-bin = ${package.version}-${package.release}
@@ -215,7 +212,6 @@ outputs:
         - /usr/share/licenses/glibc-2.44-iconv/COPYING.LIB
     dependencies:
       run:
-        - filesystem
         - glibc-2.44 = ${package.version}-${package.release}
       provides:
         - glibc-iconv = ${package.version}-${package.release}
@@ -230,8 +226,6 @@ outputs:
         - /usr/share/licenses/glibc-2.44-locales/COPYINGv2
         - /usr/share/licenses/glibc-2.44-locales/COPYING.LIB
     dependencies:
-      run:
-        - filesystem
       provides:
         - glibc-locales = ${package.version}-${package.release}
 
@@ -246,7 +240,6 @@ outputs:
         - /usr/share/licenses/nss-db-2.44/COPYING.LIB
     dependencies:
       run:
-        - filesystem
         - glibc-2.44 = ${package.version}-${package.release}
       provides:
         - nss-db = ${package.version}-${package.release}
@@ -280,7 +273,6 @@ outputs:
       elf: false
     dependencies:
       run:
-        - filesystem
         - glibc >= ${package.version}
       provides:
         - glibc-devel = ${package.version}-${package.release}
@@ -374,7 +366,6 @@ outputs:
     dependencies:
       run:
         - glibc-2.44-devel = ${package.version}-${package.release}
-        - filesystem
       provides:
         - glibc-static = ${package.version}-${package.release}
 
@@ -389,9 +380,6 @@ outputs:
       license:
         - /usr/share/licenses/glibc-2.44-doc/COPYINGv2
         - /usr/share/licenses/glibc-2.44-doc/COPYING.LIB
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: build

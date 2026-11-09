@@ -62,9 +62,6 @@ outputs:
       license:
         - /usr/share/licenses/libunistring/COPYING
         - /usr/share/licenses/libunistring/COPYING.LIB
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -90,7 +87,6 @@ outputs:
     dependencies:
       run:
         - libunistring = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: link
         stage: installed
@@ -124,9 +120,6 @@ outputs:
       license:
         - /usr/share/licenses/libunistring-doc/COPYING
         - /usr/share/licenses/libunistring-doc/COPYING.LIB
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: hardening

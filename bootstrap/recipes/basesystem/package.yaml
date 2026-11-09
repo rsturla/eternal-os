@@ -42,7 +42,6 @@ outputs:
         - /usr/share/licenses/basesystem/LICENSE
     dependencies:
       run:
-        - filesystem
         - eternal-baselayout
 
 tests:

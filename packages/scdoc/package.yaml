@@ -49,9 +49,6 @@ outputs:
   files:
     license:
     - /usr/share/licenses/scdoc/**
-  dependencies:
-    run:
-    - filesystem
   tests:
   - name: render
     stage: installed
@@ -71,9 +68,6 @@ outputs:
     include:
     - '@man'
     - /usr/share/licenses/scdoc-doc/**
-  dependencies:
-    run:
-    - filesystem
 tests:
 - name: hardening
   stage: build

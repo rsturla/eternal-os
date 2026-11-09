@@ -87,7 +87,6 @@ outputs:
     - /etc/selinux/semanage.conf
   dependencies:
     run:
-    - filesystem
     - libselinux
     - libsepol
     - audit-libs
@@ -113,7 +112,6 @@ outputs:
   dependencies:
     run:
     - libsemanage = ${package.version}-${package.release}
-    - filesystem
   tests:
   - name: compile-and-run
     stage: installed
@@ -141,7 +139,6 @@ outputs:
   dependencies:
     run:
     - libsemanage-devel = ${package.version}-${package.release}
-    - filesystem
     - audit-libs-devel
     - bzip2-devel
   tests:
@@ -177,9 +174,6 @@ outputs:
     include:
     - '@man'
     - /usr/share/licenses/libsemanage-doc/**
-  dependencies:
-    run:
-    - filesystem
 tests:
 - name: hardening
   stage: build

@@ -81,7 +81,6 @@ outputs:
     dependencies:
       run:
         - gawk = ${package.version}-${package.release}
-        - filesystem
 
   - name: gawk-doc
     summary: GNU awk pattern-matching language documentation
@@ -93,6 +92,3 @@ outputs:
         - /usr/share/licenses/gawk-doc/COPYING
       license:
         - /usr/share/licenses/gawk-doc/COPYING
-    dependencies:
-      run:
-        - filesystem

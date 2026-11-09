@@ -60,7 +60,6 @@ outputs:
     dependencies:
       run:
         - expat-libs = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -80,9 +79,6 @@ outputs:
         - /usr/share/licenses/expat-libs/COPYING
       license:
         - /usr/share/licenses/expat-libs/COPYING
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -107,7 +103,6 @@ outputs:
     dependencies:
       run:
         - expat-libs = ${package.version}-${package.release}
-        - filesystem
 
   - name: expat-doc
     summary: Expat documentation
@@ -118,9 +113,6 @@ outputs:
         - /usr/share/licenses/expat-doc/COPYING
       license:
         - /usr/share/licenses/expat-doc/COPYING
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: link

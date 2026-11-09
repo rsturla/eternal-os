@@ -97,9 +97,6 @@ outputs:
   files:
     license:
     - /usr/share/licenses/audit-libs/**
-  dependencies:
-    run:
-    - filesystem
   tests:
   - name: load
     stage: installed
@@ -131,7 +128,6 @@ outputs:
   dependencies:
     run:
     - audit-libs = ${package.version}-${package.release}
-    - filesystem
     provides:
     - audit-libs-devel = ${package.version}-${package.release}
   tests:

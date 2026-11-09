@@ -78,6 +78,3 @@ outputs:
         - /usr/share/licenses/diffutils-doc/COPYING
       license:
         - /usr/share/licenses/diffutils-doc/COPYING
-    dependencies:
-      run:
-        - filesystem

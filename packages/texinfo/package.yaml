@@ -85,7 +85,6 @@ outputs:
     dependencies:
       run:
         - perl
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -119,9 +118,6 @@ outputs:
         - /usr/share/licenses/texinfo-doc/COPYING
       license:
         - /usr/share/licenses/texinfo-doc/COPYING
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: hardening

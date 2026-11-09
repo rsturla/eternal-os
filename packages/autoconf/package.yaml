@@ -63,7 +63,6 @@ outputs:
     run:
     - m4
     - perl
-    - filesystem
     - coreutils
     - sed
     - grep
@@ -89,6 +88,3 @@ outputs:
     - '@man'
     - '@info'
     - /usr/share/licenses/autoconf-doc/**
-  dependencies:
-    run:
-    - filesystem

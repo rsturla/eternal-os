@@ -83,7 +83,6 @@ outputs:
       run:
         - isl = ${package.version}-${package.release}
         - gmp-devel
-        - filesystem
 
 tests:
   - name: link

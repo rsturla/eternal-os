@@ -80,7 +80,6 @@ outputs:
     dependencies:
       run:
         - ncurses-libs
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -105,7 +104,6 @@ outputs:
       run:
         - readline = ${package.version}-${package.release}
         - ncurses-devel
-        - filesystem
     tests:
       - name: link
         stage: installed
@@ -140,9 +138,6 @@ outputs:
         - /usr/share/licenses/readline-doc/COPYING
       license:
         - /usr/share/licenses/readline-doc/COPYING
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: hardening

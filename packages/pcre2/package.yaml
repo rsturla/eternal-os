@@ -59,7 +59,6 @@ outputs:
     dependencies:
       run:
         - pcre2-libs = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -80,9 +79,6 @@ outputs:
         - /usr/share/licenses/pcre2-libs/COPYING
       license:
         - /usr/share/licenses/pcre2-libs/COPYING
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -108,7 +104,6 @@ outputs:
     dependencies:
       run:
         - pcre2-libs = ${package.version}-${package.release}
-        - filesystem
 
   - name: pcre2-doc
     summary: PCRE2 documentation
@@ -119,9 +114,6 @@ outputs:
         - /usr/share/licenses/pcre2-doc/COPYING
       license:
         - /usr/share/licenses/pcre2-doc/COPYING
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: link

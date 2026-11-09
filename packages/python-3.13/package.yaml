@@ -98,7 +98,6 @@ outputs:
     dependencies:
       run:
         - python-3.13-libs = ${package.version}-${package.release}
-        - filesystem
       provides:
         - python-3.13 = ${package.version}-${package.release}
     tests:
@@ -123,9 +122,6 @@ outputs:
         - /usr/share/licenses/python-3.13-libs/LICENSE
       license:
         - /usr/share/licenses/python-3.13-libs/LICENSE
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -149,7 +145,6 @@ outputs:
     dependencies:
       run:
         - python-3.13 = ${package.version}-${package.release}
-        - filesystem
       provides:
         - python3 = ${package.version}-${package.release}
       conflicts:
@@ -178,7 +173,6 @@ outputs:
     dependencies:
       run:
         - python-3.13-libs = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: embed
         stage: installed
@@ -207,9 +201,6 @@ outputs:
         - /usr/share/licenses/python-3.13-doc/LICENSE
       license:
         - /usr/share/licenses/python-3.13-doc/LICENSE
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: hardening

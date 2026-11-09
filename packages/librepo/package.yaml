@@ -71,7 +71,6 @@ outputs:
         - openssl-libs
         - rpm-libs
         - zchunk-libs
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -96,7 +95,6 @@ outputs:
     dependencies:
       run:
         - librepo = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: link
         stage: installed

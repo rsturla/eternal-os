@@ -58,7 +58,6 @@ outputs:
     dependencies:
       run:
         - libattr = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -80,9 +79,6 @@ outputs:
         - /usr/share/licenses/libattr/**
       license:
         - /usr/share/licenses/libattr/**
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -107,7 +103,6 @@ outputs:
     dependencies:
       run:
         - libattr = ${package.version}-${package.release}
-        - filesystem
 
   - name: attr-doc
     summary: Documentation for attr
@@ -118,9 +113,6 @@ outputs:
         - /usr/share/licenses/attr-doc/**
       license:
         - /usr/share/licenses/attr-doc/**
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: link

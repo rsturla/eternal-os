@@ -75,6 +75,3 @@ outputs:
         - /usr/share/licenses/patch-doc/COPYING
       license:
         - /usr/share/licenses/patch-doc/COPYING
-    dependencies:
-      run:
-        - filesystem

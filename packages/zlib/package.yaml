@@ -80,7 +80,6 @@ outputs:
     dependencies:
       run:
         - zlib = ${package.version}-${package.release}
-        - filesystem
       provides:
         - zlib-ng-compat-devel = ${package.version}-${package.release}
 
@@ -95,7 +94,6 @@ outputs:
     dependencies:
       run:
         - zlib-devel = ${package.version}-${package.release}
-        - filesystem
       provides:
         - zlib-ng-compat-static = ${package.version}-${package.release}
     tests:
@@ -120,9 +118,6 @@ outputs:
         - /usr/share/licenses/zlib-doc/LICENSE
       license:
         - /usr/share/licenses/zlib-doc/LICENSE
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: link

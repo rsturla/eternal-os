@@ -67,7 +67,6 @@ outputs:
     dependencies:
       run:
         - sqlite-libs = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -86,9 +85,6 @@ outputs:
         - /usr/share/licenses/sqlite-libs/**
       license:
         - /usr/share/licenses/sqlite-libs/**
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -113,7 +109,6 @@ outputs:
     dependencies:
       run:
         - sqlite-libs = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: link
         stage: installed
@@ -141,6 +136,3 @@ outputs:
         - /usr/share/licenses/sqlite-doc/**
       license:
         - /usr/share/licenses/sqlite-doc/**
-    dependencies:
-      run:
-        - filesystem

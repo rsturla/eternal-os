@@ -92,7 +92,6 @@ outputs:
         - libsmartcols = ${package.version}-${package.release}
         - libuuid = ${package.version}-${package.release}
         - pam
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -116,9 +115,6 @@ outputs:
         - /usr/share/licenses/libblkid/**
       license:
         - /usr/share/licenses/libblkid/**
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -140,9 +136,6 @@ outputs:
         - /usr/share/licenses/libfdisk/**
       license:
         - /usr/share/licenses/libfdisk/**
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -164,9 +157,6 @@ outputs:
         - /usr/share/licenses/libmount/**
       license:
         - /usr/share/licenses/libmount/**
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -188,9 +178,6 @@ outputs:
         - /usr/share/licenses/libsmartcols/**
       license:
         - /usr/share/licenses/libsmartcols/**
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -212,9 +199,6 @@ outputs:
         - /usr/share/licenses/libuuid/**
       license:
         - /usr/share/licenses/libuuid/**
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -243,7 +227,6 @@ outputs:
         - libmount = ${package.version}-${package.release}
         - libsmartcols = ${package.version}-${package.release}
         - libuuid = ${package.version}-${package.release}
-        - filesystem
       provides:
         - libblkid-devel = ${package.version}-${package.release}
         - libfdisk-devel = ${package.version}-${package.release}
@@ -260,6 +243,3 @@ outputs:
         - /usr/share/licenses/util-linux-doc/**
       license:
         - /usr/share/licenses/util-linux-doc/**
-    dependencies:
-      run:
-        - filesystem

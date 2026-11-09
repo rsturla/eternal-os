@@ -55,7 +55,6 @@ outputs:
     - /usr/share/licenses/ninja/**
   dependencies:
     run:
-    - filesystem
     - libstdc++
     - libgcc
     - bash-binsh

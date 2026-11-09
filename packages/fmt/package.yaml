@@ -59,9 +59,6 @@ outputs:
         - /usr/lib*/lib*.a
       license:
         - /usr/share/licenses/fmt/**
-    dependencies:
-      run:
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -86,7 +83,6 @@ outputs:
     dependencies:
       run:
         - fmt-devel = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -111,7 +107,6 @@ outputs:
     dependencies:
       run:
         - fmt = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: link
         stage: installed

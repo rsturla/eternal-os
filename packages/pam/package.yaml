@@ -81,7 +81,6 @@ outputs:
   dependencies:
     run:
     - pam-libs = ${package.version}-${package.release}
-    - filesystem
     - bash-binsh
     - audit-libs
     - libselinux
@@ -105,9 +104,6 @@ outputs:
     - /usr/lib*/libpam_misc.so.*
     - /usr/lib*/libpamc.so.*
     - /usr/share/licenses/pam-libs/**
-  dependencies:
-    run:
-    - filesystem
   tests:
   - name: load
     stage: installed
@@ -131,7 +127,6 @@ outputs:
   dependencies:
     run:
     - pam-libs = ${package.version}-${package.release}
-    - filesystem
   tests:
   - name: compile-and-run
     stage: installed

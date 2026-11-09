@@ -89,7 +89,6 @@ outputs:
     dependencies:
       run:
         - gmp = ${package.version}-${package.release}
-        - filesystem
 
   - name: gmp-doc
     summary: GMP documentation
@@ -103,9 +102,6 @@ outputs:
       license:
         - /usr/share/licenses/gmp-doc/COPYING.LESSERv3
         - /usr/share/licenses/gmp-doc/COPYINGv3
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: link

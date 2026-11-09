@@ -62,7 +62,6 @@ outputs:
         - /usr/share/licenses/libselinux/**
     dependencies:
       run:
-        - filesystem
         - libsepol
     tests:
       - name: installed
@@ -118,7 +117,6 @@ outputs:
     dependencies:
       run:
         - libselinux = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -145,7 +143,6 @@ outputs:
         - libselinux = ${package.version}-${package.release}
         - libsepol-devel
         - pcre2-devel
-        - filesystem
 
   - name: libselinux-static
     summary: Static library for libselinux
@@ -158,7 +155,6 @@ outputs:
     dependencies:
       run:
         - libselinux-devel = ${package.version}-${package.release}
-        - filesystem
 
   - name: libselinux-doc
     summary: Documentation for libselinux
@@ -169,6 +165,3 @@ outputs:
         - /usr/share/licenses/libselinux-doc/**
       license:
         - /usr/share/licenses/libselinux-doc/**
-    dependencies:
-      run:
-        - filesystem

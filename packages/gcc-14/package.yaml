@@ -147,7 +147,6 @@ outputs:
     dependencies:
       run:
         - binutils
-        - filesystem
         - glibc-devel
         - libstdc++-14 = ${package.version}-${package.release}
       provides:
@@ -201,7 +200,6 @@ outputs:
         - /usr/share/licenses/libstdc++-14/COPYING.RUNTIME
     dependencies:
       run:
-        - filesystem
         - glibc >= 2.44
       provides:
         - libstdc++ = ${package.version}-${package.release}
@@ -229,7 +227,6 @@ outputs:
       run:
         - libstdc++-14 = ${package.version}-${package.release}
         - glibc-devel
-        - filesystem
       provides:
         - libstdc++-devel = ${package.version}-${package.release}
 
@@ -248,7 +245,6 @@ outputs:
     dependencies:
       run:
         - libstdc++-14-devel = ${package.version}-${package.release}
-        - filesystem
       provides:
         - libstdc++-static = ${package.version}-${package.release}
 
@@ -265,7 +261,6 @@ outputs:
         - /usr/share/licenses/libatomic-14/COPYING.RUNTIME
     dependencies:
       run:
-        - filesystem
         - glibc >= 2.44
       provides:
         - libatomic = ${package.version}-${package.release}
@@ -281,9 +276,6 @@ outputs:
         - /usr/share/licenses/gcc-14-doc/COPYING3
         - /usr/share/licenses/gcc-14-doc/COPYING3.LIB
         - /usr/share/licenses/gcc-14-doc/COPYING.RUNTIME
-    dependencies:
-      run:
-        - filesystem
 
 tests:
   - name: build

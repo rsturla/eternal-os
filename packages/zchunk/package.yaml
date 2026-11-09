@@ -67,7 +67,6 @@ outputs:
     dependencies:
       run:
         - zchunk-libs = ${package.version}-${package.release}
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -93,7 +92,6 @@ outputs:
       run:
         - openssl-libs
         - libzstd
-        - filesystem
     tests:
       - name: installed
         stage: installed
@@ -120,7 +118,6 @@ outputs:
         - zchunk-libs = ${package.version}-${package.release}
         - libzstd-devel
         - openssl-devel
-        - filesystem
     tests:
       - name: link
         stage: installed

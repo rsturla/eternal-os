@@ -63,7 +63,6 @@ outputs:
     run:
     - autoconf
     - perl
-    - filesystem
   tests:
   - name: generate
     stage: installed
@@ -94,6 +93,3 @@ outputs:
     - '@man'
     - '@info'
     - /usr/share/licenses/automake-doc/**
-  dependencies:
-    run:
-    - filesystem
