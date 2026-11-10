@@ -1,0 +1,138 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/libpsl.yaml
+# Use libidn2 instead of ICU. The release archive includes its pinned public suffix data.
+schema: 1
+package:
+  name: libpsl
+  version: 0.23.3
+  release: 1
+  summary: Public suffix lookup tools and library
+  description: Public suffix lookup tools and library.
+  license: MIT
+  upstream: https://github.com/rockdaboot/libpsl
+sources:
+- name: libpsl-0.23.3.tar.gz
+  kind: archive
+  digest: sha512:536abf5c713e879daf49a78813d39637c78de1cebb93be841adc0a733fc3fd708dad03acac4a5cf8d3bfd06ab2b6bf3e9b0cb7881367de1c471c4c49dab28465
+  locators:
+  - kind: https
+    url: https://github.com/rockdaboot/libpsl/releases/download/0.23.3/libpsl-0.23.3.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  packages:
+  - gcc
+  - make
+  - bash
+  - coreutils
+  - pkgconf
+  - python3
+  sysroot:
+  - libidn2-devel
+  - libunistring-devel
+  pipeline:
+  - uses: autotools/configure
+    with:
+      args:
+      - --disable-static
+      - --disable-gtk-doc
+      - --enable-runtime=libidn2
+      - --enable-builtin
+  - uses: make/build
+  - uses: make/install
+  - runs: |
+      find "$STAGE" -name "*.la" -delete
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE
+      - COPYING
+      outputs:
+      - libpsl
+      - libpsl-libs
+      - libpsl-devel
+      - libpsl-doc
+  - uses: strip
+outputs:
+- name: libpsl
+  files:
+    license:
+    - /usr/share/licenses/libpsl/**
+  dependencies:
+    run:
+    - libpsl-libs = ${package.version}-${package.release}
+  tests:
+  - name: suffix
+    stage: installed
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      test "$(psl --use-builtin-data --print-reg-domain example.co.uk)" = "example.co.uk: example.co.uk"
+- name: libpsl-libs
+  files:
+    include:
+    - /usr/lib*/libpsl.so.*
+    - /usr/share/licenses/libpsl-libs/**
+    license:
+    - /usr/share/licenses/libpsl-libs/**
+  dependencies:
+    run:
+    - libunistring
+  tests:
+  - name: load
+    stage: installed
+    packages:
+    - python3
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      python3 -c 'import ctypes; ctypes.CDLL("libpsl.so.5")'
+- name: libpsl-devel
+  files:
+    include:
+    - '@dev'
+    - /usr/bin/psl-make-dafsa
+    - /usr/share/licenses/libpsl-devel/**
+    license:
+    - /usr/share/licenses/libpsl-devel/**
+  dependencies:
+    run:
+    - libpsl-libs = ${package.version}-${package.release}
+  tests:
+  - name: compile-and-run
+    stage: installed
+    packages:
+    - gcc
+    - glibc-devel
+    - pkgconf
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      cat > /tmp/test.c <<'EOF'
+      #include <libpsl.h>
+      int main(void) { const psl_ctx_t *p = psl_builtin(); return !p || !psl_is_public_suffix(p, "com"); }
+      EOF
+      gcc /tmp/test.c $(pkg-config --cflags --libs libpsl) -o /tmp/test
+      /tmp/test
+- name: libpsl-doc
+  files:
+    include:
+    - '@doc'
+    - '@man'
+    - /usr/share/licenses/libpsl-doc/**
+    license:
+    - /usr/share/licenses/libpsl-doc/**
+tests:
+- name: hardening
+  stage: build
+  pipeline:
+  - uses: test/hardening-check
