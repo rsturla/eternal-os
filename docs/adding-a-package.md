@@ -141,13 +141,13 @@ repository needs a new toolchain component.
 ### Python packaging tools
 
 Python modules use an rpmx `python` matrix for every interpreter stream in
-`packages/`. The current streams are 3.13 and 3.14. Give each cell an RPM-safe
+`packages/`. The current streams are 3.11 through 3.15. Give each cell an RPM-safe
 slug, such as `py313`, and enable `release-suffix` so each cell has a distinct
 SRPM release.
 
-Name binary outputs `python-3.13-<module>` and `python-3.14-<module>`. The default
-3.14 output provides `python-<module>`. Keep runtime dependencies specific to
-the interpreter. Version installed command names so the two outputs can
+Name binary outputs `python-<version>-<module>`. The default 3.14 output provides
+`python-<module>`. Keep runtime dependencies specific to the interpreter.
+Version installed command names so the outputs can
 coexist. Use the interpreter ABI and distribution requirements that rpmx
 generates from the installed Python files and wheel metadata.
 Interpreter packages provide the matching `python3.X` build capability.
