@@ -1,0 +1,79 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-calver.yaml
+schema: 1
+package:
+  name: python-calver
+  version: 2025.10.20
+  release: 1
+  summary: Setuptools support for calendar versioning
+  license: Apache-2.0
+  upstream: https://github.com/di/calver
+sources:
+- name: calver-2025.10.20.tar.gz
+  kind: archive
+  digest: sha512:7fd26bc607328ee62b4bc8f19eb356c2b5f3d604c4ed7ea7a345b48e452e4cb3c64db9100ed8087c00e03b0cb0bee7aa69b93cca0f1ed9fa1dc1150a63799743
+  locators:
+  - kind: https
+    url: https://files.pythonhosted.org/packages/4a/96/0c57e3e228ffc54074867406b659b197678674f1f0bf600d114965289834/calver-2025.10.20.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+matrix:
+  axes:
+    python:
+    - value: '3.13'
+      version: '3.13'
+      slug: py313
+      package: python-3.13
+      capability: python-3.13
+    - value: '3.14'
+      version: '3.14'
+      slug: py314
+      package: python3.14
+      capability: python
+  max-cells: 2
+  release-suffix: true
+build:
+  root:
+    profile: ../../profiles/bootstrap-python.profile.yaml
+  packages:
+  - bash
+  - coreutils
+  - python3.14
+  - ${matrix.python.package}
+  - python-3.14-setuptools
+  pipeline:
+  - uses: python/build-wheel
+    with:
+      python: python3.14
+      build-package: python-3.14-build
+  - uses: python/install-wheel
+    with:
+      python: /usr/bin/python${matrix.python.version}
+      pip-python: python3.14
+      script-version: ${matrix.python.version}
+      pip-package: python-3.14-pip
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE
+      outputs:
+      - python-${matrix.python.version}-calver
+outputs:
+- name: python-${matrix.python.version}-calver
+  arch: noarch
+  files:
+    license:
+    - /usr/share/licenses/python-${matrix.python.version}-calver/**
+  dependencies:
+    provides:
+    - ${matrix.python.capability}-calver = ${package.version}-${package.release}
+  tests:
+  - name: functional
+    stage: installed
+    argv:
+    - /usr/bin/python${matrix.python.version}
+    - -c
+    - from calver.integration import version; from types import SimpleNamespace; import os, tempfile; os.chdir(tempfile.mkdtemp());
+      os.environ["SOURCE_DATE_EPOCH"] = "0"; d = SimpleNamespace(metadata=SimpleNamespace(version=None)); version(d,
+      "use_calver", True); assert d.metadata.version == "1970.01.01"
