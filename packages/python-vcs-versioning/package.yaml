@@ -1,0 +1,82 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-vcs-versioning.yaml
+schema: 1
+package:
+  name: python-vcs-versioning
+  version: 2.6.0
+  release: 1
+  summary: Python project versions from version control metadata
+  license: MIT
+  upstream: https://github.com/pypa/setuptools-scm
+sources:
+- name: vcs_versioning-2.6.0.tar.gz
+  kind: archive
+  digest: sha512:dcae42cc2daa2918096c100d17dd2a9de7f83e79db98194bbc7ed4508dc9f90ab2ac26d8164f8ae0cd0b69ef0879e12d243b479ebe15338ad4ea872d4182a0d2
+  locators:
+  - kind: https
+    url: https://files.pythonhosted.org/packages/ad/e7/2a691db7d076b75d099fdba1a14cd966931f2aeb591e77f6d22f15097326/vcs_versioning-2.6.0.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+matrix:
+  axes:
+    python:
+    - value: '3.13'
+      version: '3.13'
+      slug: py313
+      package: python-3.13
+      capability: python-3.13
+    - value: '3.14'
+      version: '3.14'
+      slug: py314
+      package: python3.14
+      capability: python
+  max-cells: 2
+  release-suffix: true
+build:
+  root:
+    profile: ../../profiles/bootstrap-python.profile.yaml
+  packages:
+  - bash
+  - coreutils
+  - python3.14
+  - ${matrix.python.package}
+  - python-3.14-setuptools
+  - python-3.14-packaging
+  pipeline:
+  - uses: python/build-wheel
+    with:
+      python: python3.14
+      build-package: python-3.14-build
+  - uses: python/install-wheel
+    with:
+      python: /usr/bin/python${matrix.python.version}
+      pip-python: python3.14
+      script-version: ${matrix.python.version}
+      pip-package: python-3.14-pip
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE.txt
+      outputs:
+      - python-${matrix.python.version}-vcs-versioning
+outputs:
+- name: python-${matrix.python.version}-vcs-versioning
+  arch: noarch
+  files:
+    license:
+    - /usr/share/licenses/python-${matrix.python.version}-vcs-versioning/**
+  dependencies:
+    provides:
+    - ${matrix.python.capability}-vcs-versioning = ${package.version}-${package.release}
+    run:
+    - python-${matrix.python.version}-packaging
+  tests:
+  - name: functional
+    stage: installed
+    argv:
+    - /usr/bin/python${matrix.python.version}
+    - -c
+    - 'from vcs_versioning import PyProjectData, infer_version_string; import os, tempfile; os.chdir(tempfile.mkdtemp());
+      p = PyProjectData.for_testing(tool_name="vcs-versioning"); version = infer_version_string("demo", p,
+      {"root": ".", "fallback_root": ".", "fallback_version": "1.2.3"}); assert version == "1.2.3", version'
