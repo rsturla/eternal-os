@@ -25,27 +25,22 @@ matrix:
       version: '3.11'
       slug: py311
       package: python-3.11
-      capability: python-3.11
     - value: '3.12'
       version: '3.12'
       slug: py312
       package: python-3.12
-      capability: python-3.12
     - value: '3.13'
       version: '3.13'
       slug: py313
       package: python-3.13
-      capability: python-3.13
     - value: '3.14'
       version: '3.14'
       slug: py314
       package: python3.14
-      capability: python
     - value: '3.15'
       version: '3.15'
       slug: py315
       package: python-3.15
-      capability: python-3.15
   max-cells: 5
   release-suffix: true
 build:
@@ -83,9 +78,6 @@ outputs:
   files:
     license:
     - /usr/share/licenses/python-${matrix.python.version}-packaging/**
-  dependencies:
-    provides:
-    - ${matrix.python.capability}-packaging = ${package.version}-${package.release}
   tests:
   - name: functional
     stage: installed
