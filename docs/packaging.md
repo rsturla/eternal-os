@@ -35,8 +35,9 @@ from the bootstrap seed to an in-tree recipe.
 
 ### Versioned package names are streams
 
-When several upstream versions must coexist, put the stream in the package name
-and provide the unversioned capability:
+When several upstream versions must coexist, put the stream in the package
+name. Shared system libraries can provide an unversioned capability; language
+toolchains follow the selector rule below.
 
 ```yaml
 package:
@@ -86,6 +87,26 @@ Rules:
 - No `release: 100` or similar hacks to outrank the seed. Bootstrap resolver
   policy belongs in the bootstrap ladder.
 
+### Language versions are selected by the user
+
+Eternal does not designate a distribution-wide default version for a
+programming language or its toolchain. Ship versioned commands and packages
+that can coexist. A recipe or application must name the language stream it
+needs, including the matching library and build-tool packages.
+
+Each stream may offer an optional `-default` output that supplies unversioned
+commands, such as `python3` or `gcc`. Users choose a stream by installing its
+selector. Selectors for the same commands must conflict with one another and
+must depend on their matching versioned implementation. Installing a versioned
+implementation or library must not require a selector. Do not give a language
+library an unversioned alias that could resolve to a different stream from the
+user's selected commands. A generic package request without a selector is not
+a promise of which version the package manager will choose.
+
+Buildroots may select a specific toolchain stream explicitly. A temporary
+bootstrap seed does not set a distribution-wide default. This language rule
+does not change the selection policy for shared system libraries such as glibc.
+
 ### Python module names
 
 Use `python-<project>` for a Python source recipe. Normalize the upstream
@@ -95,15 +116,15 @@ For example, `trove_classifiers` becomes `python-trove-classifiers`.
 
 Name each binary module `python-<major.minor>-<project>`. This matches the
 interpreter packages, such as `python-3.14`. Keep the interpreter streams in
-one rpmx matrix and cover every supported interpreter recipe. Set the default
-stream explicitly in `rpmx-defaults.yaml` under `metadata.python.default-stream`.
-Only that stream supplies the unversioned `python-<project>` capability.
-Adding a supported stream does not promote it to the default.
-The selected interpreter's `-default` output provides `python3` at its full
-package version. Other selectors provide `python3 = 0`, so adding a newer
-non-default interpreter does not win the unversioned command capability.
-Other streams provide their own versioned identity. Keep module runtime
-dependencies specific to that interpreter stream.
+one rpmx matrix and cover every supported interpreter recipe. Do not provide
+an unversioned module alias: module dependencies must name their interpreter
+stream.
+
+Eternal does not select a default Python stream. Users can install one
+`python-<version>-default` output to supply the unversioned `python3` and
+related commands. Each selector provides `python3` at its full package version
+and conflicts with the other selectors. A versioned interpreter and its
+modules can be installed without a selector.
 
 Commands keep upstream Python spellings, such as `python3.14`. Python ABI and
 distribution requirements also keep their standard spellings. These values
@@ -659,9 +680,9 @@ outputs:
         - cpp = ${package.version}-${package.release}
 ```
 
-`gcc-16-default` is the only output that provides the unversioned capabilities.
-Advertise `gcc`, `gcc-c++`, `cpp` and `cc` together so a recipe that asks for
-the C++ compiler cannot accidentally get a C-only default stream.
+For this stream, the optional `gcc-16-default` output provides the unversioned
+capabilities. Advertise `gcc`, `gcc-c++`, `cpp` and `cc` together so a recipe
+that asks for the C++ compiler cannot accidentally get a C-only selector.
 
 `libstdc++-16-devel` provides `libstdc++-devel`; the separate
 `libstdc++-16-static` output provides `libstdc++-static`. A static C++ link
