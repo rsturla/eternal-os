@@ -1,0 +1,79 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-installer.yaml
+schema: 1
+package:
+  name: python-installer
+  version: 1.1.0
+  release: 1
+  summary: Library for installing Python wheels
+  license: MIT
+  upstream: https://github.com/pypa/installer
+sources:
+- name: installer-1.1.0.tar.gz
+  kind: archive
+  digest: sha512:0dab0a9d01c1bf7e001b1a41b8380a56ec6df22db6916e919bcb3063adfe3fdbbabae7fc4000915b93c704d5251d976beecdf2cc026eb9d18b6e798d9bbe0979
+  locators:
+  - kind: https
+    url: https://files.pythonhosted.org/packages/56/d3/2fab33d15004d41ae8e7b5d3e310510f7f34a7e1dd032a3e60d8b38d8fba/installer-1.1.0.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+matrix:
+  axes:
+    python:
+    - value: '3.13'
+      version: '3.13'
+      slug: py313
+      package: python-3.13
+      capability: python-3.13
+    - value: '3.14'
+      version: '3.14'
+      slug: py314
+      package: python3.14
+      capability: python
+  max-cells: 2
+  release-suffix: true
+build:
+  root:
+    profile: ../../profiles/bootstrap-python.profile.yaml
+  packages:
+  - bash
+  - coreutils
+  - python3.14
+  - ${matrix.python.package}
+  - python-3.14-flit-core
+  pipeline:
+  - uses: python/build-wheel
+    with:
+      frontend: pip
+      build-package: python-3.14-pip
+      python: python3.14
+  - uses: python/install-wheel
+    with:
+      python: /usr/bin/python${matrix.python.version}
+      pip-python: python3.14
+      script-version: ${matrix.python.version}
+      pip-package: python-3.14-pip
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE
+      outputs:
+      - python-${matrix.python.version}-installer
+outputs:
+- name: python-${matrix.python.version}-installer
+  arch: noarch
+  files:
+    license:
+    - /usr/share/licenses/python-${matrix.python.version}-installer/**
+  dependencies:
+    provides:
+    - ${matrix.python.capability}-installer = ${package.version}-${package.release}
+  tests:
+  - name: functional
+    stage: installed
+    argv:
+    - /usr/bin/python${matrix.python.version}
+    - -c
+    - from installer.utils import parse_entrypoints; assert list(parse_entrypoints("[console_scripts]\ndemo
+      = demo:main\n"))
