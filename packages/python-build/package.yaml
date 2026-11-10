@@ -1,0 +1,86 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-build.yaml
+schema: 1
+package:
+  name: python-build
+  version: 1.6.1
+  release: 1
+  summary: Python source and wheel build frontend
+  license: MIT
+  upstream: https://build.pypa.io/
+sources:
+- name: build-1.6.1.tar.gz
+  kind: archive
+  digest: sha512:6d1a0704a8888cc3ad5728b9c47803248e4d393eeabfde0b6a338b5cacf69ee927b618d696a8e7f491cc596771d63868b490782e2775867ef98e9bc452b36d05
+  locators:
+  - kind: https
+    url: https://files.pythonhosted.org/packages/bd/67/4898a44ea4f3f8e213b0954ec0aa0a16971d62a6212d6ea3931e97115b99/build-1.6.1.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+matrix:
+  axes:
+    python:
+    - value: '3.13'
+      version: '3.13'
+      slug: py313
+      package: python-3.13
+      capability: python-3.13
+    - value: '3.14'
+      version: '3.14'
+      slug: py314
+      package: python3.14
+      capability: python
+  max-cells: 2
+  release-suffix: true
+build:
+  root:
+    profile: ../../profiles/bootstrap-python.profile.yaml
+  packages:
+  - bash
+  - coreutils
+  - python3.14
+  - ${matrix.python.package}
+  - python-3.14-flit-core
+  pipeline:
+  - uses: python/build-wheel
+    with:
+      frontend: pip
+      build-package: python-3.14-pip
+      python: python3.14
+  - uses: python/install-wheel
+    with:
+      python: /usr/bin/python${matrix.python.version}
+      pip-python: python3.14
+      script-version: ${matrix.python.version}
+      pip-package: python-3.14-pip
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE
+      outputs:
+      - python-${matrix.python.version}-build
+outputs:
+- name: python-${matrix.python.version}-build
+  arch: noarch
+  files:
+    license:
+    - /usr/share/licenses/python-${matrix.python.version}-build/**
+  dependencies:
+    provides:
+    - ${matrix.python.capability}-build = ${package.version}-${package.release}
+    run:
+    - python-${matrix.python.version}-packaging
+    - python-${matrix.python.version}-pyproject-hooks
+  tests:
+  - name: functional
+    stage: installed
+    argv:
+    - /usr/bin/python${matrix.python.version}
+    - -c
+    - from build import ProjectBuilder; import tempfile, pathlib; p = pathlib.Path(tempfile.mkdtemp()); (p
+      / "pyproject.toml").write_text("[build-system]\nrequires = [\"flit_core\"]\nbuild-backend = \"flit_core.buildapi\"\n[project]\nname
+      = \"demo\"\nversion = \"1.0\"\ndescription = \"smoke\"\n"); (p / "demo.py").write_text("answer = 42\n");
+      assert pathlib.Path(ProjectBuilder(str(p)).build("wheel", str(p / "dist"))).is_file()
+    packages:
+    - python-${matrix.python.version}-flit-core
