@@ -108,7 +108,7 @@ repositories:
       - libuuid*
       - zchunk*
   - id: fedora
-    metalink: https://mirrors.fedoraproject.org/metalink?repo=fedora-$releasever&arch=$basearch
+    baseurl: https://dl.fedoraproject.org/pub/fedora/linux/releases/$releasever/Everything/$basearch/os/
     # These package names are already produced by Eternal. Hiding the Fedora
     # copies is what makes the build root consume the published Eternal
     # repository instead of only using it for metadata.
