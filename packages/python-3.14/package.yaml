@@ -20,7 +20,7 @@ schema: 1
 package:
   name: python-3.14
   version: "3.14.10"
-  release: 1
+  release: 2
   summary: The Python programming language (version 3.14)
   description: |
     Python is an interpreted, interactive, object-oriented programming
@@ -98,6 +98,7 @@ outputs:
         - python-3.14-libs = ${package.version}-${package.release}
       provides:
         - python-3.14 = ${package.version}-${package.release}
+        - python3.14 = ${package.version}-${package.release}
     tests:
       - name: installed
         stage: installed
@@ -138,6 +139,7 @@ outputs:
     files:
       include:
         - /usr/bin/python3
+        - /usr/bin/pydoc3
         - /usr/share/licenses/python-3.14-default/LICENSE
       license:
         - /usr/share/licenses/python-3.14-default/LICENSE
@@ -157,6 +159,7 @@ outputs:
           - -c
           - |
             python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])' | grep -qx 3.14
+            pydoc3 -h >/dev/null
 
   - name: python-3.14-devel
     summary: Development files for Python 3.14
