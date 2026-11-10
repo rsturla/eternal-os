@@ -1,0 +1,219 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+schema: 1
+
+package:
+  name: python-3.15
+  version: "3.15.2"
+  release: 1
+  summary: The Python programming language (version 3.15)
+  description: |
+    Python is an interpreted, interactive, object-oriented programming
+    language. This package provides the 3.15 language stream with a versioned
+    interpreter, standard library, shared library and development files so
+    several Python versions can be installed side by side.
+  license: PSF-2.0
+  upstream: https://www.python.org/
+  cpe:
+    vendor: python
+    product: python
+
+sources:
+  - name: Python-3.15.2.tar.xz
+    kind: archive
+    digest: "sha512:ee1040e04ad163ece3493a698d49c4e899be2ed4360e0409734f4bfbb67afe9e583a69aec4fd1534834eea71f3e601545d22f2be87220b8ba6ca2d8355c2f321"
+    locators:
+      - kind: https
+        url: https://www.python.org/ftp/python/3.15.2/Python-3.15.2.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  packages: [gcc, make, bash, coreutils, pkgconf, sed, grep, diffutils, findutils]
+  sysroot:
+    - bzip2-devel
+    - expat-devel
+    - libffi-devel
+    - libzstd-devel
+    - ncurses-devel
+    - openssl-devel
+    - readline-devel
+    - sqlite-devel
+    - xz-devel
+    - zlib-devel
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          - --enable-shared
+          - --without-static-libpython
+          - --disable-test-modules
+          - --without-ensurepip
+          - --with-system-expat
+          - --with-platlibdir=lib
+          - --enable-loadable-sqlite-extensions
+    - uses: make/build
+    - uses: make/install
+    - runs: |
+        set -eu
+        # The unversioned interpreter name belongs to the -default output.
+        ln -sfn python3.15 "$STAGE/usr/bin/python3"
+        # `make install` also writes unversioned development names. They would
+        # be claimed by both streams' -devel outputs, and a tree that builds
+        # extensions for two interpreters has to install both. Every consumer
+        # takes the version: `python3.15-config`, `pkg-config python3.15`.
+        rm -f "$STAGE/usr/bin/python3-config" "$STAGE$LIBDIR/pkgconfig/python3.pc"
+    - uses: license/copy
+      with:
+        files: [LICENSE]
+        outputs: [python-3.15, python-3.15-libs, python-3.15-default, python-3.15-devel, python-3.15-doc]
+    - uses: strip
+
+outputs:
+  - name: python-3.15
+    summary: The Python programming language (version 3.15)
+    files:
+      license:
+        - /usr/share/licenses/python-3.15/LICENSE
+    dependencies:
+      run:
+        - python-3.15-libs = ${package.version}-${package.release}
+      provides:
+        - python-3.15 = ${package.version}-${package.release}
+        - python3.15 = ${package.version}-${package.release}
+    tests:
+      - name: installed
+        stage: installed
+        packages: [bzip2-libs, expat, libffi, libzstd, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
+        argv:
+          - sh
+          - -c
+          - |
+            python3.15 -c 'import sys; print("%d.%d" % sys.version_info[:2])' | grep -qx 3.15
+            python3.15 -c 'import bz2, ctypes, decimal, hashlib, json, lzma, sqlite3, unicodedata, zlib; print("modules ok")'
+            python3.15 -c 'import ssl; print(ssl.OPENSSL_VERSION)'
+            python3.15 -c 'import readline; print("readline ok")'
+            python3.15 -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])' | grep -qx /usr/lib/python3.15
+
+      - name: coinstall-default
+        stage: installed
+        packages: [python3]
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            python3.15 -c 'import sys; assert sys.version_info[:2] == (3, 15)'
+            python3 -c 'import sys; assert sys.version_info[:2] == (3, 14)'
+
+  - name: python-3.15-libs
+    summary: Python 3.15 runtime library
+    files:
+      include:
+        - /usr/lib*/libpython3.15.so.*
+        - /usr/share/licenses/python-3.15-libs/LICENSE
+      license:
+        - /usr/share/licenses/python-3.15-libs/LICENSE
+    tests:
+      - name: installed
+        stage: installed
+        packages: [bash-binsh]
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libpython3.15.so.* /usr/lib/libpython3.15.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: python-3.15-default
+    summary: Unversioned Python 3.15 command names
+    files:
+      include:
+        - /usr/bin/python3
+        - /usr/bin/pydoc3
+        - /usr/share/licenses/python-3.15-default/LICENSE
+      license:
+        - /usr/share/licenses/python-3.15-default/LICENSE
+    dependencies:
+      run:
+        - python-3.15 = ${package.version}-${package.release}
+      provides:
+        - python3 = 0
+      conflicts:
+        - python-3.11-default
+        - python-3.12-default
+        - python-3.13-default
+        - python-3.14-default
+    tests:
+      - name: installed
+        stage: installed
+        packages: [bzip2-libs, expat, libffi, libzstd, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
+        argv:
+          - sh
+          - -c
+          - |
+            python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])' | grep -qx 3.15
+            pydoc3 -h >/dev/null
+
+  - name: python-3.15-devel
+    summary: Development files for Python 3.15
+    files:
+      include:
+        - "@dev"
+        - /usr/include/python3.15/**
+        - /usr/lib*/python3.15/config-3.15/**
+        - /usr/bin/python3.15-config
+        - /usr/share/licenses/python-3.15-devel/LICENSE
+      license:
+        - /usr/share/licenses/python-3.15-devel/LICENSE
+    dependencies:
+      run:
+        - python-3.15-libs = ${package.version}-${package.release}
+    tests:
+      - name: embed
+        stage: installed
+        packages: [gcc, glibc-devel, grep, sed, bash-binsh, coreutils]
+        argv:
+          - sh
+          - -c
+          - |
+            cat > /tmp/embed.c <<'EOF'
+            #include <Python.h>
+            int main(void) {
+              Py_Initialize();
+              PyRun_SimpleString("print('embedded')");
+              return Py_FinalizeEx() == 0 ? 0 : 1;
+            }
+            EOF
+            gcc /tmp/embed.c $(python3.15-config --embed --cflags --ldflags) -o /tmp/embed
+            /tmp/embed | grep -qx embedded
+
+  - name: python-3.15-doc
+    summary: Documentation for Python 3.15
+    files:
+      include:
+        - "@man"
+        - "@doc"
+        - /usr/share/licenses/python-3.15-doc/LICENSE
+      license:
+        - /usr/share/licenses/python-3.15-doc/LICENSE
+
+tests:
+  - name: hardening
+    stage: build
+    pipeline:
+      # The launcher only forwards to Py_BytesMain: it has no stack buffer and
+      # no libc call to fortify, so those two properties cannot appear in it.
+      # They are checked on the library, where the interpreter actually lives.
+      - uses: test/hardening-check
+        with:
+          paths: [/usr/bin/python3.15]
+          skip: [stack-protector, fortify]
+      - uses: test/hardening-check
+        with:
+          paths: [/usr/lib64/libpython3.15.so.1.0]
+          skip: [pie]
