@@ -1,0 +1,152 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/libcap-ng.yaml
+# Upstream publishes this release as a tag without a release archive. Omit Python bindings.
+# The preload helper has no arrays or fortifiable libc calls. Check its other ELF properties.
+schema: 1
+package:
+  name: libcap-ng
+  version: 0.9.6
+  release: 1
+  summary: POSIX capability tools and library
+  description: POSIX capability tools and library.
+  license: LGPL-2.1-or-later AND GPL-2.0-or-later
+  upstream: https://people.redhat.com/sgrubb/libcap-ng/
+sources:
+- name: libcap-ng-0.9.6.tar.gz
+  kind: archive
+  digest: sha512:77bc255688606cbc3a9d40cc1d417ebf748d04b8d837d793708b58431857ebfaa077f00cebfcf03c58ce56985feb63f9f8eb70cce21ba304ca3418a0fe1b61d1
+  locators:
+  - kind: https
+    url: https://github.com/stevegrubb/libcap-ng/archive/refs/tags/v0.9.6.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  packages:
+  - gcc
+  - make
+  - bash
+  - coreutils
+  - pkgconf
+  - autoconf
+  - automake
+  - libtool
+  - pkgconf-devel
+  pipeline:
+  - runs: |
+      ./autogen.sh
+  - uses: autotools/configure
+    with:
+      args:
+      - --without-python
+      - --without-python3
+      - --disable-static
+      - --disable-cap-audit
+  - uses: make/build
+  - uses: make/install
+  - runs: |
+      find "$STAGE" -name "*.la" -delete
+  - uses: license/copy
+    with:
+      files:
+      - COPYING
+      - COPYING.LIB
+      outputs:
+      - libcap-ng
+      - libcap-ng-libs
+      - libcap-ng-devel
+      - libcap-ng-doc
+  - uses: strip
+outputs:
+- name: libcap-ng
+  files:
+    license:
+    - /usr/share/licenses/libcap-ng/**
+  dependencies:
+    run:
+    - libcap-ng-libs = ${package.version}-${package.release}
+  tests:
+  - name: capabilities
+    stage: installed
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      pscap -p $$
+      filecap /usr/bin/bash
+- name: libcap-ng-libs
+  files:
+    include:
+    - /usr/lib*/libcap-ng.so.*
+    - /usr/lib*/libdrop_ambient.so.*
+    - /usr/share/licenses/libcap-ng-libs/**
+    license:
+    - /usr/share/licenses/libcap-ng-libs/**
+  tests:
+  - name: load
+    stage: installed
+    packages:
+    - python3
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      python3 -c 'import ctypes; ctypes.CDLL("libcap-ng.so.0")'
+- name: libcap-ng-devel
+  files:
+    include:
+    - '@dev'
+    - /usr/share/licenses/libcap-ng-devel/**
+    license:
+    - /usr/share/licenses/libcap-ng-devel/**
+  dependencies:
+    run:
+    - libcap-ng-libs = ${package.version}-${package.release}
+  tests:
+  - name: compile-and-run
+    stage: installed
+    packages:
+    - gcc
+    - glibc-devel
+    - pkgconf
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      cat > /tmp/test.c <<'EOF'
+      #include <cap-ng.h>
+      int main(void) { capng_clear(CAPNG_SELECT_BOTH); return capng_have_capabilities(CAPNG_SELECT_BOTH) != CAPNG_NONE; }
+      EOF
+      gcc /tmp/test.c $(pkg-config --cflags --libs libcap-ng) -o /tmp/test
+      /tmp/test
+- name: libcap-ng-doc
+  files:
+    include:
+    - '@doc'
+    - '@man'
+    - /usr/share/licenses/libcap-ng-doc/**
+    license:
+    - /usr/share/licenses/libcap-ng-doc/**
+tests:
+- name: hardening
+  stage: build
+  pipeline:
+  - uses: test/hardening-check
+    with:
+      paths:
+      - /usr/bin
+      - /usr/lib64/libcap-ng.so.0.0.0
+      - /usr/lib/libcap-ng.so.0.0.0
+  - uses: test/hardening-check
+    with:
+      paths:
+      - /usr/lib64/libdrop_ambient.so.0.0.0
+      - /usr/lib/libdrop_ambient.so.0.0.0
+      skip:
+      - stack-protector
+      - fortify
