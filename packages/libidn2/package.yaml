@@ -1,0 +1,136 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/libidn2.yaml
+# Disable NLS, as in Wolfi. Use the release tarball to avoid gnulib bootstrap tools.
+schema: 1
+package:
+  name: libidn2
+  version: 2.3.8
+  release: 1
+  summary: Internationalized domain name tools and library
+  description: Internationalized domain name tools and library.
+  license: GPL-2.0-or-later AND LGPL-3.0-or-later AND Unicode-DFS-2016
+  upstream: https://www.gnu.org/software/libidn/
+sources:
+- name: libidn2-2.3.8.tar.gz
+  kind: archive
+  digest: sha512:4d8427c0f115268132f7544e80a808c883ab1406338f6c529b1a586b016d57aedb0857f66166eb8d9f37d70efc9dccf907b673b43b17bcf258c8797db1e829ce
+  locators:
+  - kind: https
+    url: https://ftp.gnu.org/gnu/libidn/libidn2-2.3.8.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  packages:
+  - gcc
+  - make
+  - bash
+  - coreutils
+  - pkgconf
+  sysroot:
+  - libunistring-devel
+  pipeline:
+  - uses: autotools/configure
+    with:
+      args:
+      - --disable-nls
+      - --disable-static
+  - uses: make/build
+  - uses: make/install
+  - runs: |
+      find "$STAGE" -name "*.la" -delete
+      rm -f "$STAGE/usr/share/info/dir"
+  - uses: license/copy
+    with:
+      files:
+      - COPYING
+      - COPYINGv2
+      - COPYING.LESSERv3
+      - COPYING.unicode
+      outputs:
+      - libidn2
+      - libidn2-libs
+      - libidn2-devel
+      - libidn2-doc
+  - uses: strip
+outputs:
+- name: libidn2
+  files:
+    license:
+    - /usr/share/licenses/libidn2/**
+  dependencies:
+    run:
+    - libidn2-libs = ${package.version}-${package.release}
+  tests:
+  - name: idna
+    stage: installed
+    argv:
+    - bash
+    - -eu
+    - -c
+    - "export LC_ALL=C.UTF-8\ntest \"$(idn2 m\xFCnchen.de)\" = xn--mnchen-3ya.de\n"
+- name: libidn2-libs
+  files:
+    include:
+    - /usr/lib*/libidn2.so.*
+    - /usr/share/licenses/libidn2-libs/**
+    license:
+    - /usr/share/licenses/libidn2-libs/**
+  dependencies:
+    run:
+    - libunistring
+  tests:
+  - name: load
+    stage: installed
+    packages:
+    - python3
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      python3 -c 'import ctypes; ctypes.CDLL("libidn2.so.0")'
+- name: libidn2-devel
+  files:
+    include:
+    - '@dev'
+    - /usr/share/licenses/libidn2-devel/**
+    license:
+    - /usr/share/licenses/libidn2-devel/**
+  dependencies:
+    run:
+    - libidn2-libs = ${package.version}-${package.release}
+  tests:
+  - name: compile-and-run
+    stage: installed
+    packages:
+    - gcc
+    - glibc-devel
+    - pkgconf
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      cat > /tmp/test.c <<'EOF'
+      #include <idn2.h>
+      int main(void) { char *out = 0; if (idn2_lookup_u8((const uint8_t *)"example.com", (uint8_t **)&out, 0)) return 1; idn2_free(out); return 0; }
+      EOF
+      gcc /tmp/test.c $(pkg-config --cflags --libs libidn2) -o /tmp/test
+      /tmp/test
+- name: libidn2-doc
+  files:
+    include:
+    - '@doc'
+    - '@man'
+    - '@info'
+    - /usr/share/licenses/libidn2-doc/**
+    license:
+    - /usr/share/licenses/libidn2-doc/**
+tests:
+- name: hardening
+  stage: build
+  pipeline:
+  - uses: test/hardening-check
