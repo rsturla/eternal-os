@@ -15,11 +15,7 @@ def check(root):
         for path in recipes
         if re.fullmatch(r"python-\d+\.\d+", path.parent.name)
     )
-    defaults = yaml.safe_load((root / "rpmx-defaults.yaml").read_text())
-    default = defaults.get("metadata", {}).get("python", {}).get("default-stream")
     errors = []
-    if streams and default not in streams:
-        errors.append("rpmx-defaults.yaml: metadata.python.default-stream must name a supported stream")
     for path in recipes:
         data = yaml.safe_load(path.read_text())
         name = data["package"]["name"]
@@ -29,10 +25,14 @@ def check(root):
             version = name.removeprefix("python-")
             selector = next((output for output in data.get("outputs", [])
                              if output["name"] == name + "-default"), None)
-            expected = "python3 = ${package.version}-${package.release}" if version == default else "python3 = 0"
+            expected = "python3 = ${package.version}-${package.release}"
             provides = selector.get("dependencies", {}).get("provides", []) if selector else []
             if expected not in provides:
                 errors.append(f"{path}: default command output must provide {expected}")
+            conflicts = selector.get("dependencies", {}).get("conflicts", []) if selector else []
+            for other in streams:
+                if other != version and f"python-{other}-default" not in conflicts:
+                    errors.append(f"{path}: default command output must conflict with python-{other}-default")
         axes = data.get("matrix", {}).get("axes", {})
         if "python" not in axes:
             continue
@@ -51,15 +51,10 @@ def check(root):
         versions = [str(cell.get("version", "")) for cell in cells]
         if sorted(versions) != streams:
             errors.append(f"{path}: Python matrix must cover supported streams {streams}")
-        for cell in cells:
-            version = str(cell.get("version", ""))
-            capability = "python" if version == default else "python-" + version
-            if cell.get("capability") != capability:
-                errors.append(f"{path}: Python {version} capability must be {capability}")
         provides = outputs[0].get("dependencies", {}).get("provides", []) if outputs else []
-        alias = "${matrix.python.capability}-" + module
-        if not any(value.split()[0] == alias for value in provides):
-            errors.append(f"{path}: default capability must be {alias}")
+        alias = "python-" + module
+        if any(value.split()[0] == alias for value in provides):
+            errors.append(f"{path}: Python modules must not provide the unversioned {alias} alias")
     return errors
 
 

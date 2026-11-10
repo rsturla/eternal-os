@@ -54,9 +54,9 @@ class PythonBootstrap(unittest.TestCase):
         self.assertLess(order.index("python-build"), order.index("python-demo"))
         self.assertLess(order.index("python-packaging"), order.index("python-demo"))
 
-    def test_fedora_seed_does_not_resolve_to_unpublished_default_alias(self):
+    def test_fedora_seed_does_not_resolve_to_an_eternal_module(self):
         plans = {
-            "python-build": plan("python-3.14-build", provides=["python-build = 1-1"]),
+            "python-build": plan("python-3.14-build"),
             "python-demo": plan("python-3.15-demo", needs=["python3-build"]),
         }
         self.assertEqual(bootstrap.dependency_order(plans, "python-demo"), ["python-demo"])
