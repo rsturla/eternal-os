@@ -1,0 +1,76 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-flit-core.yaml
+schema: 1
+package:
+  name: python-flit-core
+  version: 3.12.0
+  release: 1
+  summary: Python package build backend for Flit
+  license: BSD-3-Clause
+  upstream: https://flit.pypa.io/
+sources:
+- name: flit_core-3.12.0.tar.gz
+  kind: archive
+  digest: sha512:189dcd674722164b165e18b11c4dc72b8309fa2e3c82fc1ed6a9160bb5c6c1f86e2b2cfa111603cf73dca0dba74a496a664d5cbb6242587b47f139c42f7ae8bd
+  locators:
+  - kind: https
+    url: https://files.pythonhosted.org/packages/69/59/b6fc2188dfc7ea4f936cd12b49d707f66a1cb7a1d2c16172963534db741b/flit_core-3.12.0.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+matrix:
+  axes:
+    python:
+    - value: '3.13'
+      version: '3.13'
+      slug: py313
+      package: python-3.13
+      capability: python-3.13
+    - value: '3.14'
+      version: '3.14'
+      slug: py314
+      package: python3.14
+      capability: python
+  max-cells: 2
+  release-suffix: true
+build:
+  root:
+    profile: ../../profiles/bootstrap-python.profile.yaml
+  packages:
+  - bash
+  - coreutils
+  - python3.14
+  - ${matrix.python.package}
+  pipeline:
+  - runs: |
+      # Flit provides its own installer to break the initial packaging cycle.
+      python${matrix.python.version} -m flit_core.wheel
+      python${matrix.python.version} bootstrap_install.py --install-root="$STAGE" \
+        --installdir=/usr/lib/python${matrix.python.version}/site-packages dist/*.whl
+      # Both supported interpreters provide tomllib in the standard library.
+      rm -rf flit_core/vendor "$STAGE/usr/lib/python${matrix.python.version}/site-packages/flit_core/vendor"
+      metadata="$STAGE/usr/lib/python${matrix.python.version}/site-packages/flit_core-${package.version}.dist-info"
+      rm -f "$metadata/RECORD"
+      printf 'rpm\n' > "$metadata/INSTALLER"
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE
+      outputs:
+      - python-${matrix.python.version}-flit-core
+outputs:
+- name: python-${matrix.python.version}-flit-core
+  arch: noarch
+  files:
+    license:
+    - /usr/share/licenses/python-${matrix.python.version}-flit-core/**
+  dependencies:
+    provides:
+    - ${matrix.python.capability}-flit-core = ${package.version}-${package.release}
+  tests:
+  - name: functional
+    stage: installed
+    argv:
+    - /usr/bin/python${matrix.python.version}
+    - -c
+    - from flit_core import buildapi; assert callable(buildapi.build_wheel)
