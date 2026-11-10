@@ -106,7 +106,7 @@ def main():
                     shutil.copytree(path, work / "toolchain")
                     repository["baseurl"] = (work / "toolchain").as_uri()
         profile_file = work / "profile.yaml"
-        # Include interpreter-qualified package names and the default aliases.
+        # Include interpreter-qualified package names and declared capabilities.
         available = set()
         for name in order:
             for repository in profile["repositories"]:
