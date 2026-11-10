@@ -14,7 +14,7 @@ builder:
   image: registry.fedoraproject.org/fedora:44
 repositories:
   - id: fedora
-    metalink: https://mirrors.fedoraproject.org/metalink?repo=fedora-$releasever&arch=$basearch
+    baseurl: https://dl.fedoraproject.org/pub/fedora/linux/releases/$releasever/Everything/$basearch/os/
   - id: updates
     metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch
 packages:
