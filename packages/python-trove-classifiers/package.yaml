@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-trove-classifiers.yaml
+schema: 1
+package:
+  name: python-trove-classifiers
+  version: 2026.9.21.13
+  release: 1
+  summary: PyPI project classifier definitions
+  license: Apache-2.0
+  upstream: https://github.com/pypa/trove-classifiers
+sources:
+- name: trove_classifiers-2026.9.21.13.tar.gz
+  kind: archive
+  digest: sha512:38cc0c21213a765d32ccf833d16d3056a47a1c9802b3f36ebcff392997106d1707d3dbee84b55b04b65d608c8beb7400ec3e586970b01778871be795207325d6
+  locators:
+  - kind: https
+    url: https://files.pythonhosted.org/packages/bf/93/af436dfaa845cab5d96f0adbc1e4f3730532d37fa249e4eb796fb1d7fc82/trove_classifiers-2026.9.21.13.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+matrix:
+  axes:
+    python:
+    - value: '3.13'
+      version: '3.13'
+      slug: py313
+      package: python-3.13
+      capability: python-3.13
+    - value: '3.14'
+      version: '3.14'
+      slug: py314
+      package: python3.14
+      capability: python
+  max-cells: 2
+  release-suffix: true
+build:
+  root:
+    profile: ../../profiles/bootstrap-python.profile.yaml
+  packages:
+  - bash
+  - coreutils
+  - python3.14
+  - ${matrix.python.package}
+  - python-3.14-setuptools
+  - python-3.14-calver
+  pipeline:
+  - uses: python/build-wheel
+    with:
+      python: python3.14
+      build-package: python-3.14-build
+  - uses: python/install-wheel
+    with:
+      python: /usr/bin/python${matrix.python.version}
+      pip-python: python3.14
+      script-version: ${matrix.python.version}
+      pip-package: python-3.14-pip
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE
+      outputs:
+      - python-${matrix.python.version}-trove-classifiers
+outputs:
+- name: python-${matrix.python.version}-trove-classifiers
+  arch: noarch
+  files:
+    license:
+    - /usr/share/licenses/python-${matrix.python.version}-trove-classifiers/**
+  dependencies:
+    provides:
+    - ${matrix.python.capability}-trove-classifiers = ${package.version}-${package.release}
+  tests:
+  - name: functional
+    stage: installed
+    argv:
+    - /usr/bin/python${matrix.python.version}
+    - -c
+    - 'from trove_classifiers import classifiers; assert "Programming Language :: Python :: 3" in classifiers'
