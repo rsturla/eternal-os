@@ -1,0 +1,130 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-pip.yaml
+schema: 1
+package:
+  name: python-pip
+  version: 26.2.2
+  release: 1
+  summary: Python package installer
+  license: MIT AND Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND ISC AND MPL-2.0 AND PSF-2.0
+  upstream: https://pip.pypa.io/
+sources:
+- name: pip-26.2.2.tar.gz
+  kind: archive
+  digest: sha512:82278769f49df3f1c0f60c8cceda25e879f0792cec91d55a252c697169688e0114628f2a18b7dcf266804c8645224fc42409b0d0f18625fa5d78d9603533bdcf
+  locators:
+  - kind: https
+    url: https://files.pythonhosted.org/packages/fa/e8/0842d757e483e895e670f655084cfe8b8c72580c6769a76b30b2789a0608/pip-26.2.2.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+- name: urllib3-2.8.0.tar.gz
+  kind: archive
+  digest: sha512:3104f0b89b9d7421b0b13ff34c9e68a315772f2e1271c8b02da516b7dc4108676e632145ab9b390c3d9033019253f36a48ca44c5b89269058eebb0d21f472383
+  locators:
+  - kind: https
+    url: https://files.pythonhosted.org/packages/e3/05/b17359e1cefb4f909b5e40b1b90a496d987258916dbbf88e842c729f510e/urllib3-2.8.0.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+    destination: vendor-updates/urllib3
+- name: msgpack-1.2.3.tar.gz
+  kind: archive
+  digest: sha512:eb18277932ef589b7e3024ae2eeabc0bbf6c6cb13b576838c325c4acd0d040e5378ede8dd334748a0840c0b5a67631cc14dbc52359167fc85e513e37aeee6a5e
+  locators:
+  - kind: https
+    url: https://files.pythonhosted.org/packages/0a/e7/bb605a7bab2d8425a64b3fa762b39dc1bf1c7e3f11ba6fb5413d6db0ff8c/msgpack-1.2.3.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+    destination: vendor-updates/msgpack
+- name: certifi-2026.10.23.tar.gz
+  kind: archive
+  digest: sha512:0ea25800d79530c297a9bcea5febfb4e790baacaf19283aa66e5272ce947ab464670328eb3cbb8c49dfecbc31074534d7136bc79bb55e2e857819c032d9bf9d7
+  locators:
+  - kind: https
+    url: https://files.pythonhosted.org/packages/fd/11/b524cbd9bbdaca58608e4cf4053fd463417549e1959fa8d3aa18319f9555/certifi-2026.10.23.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+    destination: vendor-updates/certifi
+matrix:
+  axes:
+    python:
+    - value: '3.13'
+      version: '3.13'
+      slug: py313
+      package: python-3.13
+      capability: python-3.13
+    - value: '3.14'
+      version: '3.14'
+      slug: py314
+      package: python3.14
+      capability: python
+  max-cells: 2
+  release-suffix: true
+build:
+  root:
+    profile: ../../profiles/bootstrap-python.profile.yaml
+  packages:
+  - bash
+  - coreutils
+  - python3.14
+  - ${matrix.python.package}
+  - python-3.14-flit-core
+  pipeline:
+  - runs: |
+      # Apply the same vendored-library updates as the pinned Wolfi recipe.
+      rm -rf src/pip/_vendor/urllib3 src/pip/_vendor/msgpack
+      cp -a vendor-updates/urllib3/src/urllib3 src/pip/_vendor/urllib3
+      mkdir -p src/pip/_vendor/msgpack
+      for file in __init__.py exceptions.py ext.py fallback.py; do
+        cp "vendor-updates/msgpack/msgpack/$file" src/pip/_vendor/msgpack/
+      done
+      cp vendor-updates/msgpack/COPYING src/pip/_vendor/msgpack/
+      cp vendor-updates/certifi/certifi/__init__.py vendor-updates/certifi/certifi/cacert.pem src/pip/_vendor/certifi/
+      python3.14 - <<'PY'
+      from pathlib import Path
+      p = Path("src/pip/_vendor/vendor.txt")
+      text = p.read_text()
+      for old, new in [("urllib3==2.7.0", "urllib3==2.8.0"), ("msgpack==1.1.2", "msgpack==1.2.3"), ("certifi==2026.10.19", "certifi==2026.10.23")]:
+          assert old in text, old
+          text = text.replace(old, new)
+      p.write_text(text)
+      PY
+      rm -rf vendor-updates
+  - uses: python/build-wheel
+    with:
+      frontend: pip
+      build-package: python3-pip
+      python: python3.14
+  - uses: python/install-wheel
+    with:
+      pip-package: python3-pip
+      python: /usr/bin/python${matrix.python.version}
+      pip-python: python3.14
+      script-version: ${matrix.python.version}
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE.txt
+      outputs:
+      - python-${matrix.python.version}-pip
+outputs:
+- name: python-${matrix.python.version}-pip
+  arch: noarch
+  files:
+    license:
+    - /usr/share/licenses/python-${matrix.python.version}-pip/**
+  dependencies:
+    provides:
+    - ${matrix.python.capability}-pip = ${package.version}-${package.release}
+  tests:
+  - name: functional
+    stage: installed
+    argv:
+    - /usr/bin/python${matrix.python.version}
+    - -c
+    - 'from pip._internal.cli.main import main; from pip._vendor import urllib3, msgpack, certifi; assert urllib3.__version__
+      == "2.8.0"; assert msgpack.version == (1, 2, 3); assert certifi.__version__ == "2026.10.23"; assert msgpack.unpackb(msgpack.packb({"answer":
+      42})) == {"answer": 42}; assert main(["--version"]) == 0'
