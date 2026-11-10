@@ -1,0 +1,81 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-packaging.yaml
+schema: 1
+package:
+  name: python-packaging
+  version: '26.3'
+  release: 1
+  summary: Python package version, requirement and tag utilities
+  license: Apache-2.0 OR BSD-2-Clause
+  upstream: https://packaging.pypa.io/
+sources:
+- name: packaging-26.3.tar.gz
+  kind: archive
+  digest: sha512:6a649d40efe6e6e9a7aaa1c4be9dc9e5eac40c35c57834407f9e610cda9f7c9c74d42bd2d5d86d3a7637cfa0201ad534997da8697acd7e5261f2fa18be478a95
+  locators:
+  - kind: https
+    url: https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+matrix:
+  axes:
+    python:
+    - value: '3.13'
+      version: '3.13'
+      slug: py313
+      package: python-3.13
+      capability: python-3.13
+    - value: '3.14'
+      version: '3.14'
+      slug: py314
+      package: python3.14
+      capability: python
+  max-cells: 2
+  release-suffix: true
+build:
+  root:
+    profile: ../../profiles/bootstrap-python.profile.yaml
+  packages:
+  - bash
+  - coreutils
+  - python3.14
+  - ${matrix.python.package}
+  - python-3.14-flit-core
+  pipeline:
+  - uses: python/build-wheel
+    with:
+      frontend: pip
+      build-package: python-3.14-pip
+      python: python3.14
+  - uses: python/install-wheel
+    with:
+      python: /usr/bin/python${matrix.python.version}
+      pip-python: python3.14
+      script-version: ${matrix.python.version}
+      pip-package: python-3.14-pip
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE
+      - LICENSE.APACHE
+      - LICENSE.BSD
+      outputs:
+      - python-${matrix.python.version}-packaging
+outputs:
+- name: python-${matrix.python.version}-packaging
+  arch: noarch
+  files:
+    license:
+    - /usr/share/licenses/python-${matrix.python.version}-packaging/**
+  dependencies:
+    provides:
+    - ${matrix.python.capability}-packaging = ${package.version}-${package.release}
+  tests:
+  - name: functional
+    stage: installed
+    argv:
+    - /usr/bin/python${matrix.python.version}
+    - -c
+    - from packaging.version import Version; from packaging.requirements import Requirement; assert Version("2.0")
+      > Version("1.9"); assert "1.5" in Requirement("demo>=1,<2").specifier
