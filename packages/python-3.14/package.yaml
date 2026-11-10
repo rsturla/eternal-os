@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
-# Python 3.14, the default interpreter stream. The toolchain needs it twice
+# Python 3.14, one of the supported interpreter streams. The toolchain needs it twice
 # over: glibc and GCC run Python scripts in their build, and several
 # recipes in this repository generate files with it.
 #
@@ -150,7 +150,10 @@ outputs:
       provides:
         - python3 = ${package.version}-${package.release}
       conflicts:
+        - python-3.11-default
+        - python-3.12-default
         - python-3.13-default
+        - python-3.15-default
     tests:
       - name: installed
         stage: installed
