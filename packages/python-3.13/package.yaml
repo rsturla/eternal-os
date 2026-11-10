@@ -23,7 +23,7 @@ schema: 1
 package:
   name: python-3.13
   version: "3.13.18"
-  release: 1
+  release: 2
   summary: The Python programming language (version 3.13)
   description: |
     Python is an interpreted, interactive, object-oriented programming
@@ -100,6 +100,7 @@ outputs:
         - python-3.13-libs = ${package.version}-${package.release}
       provides:
         - python-3.13 = ${package.version}-${package.release}
+        - python3.13 = ${package.version}-${package.release}
     tests:
       - name: installed
         stage: installed
@@ -113,6 +114,16 @@ outputs:
             python3.13 -c 'import ssl; print(ssl.OPENSSL_VERSION)'
             python3.13 -c 'import readline; print("readline ok")'
             python3.13 -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])' | grep -qx /usr/lib/python3.13
+      - name: coinstall-default
+        stage: installed
+        packages: [python3]
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            python3.13 -c 'import sys; assert sys.version_info[:2] == (3, 13)'
+            python3 -c 'import sys; assert sys.version_info[:2] == (3, 14)'
 
   - name: python-3.13-libs
     summary: Python 3.13 runtime library
@@ -140,6 +151,7 @@ outputs:
     files:
       include:
         - /usr/bin/python3
+        - /usr/bin/pydoc3
         - /usr/share/licenses/python-3.13-default/LICENSE
       license:
         - /usr/share/licenses/python-3.13-default/LICENSE
@@ -147,7 +159,7 @@ outputs:
       run:
         - python-3.13 = ${package.version}-${package.release}
       provides:
-        - python3 = ${package.version}-${package.release}
+        - python3 = 0
       conflicts:
         - python-3.14-default
     tests:
@@ -159,6 +171,7 @@ outputs:
           - -c
           - |
             python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])' | grep -qx 3.13
+            pydoc3 -h >/dev/null
 
   - name: python-3.13-devel
     summary: Development files for Python 3.13
