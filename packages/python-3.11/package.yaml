@@ -60,7 +60,7 @@ build:
         # The unversioned interpreter name belongs to the -default output.
         ln -sfn python3.11 "$STAGE/usr/bin/python3"
         # `make install` also writes unversioned development names. They would
-        # be claimed by both streams' -devel outputs, and a tree that builds
+        # be claimed by the streams' -devel outputs, and a tree that builds
         # extensions for two interpreters has to install both. Every consumer
         # takes the version: `python3.11-config`, `pkg-config python3.11`.
         rm -f "$STAGE/usr/bin/python3-config" "$STAGE$LIBDIR/pkgconfig/python3.pc"
