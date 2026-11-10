@@ -1,0 +1,103 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/jsoncpp.yaml
+# Disable unused object and static libraries. Run the upstream C++ tests.
+schema: 1
+package:
+  name: jsoncpp
+  version: 1.9.8
+  release: 1
+  summary: C++ JSON parser and writer
+  description: C++ JSON parser and writer.
+  license: MIT
+  upstream: https://github.com/open-source-parsers/jsoncpp
+sources:
+- name: jsoncpp-1.9.8.tar.gz
+  kind: archive
+  digest: sha512:849957d9c87edc1d375698a9ea2709b7304cabc2b05ba180dc09f68653e32316e1ae4fe0108ab63ec7b56d255ccbc6ccf8715cf8396c1438edda775bec74b05b
+  locators:
+  - kind: https
+    url: https://github.com/open-source-parsers/jsoncpp/archive/refs/tags/1.9.8.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  packages:
+  - cmake
+  - gcc
+  - make
+  - bash
+  - coreutils
+  - pkgconf
+  - gcc-c++
+  pipeline:
+  - uses: cmake/configure
+    with:
+      args:
+      - -DBUILD_SHARED_LIBS=ON
+      - -DBUILD_STATIC_LIBS=OFF
+      - -DBUILD_OBJECT_LIBS=OFF
+      - -DJSONCPP_WITH_TESTS=ON
+      - -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF
+      - -DJSONCPP_WITH_EXAMPLE=OFF
+  - uses: cmake/build
+  - uses: cmake/check
+  - uses: cmake/install
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE
+      outputs:
+      - jsoncpp
+      - jsoncpp-devel
+  - uses: strip
+outputs:
+- name: jsoncpp
+  files:
+    license:
+    - /usr/share/licenses/jsoncpp/**
+  tests:
+  - name: load
+    stage: installed
+    packages:
+    - python3
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      python3 -c 'import ctypes; ctypes.CDLL("libjsoncpp.so.27")'
+- name: jsoncpp-devel
+  files:
+    include:
+    - '@dev'
+    - /usr/share/licenses/jsoncpp-devel/**
+    license:
+    - /usr/share/licenses/jsoncpp-devel/**
+  dependencies:
+    run:
+    - jsoncpp = ${package.version}-${package.release}
+  tests:
+  - name: compile-and-run
+    stage: installed
+    packages:
+    - gcc-c++
+    - glibc-devel
+    - pkgconf
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      cat > /tmp/test.cc <<'EOF'
+      #include <json/json.h>
+      int main(void) { Json::Value v; v["answer"] = 42; return v["answer"].asInt() != 42; }
+      EOF
+      g++ /tmp/test.cc $(pkg-config --cflags --libs jsoncpp) -o /tmp/test
+      /tmp/test
+tests:
+- name: hardening
+  stage: build
+  pipeline:
+  - uses: test/hardening-check
