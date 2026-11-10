@@ -1,0 +1,79 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-pluggy.yaml
+schema: 1
+package:
+  name: python-pluggy
+  version: 1.7.0
+  release: 1
+  summary: Plugin and hook system for Python
+  license: MIT
+  upstream: https://pluggy.readthedocs.io/
+sources:
+- name: pluggy-1.7.0.tar.gz
+  kind: archive
+  digest: sha512:945b352d9a5562764830ac7b7199d8801f4486638bf0b1630f61d7a102b466119af2c1e168cb457bcedf1212be1c5ebcb0848f05c76e91db34951f43c48ae466
+  locators:
+  - kind: https
+    url: https://files.pythonhosted.org/packages/bf/db/7fc19e6f2dc92a966727031389fc2e08b558f0f25eb7403c1119ad4713cd/pluggy-1.7.0.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+matrix:
+  axes:
+    python:
+    - value: '3.13'
+      version: '3.13'
+      slug: py313
+      package: python-3.13
+      capability: python-3.13
+    - value: '3.14'
+      version: '3.14'
+      slug: py314
+      package: python3.14
+      capability: python
+  max-cells: 2
+  release-suffix: true
+build:
+  root:
+    profile: ../../profiles/bootstrap-python.profile.yaml
+  packages:
+  - bash
+  - coreutils
+  - python3.14
+  - ${matrix.python.package}
+  - python-3.14-setuptools
+  - python-3.14-setuptools-scm
+  pipeline:
+  - uses: python/build-wheel
+    with:
+      python: python3.14
+      build-package: python-3.14-build
+  - uses: python/install-wheel
+    with:
+      python: /usr/bin/python${matrix.python.version}
+      pip-python: python3.14
+      script-version: ${matrix.python.version}
+      pip-package: python-3.14-pip
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE
+      outputs:
+      - python-${matrix.python.version}-pluggy
+outputs:
+- name: python-${matrix.python.version}-pluggy
+  arch: noarch
+  files:
+    license:
+    - /usr/share/licenses/python-${matrix.python.version}-pluggy/**
+  dependencies:
+    provides:
+    - ${matrix.python.capability}-pluggy = ${package.version}-${package.release}
+  tests:
+  - name: functional
+    stage: installed
+    argv:
+    - /usr/bin/python${matrix.python.version}
+    - -c
+    - import pluggy; pm = pluggy.PluginManager("demo"); assert pm.register(object(), "plugin") == "plugin";
+      assert pm.has_plugin("plugin")
