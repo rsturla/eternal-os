@@ -135,6 +135,7 @@ outputs:
       include:
         - /usr/bin/python3
         - /usr/bin/pydoc3
+        - /usr/bin/idle3
         - /usr/share/licenses/python-3.15-default/LICENSE
       license:
         - /usr/share/licenses/python-3.15-default/LICENSE
