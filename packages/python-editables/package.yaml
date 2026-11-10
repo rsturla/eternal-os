@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-editables.yaml
+schema: 1
+package:
+  name: python-editables
+  version: '0.6'
+  release: 1
+  summary: Support for editable Python package installations
+  license: MIT
+  upstream: https://editables.readthedocs.io/
+sources:
+- name: editables-0.6.tar.gz
+  kind: archive
+  digest: sha512:9852fa7ab154b8f24572814b79ad2425edca2c5a54307e446674c33366f405c588af5a7c87344513912e7c707c5ecafc415f3b70c3b61eca39ba8fa53524d742
+  locators:
+  - kind: https
+    url: https://files.pythonhosted.org/packages/82/f8/02a4e9a0cb961b0feeb431ac96b231c157ecdcbbeacafe9e2fdb4b1dde39/editables-0.6.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+matrix:
+  axes:
+    python:
+    - value: '3.13'
+      version: '3.13'
+      slug: py313
+      package: python-3.13
+      capability: python-3.13
+    - value: '3.14'
+      version: '3.14'
+      slug: py314
+      package: python3.14
+      capability: python
+  max-cells: 2
+  release-suffix: true
+build:
+  root:
+    profile: ../../profiles/bootstrap-python.profile.yaml
+  packages:
+  - bash
+  - coreutils
+  - python3.14
+  - ${matrix.python.package}
+  - python-3.14-flit-core
+  pipeline:
+  - uses: python/build-wheel
+    with:
+      python: python3.14
+      build-package: python-3.14-build
+  - uses: python/install-wheel
+    with:
+      python: /usr/bin/python${matrix.python.version}
+      pip-python: python3.14
+      script-version: ${matrix.python.version}
+      pip-package: python-3.14-pip
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE.txt
+      outputs:
+      - python-${matrix.python.version}-editables
+outputs:
+- name: python-${matrix.python.version}-editables
+  arch: noarch
+  files:
+    license:
+    - /usr/share/licenses/python-${matrix.python.version}-editables/**
+  dependencies:
+    provides:
+    - ${matrix.python.capability}-editables = ${package.version}-${package.release}
+  tests:
+  - name: functional
+    stage: installed
+    argv:
+    - /usr/bin/python${matrix.python.version}
+    - -c
+    - from editables import EditableProject; p = EditableProject("demo", "/tmp"); p.add_to_path("."); assert
+      list(p.files())
