@@ -1,0 +1,80 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-hatch-vcs.yaml
+schema: 1
+package:
+  name: python-hatch-vcs
+  version: 0.5.0
+  release: 1
+  summary: Hatch versions from version control metadata
+  license: MIT
+  upstream: https://github.com/ofek/hatch-vcs
+sources:
+- name: hatch_vcs-0.5.0.tar.gz
+  kind: archive
+  digest: sha512:75731f61b325ab757a681dfc4b28d78f998961b4f96ae0070209a7a1ac96a28e27beecedef41aed08e9538f4136dcac29a3cc5aa254af2d2ded921d7afb28951
+  locators:
+  - kind: https
+    url: https://files.pythonhosted.org/packages/6b/b0/4cc743d38adbee9d57d786fa496ed1daadb17e48589b6da8fa55717a0746/hatch_vcs-0.5.0.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+matrix:
+  axes:
+    python:
+    - value: '3.13'
+      version: '3.13'
+      slug: py313
+      package: python-3.13
+      capability: python-3.13
+    - value: '3.14'
+      version: '3.14'
+      slug: py314
+      package: python3.14
+      capability: python
+  max-cells: 2
+  release-suffix: true
+build:
+  root:
+    profile: ../../profiles/bootstrap-python.profile.yaml
+  packages:
+  - bash
+  - coreutils
+  - python3.14
+  - ${matrix.python.package}
+  - python-3.14-hatchling
+  pipeline:
+  - uses: python/build-wheel
+    with:
+      python: python3.14
+      build-package: python-3.14-build
+  - uses: python/install-wheel
+    with:
+      python: /usr/bin/python${matrix.python.version}
+      pip-python: python3.14
+      script-version: ${matrix.python.version}
+      pip-package: python-3.14-pip
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE.txt
+      outputs:
+      - python-${matrix.python.version}-hatch-vcs
+outputs:
+- name: python-${matrix.python.version}-hatch-vcs
+  arch: noarch
+  files:
+    license:
+    - /usr/share/licenses/python-${matrix.python.version}-hatch-vcs/**
+  dependencies:
+    provides:
+    - ${matrix.python.capability}-hatch-vcs = ${package.version}-${package.release}
+    run:
+    - python-${matrix.python.version}-hatchling
+    - python-${matrix.python.version}-setuptools-scm
+  tests:
+  - name: functional
+    stage: installed
+    argv:
+    - /usr/bin/python${matrix.python.version}
+    - -c
+    - from hatch_vcs.version_source import VCSVersionSource; assert VCSVersionSource.PLUGIN_NAME == "vcs"
