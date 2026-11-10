@@ -1,17 +1,16 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
-# Python 3.13, one of the supported interpreter streams. It is the older of the
-# two streams Eternal carries: 3.14 is the default, 3.13 is here because a
-# large part of the Python ecosystem still targets it. The toolchain needs
+# Python 3.13, one of the supported interpreter streams. Python 3.14 is the
+# default, and part of the Python ecosystem still targets 3.13. The toolchain needs
 # it twice over: glibc and GCC run Python scripts in their build, and several
 # recipes in this repository generate files with it.
 #
 # The version is part of the package name, like glibc and Lua, and the
 # installed tree carries it as well: the standard library lives in
 # `/usr/lib/python3.13`, the shared library is `libpython3.13.so.1.0` and the
-# headers are under `/usr/include/python3.13`. Two streams can therefore be
+# headers are under `/usr/include/python3.13`. Multiple streams can be
 # installed at once, and `python-3.13-default` is the only output that owns the
-# unversioned `/usr/bin/python3`. Both `-default` outputs conflict, so a root
+# unversioned `/usr/bin/python3`. The `-default` outputs conflict, so a root
 # installs exactly one of them.
 #
 # The interpreter is built against the system copy of every optional module
@@ -79,7 +78,7 @@ build:
         # The unversioned interpreter name belongs to the -default output.
         ln -sfn python3.13 "$STAGE/usr/bin/python3"
         # `make install` also writes unversioned development names. They would
-        # be claimed by both streams' -devel outputs, and a tree that builds
+        # be claimed by the streams' -devel outputs, and a tree that builds
         # extensions for two interpreters has to install both. Every consumer
         # takes the version: `python3.13-config`, `pkg-config python3.13`.
         rm -f "$STAGE/usr/bin/python3-config" "$STAGE$LIBDIR/pkgconfig/python3.pc"
