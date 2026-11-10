@@ -145,8 +145,8 @@ Python modules use an rpmx `python` matrix for every interpreter stream in
 slug, such as `py313`, and enable `release-suffix` so each cell has a distinct
 SRPM release.
 
-Name binary outputs `python-<version>-<module>`. The default 3.14 output provides
-`python-<module>`. Keep runtime dependencies specific to the interpreter.
+Name binary outputs `python-<version>-<module>`. Keep runtime dependencies
+specific to the interpreter; do not provide an unversioned module alias.
 Version installed command names so the outputs can
 coexist. Use the interpreter ABI and distribution requirements that rpmx
 generates from the installed Python files and wheel metadata.
@@ -160,7 +160,7 @@ capability.
 Use `python/build-wheel` and `python/install-wheel`. The steps select the PEP
 517 backend from `pyproject.toml`, install for each target interpreter and
 version commands for co-installation. They also keep RPM as the file owner.
-Pure Python wheels can use the default interpreter for the build and pip.
+Pure Python wheels can use a chosen build interpreter and its pip package.
 
 Flit Core builds and installs itself through its upstream bootstrap commands.
 Pip uses Fedora's `python3-pip` explicitly for its initial build and install.
@@ -188,13 +188,12 @@ source dependencies for a new interpreter stream.
 ### Bootstrap a new Python stream
 
 For a new stream such as 3.15, add a versioned `python-3.15` runtime recipe.
-Use a Fedora seed to build the interpreter when required. Keep the existing
-default in `rpmx-defaults.yaml` under `metadata.python.default-stream`.
-Promote a new default only after its package set passes validation. Keep
-command ownership consistent with `docs/packaging.md`.
+Use a Fedora seed to build the interpreter when required. Add an optional
+`python-3.15-default` output so users can select its unversioned commands.
+Keep command ownership consistent with `docs/packaging.md`.
 Extend every Python module matrix with the new stream. Use `python-3.15` as
 its interpreter package and `python-3.15-<project>` for module outputs.
-The naming check rejects missing streams and incorrect default capabilities.
+The naming check rejects missing streams and incorrect selector capabilities.
 
 The bootstrap helper discovers versioned interpreter recipes without a fixed
 version list. It builds a new interpreter before its module dependencies.
