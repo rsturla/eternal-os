@@ -1,0 +1,83 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-setuptools.yaml
+# Declare the public Python metadata explicitly; nested vendor dist-info is private.
+schema: 1
+package:
+  name: python-setuptools
+  version: 84.2.1
+  release: 1
+  summary: Python package build backend
+  license: MIT AND Apache-2.0 AND (Apache-2.0 OR BSD-2-Clause) AND LGPL-3.0-or-later
+  upstream: https://setuptools.pypa.io/
+sources:
+- name: setuptools-84.2.1.tar.gz
+  kind: archive
+  digest: sha512:9e4c9a9ec45c69abe6f8953b6c6490eb1ffe2aea9a666beab45bdd7d5e2acbb2dbfddf6d7797c01c3e5a47b10bee519c029587fb45000ebb5c5b72468498ef0b
+  locators:
+  - kind: https
+    url: https://files.pythonhosted.org/packages/70/b3/c19426f783614d625699a4b247faf628ea9ab1db228674491767b417f9e1/setuptools-84.2.1.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+matrix:
+  axes:
+    python:
+    - value: '3.13'
+      version: '3.13'
+      slug: py313
+      package: python-3.13
+      capability: python-3.13
+    - value: '3.14'
+      version: '3.14'
+      slug: py314
+      package: python3.14
+      capability: python
+  max-cells: 2
+  release-suffix: true
+build:
+  root:
+    profile: ../../profiles/bootstrap-python.profile.yaml
+  packages:
+  - bash
+  - coreutils
+  - python3.14
+  - ${matrix.python.package}
+  pipeline:
+  - uses: python/build-wheel
+    with:
+      python: python3.14
+      build-package: python-3.14-build
+  - uses: python/install-wheel
+    with:
+      python: /usr/bin/python${matrix.python.version}
+      pip-python: python3.14
+      script-version: ${matrix.python.version}
+      pip-package: python-3.14-pip
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE
+      outputs:
+      - python-${matrix.python.version}-setuptools
+outputs:
+- name: python-${matrix.python.version}-setuptools
+  arch: noarch
+  files:
+    license:
+    - /usr/share/licenses/python-${matrix.python.version}-setuptools/**
+  dependencies:
+    provides:
+    - ${matrix.python.capability}-setuptools = ${package.version}-${package.release}
+    - python${matrix.python.version}dist(setuptools) = ${package.version}
+    run:
+    - python(abi) = ${matrix.python.version}
+  tests:
+  - name: functional
+    stage: installed
+    argv:
+    - /usr/bin/python${matrix.python.version}
+    - -c
+    - 'from setuptools import Distribution; d = Distribution({"name": "demo", "version": "1.0"}); assert d.get_name()
+      == "demo"; assert d.get_version() == "1.0"'
+  generators:
+    python: false
