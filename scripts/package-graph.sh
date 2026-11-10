@@ -56,7 +56,7 @@ resolve() {
 for name in "${names[@]}"; do
   build_raw=$(jq -r '
     .plan.cells[]?
-    | (.tools[]?), (.host[]?), (.target[]?), (.test_tools[]?)
+    | (.packages[]?), (.sysroot[]?), (.pipeline[]?.needs[]?), (.tests[]?.packages[]?)
   ' <<<"${plan[$name]}")
   run_raw=$(jq -r '
     .plan.cells[]?.outputs[]?

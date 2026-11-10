@@ -4,6 +4,10 @@
 # for facts that are true for every Eternal package, not for upstream identity
 # (license, CPE, upstream URL) or package-specific build settings.
 schema: 1
+metadata:
+  python:
+    # Adding a supported stream does not promote it to the distro default.
+    default-stream: "3.14"
 package:
   # Fallback for packages with no upstream source of their own. Packages with
   # an archive or git source derive their timestamp from that source instead.

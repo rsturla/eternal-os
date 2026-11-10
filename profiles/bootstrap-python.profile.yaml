@@ -1,0 +1,160 @@
+# Python 3.13 is an alternate interpreter in Fedora and has no python(abi) provide.
+# Use Eternal's versioned 3.13 runtime alongside the Fedora default interpreter.
+document: rpmx-profile
+version: 1
+name: bootstrap-python
+releasever: '44'
+dist-tag: .eternal
+archs:
+- x86_64
+- aarch64
+builder:
+  image: registry.fedoraproject.org/fedora:44
+repositories:
+- id: eternal
+  baseurl: https://packages.eternal.sturla.tech/rolling/$basearch
+  exclude:
+  - filesystem
+  - basesystem
+  - eternal-release
+  - eternal-base
+  - eternal-baselayout
+  - glibc-*
+  - gcc-*
+  - ld-linux-*
+  - libc-bin-*
+  - libstdc++-*
+  - libatomic-*
+  - nss-db-*
+  - expat*
+  - zstd*
+  - acl*
+  - attr*
+  - audit*
+  - autoconf*
+  - automake*
+  - bison*
+  - bzip2*
+  - ca-certificates*
+  - cmake*
+  - curl*
+  - dnf5*
+  - docbook-style-xsl*
+  - file*
+  - flex*
+  - fmt*
+  - gettext*
+  - glib2*
+  - json-c*
+  - kernel-headers*
+  - libarchive*
+  - libcap*
+  - librepo*
+  - libselinux*
+  - libsemanage*
+  - libsepol*
+  - libsolv*
+  - libtool*
+  - libunistring*
+  - libxcrypt*
+  - libxml2*
+  - libxslt*
+  - lua*
+  - meson*
+  - ncurses*
+  - ninja*
+  - openssl3*
+  - pam*
+  - perl*
+  - popt*
+  - python-3.14
+  - python-3.14-libs
+  - python-3.14-default
+  - python-3.14-devel
+  - python-3.14-doc
+  - readline*
+  - rpm*
+  - scdoc*
+  - shadow-utils*
+  - sqlite*
+  - texinfo*
+  - toml11*
+  - tzdata*
+  - util-linux*
+  - libblkid*
+  - libfdisk*
+  - libmount*
+  - libsmartcols*
+  - libuuid*
+  - zchunk*
+- id: fedora
+  baseurl: https://dl.fedoraproject.org/pub/fedora/linux/releases/$releasever/Everything/$basearch/os/
+  exclude:
+  - bash
+  - bash-binsh
+  - binutils
+  - coreutils
+  - coreutils-single
+  - make
+  - pkgconf
+  - pkgconf-m4
+  - pkgconf-pkg-config
+  - libpkgconf
+  - zlib
+  - zlib-devel
+  - zlib-static
+  - zlib-ng-compat
+  - zlib-ng-compat-devel
+  - zlib-ng-compat-static
+  - python3.13
+  - python3.13-libs
+  - python3.13-devel
+- id: updates
+  metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch
+  exclude:
+  - bash
+  - bash-binsh
+  - binutils
+  - coreutils
+  - coreutils-single
+  - make
+  - pkgconf
+  - pkgconf-m4
+  - pkgconf-pkg-config
+  - libpkgconf
+  - zlib
+  - zlib-devel
+  - zlib-static
+  - zlib-ng-compat
+  - zlib-ng-compat-devel
+  - zlib-ng-compat-static
+  - python3.13
+  - python3.13-libs
+  - python3.13-devel
+- id: eternal-toolchain
+  baseurl: file://../.work/toolchain-repo
+packages:
+  install:
+  - openssf-compiler-options
+  - bash
+  - bash-binsh
+  - binutils
+  - coreutils
+  - findutils
+  - gcc
+  - make
+  - patch
+  - tar
+  - gzip
+  - sed
+  - grep
+  - gawk
+  - diffutils
+  - pkgconf
+sbom: true
+options:
+  weak_deps: false
+  docs: false
+paths:
+  prefix: /usr
+  libdir: /usr/lib64
