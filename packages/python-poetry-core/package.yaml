@@ -1,0 +1,76 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-poetry-core.yaml
+schema: 1
+package:
+  name: python-poetry-core
+  version: 2.5.0
+  release: 1
+  summary: Python package build backend for Poetry
+  license: MIT AND BSD-3-Clause AND (Apache-2.0 OR BSD-2-Clause)
+  upstream: https://github.com/python-poetry/poetry-core
+sources:
+- name: poetry_core-2.5.0.tar.gz
+  kind: archive
+  digest: sha512:a6e2b6369ef674566d43df66a23c1ce6b9c9d20ed291742845bf95e8049ca395fccc373ef25871867ebb9ae3ec54d3a33f99e49c1c2c123ce6743653c8a27b09
+  locators:
+  - kind: https
+    url: https://files.pythonhosted.org/packages/42/b5/50f1fda26c4fe5b1d6ce5cdf0391bdfa1ca12fdcb8ad68344d5cf678fc90/poetry_core-2.5.0.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+matrix:
+  axes:
+    python:
+    - value: '3.13'
+      version: '3.13'
+      slug: py313
+      package: python-3.13
+      capability: python-3.13
+    - value: '3.14'
+      version: '3.14'
+      slug: py314
+      package: python3.14
+      capability: python
+  max-cells: 2
+  release-suffix: true
+build:
+  root:
+    profile: ../../profiles/bootstrap-python.profile.yaml
+  packages:
+  - bash
+  - coreutils
+  - python3.14
+  - ${matrix.python.package}
+  pipeline:
+  - uses: python/build-wheel
+    with:
+      python: python3.14
+      build-package: python-3.14-build
+  - uses: python/install-wheel
+    with:
+      python: /usr/bin/python${matrix.python.version}
+      pip-python: python3.14
+      script-version: ${matrix.python.version}
+      pip-package: python-3.14-pip
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE
+      outputs:
+      - python-${matrix.python.version}-poetry-core
+outputs:
+- name: python-${matrix.python.version}-poetry-core
+  arch: noarch
+  files:
+    license:
+    - /usr/share/licenses/python-${matrix.python.version}-poetry-core/**
+  dependencies:
+    provides:
+    - ${matrix.python.capability}-poetry-core = ${package.version}-${package.release}
+  tests:
+  - name: functional
+    stage: installed
+    argv:
+    - /usr/bin/python${matrix.python.version}
+    - -c
+    - from poetry.core.constraints.version import parse_constraint; assert parse_constraint("^1.2").allows_all(parse_constraint(">=1.3,<2.0"))
