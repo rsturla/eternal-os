@@ -1,0 +1,145 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/rhash.yaml
+# Link OpenSSL directly, as in Wolfi. Keep the library independent of the commands.
+schema: 1
+package:
+  name: rhash
+  version: 1.4.6
+  release: 1
+  summary: File checksum tools and library
+  description: File checksum tools and library.
+  license: 0BSD
+  upstream: https://rhash.sourceforge.net/
+sources:
+- name: rhash-1.4.6.tar.gz
+  kind: archive
+  digest: sha512:c125b71ec36cce2ec31057239cac8b987555f5e3b152dacb6386b905f8cc4d449c1de5b53e5a5206a2d87975681225c9b54e5826c10ffd91b3440f8595d22b15
+  locators:
+  - kind: https
+    url: https://github.com/rhash/RHash/archive/refs/tags/v1.4.6.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  packages:
+  - gcc
+  - make
+  - bash
+  - coreutils
+  - pkgconf
+  sysroot:
+  - openssl-devel
+  pipeline:
+  - uses: autotools/configure
+    with:
+      args:
+      - --sysconfdir=/etc
+      - --enable-openssl
+      - --disable-openssl-runtime
+      - --enable-lib-shared
+      - --disable-lib-static
+      - --disable-gettext
+  - uses: make/build
+  - uses: make/install
+  - uses: make/install
+    with:
+      args:
+      - install-lib-headers
+      - install-lib-shared
+      - install-lib-so-link
+      - install-pkg-config
+  - uses: license/copy
+    with:
+      files:
+      - COPYING
+      outputs:
+      - rhash
+      - rhash-libs
+      - rhash-devel
+      - rhash-doc
+  - uses: strip
+outputs:
+- name: rhash
+  files:
+    license:
+    - /usr/share/licenses/rhash/**
+  dependencies:
+    run:
+    - rhash-libs = ${package.version}-${package.release}
+  tests:
+  - name: digest
+    stage: installed
+    packages:
+    - grep
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      printf abc > /tmp/input
+      rhash --sha256 /tmp/input > /tmp/digest
+      grep -q ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad /tmp/digest
+- name: rhash-libs
+  files:
+    include:
+    - /usr/lib*/librhash.so.*
+    - /usr/share/licenses/rhash-libs/**
+    license:
+    - /usr/share/licenses/rhash-libs/**
+  dependencies:
+    run:
+    - openssl-libs
+  tests:
+  - name: load
+    stage: installed
+    packages:
+    - python3
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      python3 -c 'import ctypes; ctypes.CDLL("librhash.so.1")'
+- name: rhash-devel
+  files:
+    include:
+    - '@dev'
+    - /usr/share/licenses/rhash-devel/**
+    license:
+    - /usr/share/licenses/rhash-devel/**
+  dependencies:
+    run:
+    - rhash-libs = ${package.version}-${package.release}
+  tests:
+  - name: compile-and-run
+    stage: installed
+    packages:
+    - gcc
+    - glibc-devel
+    - pkgconf
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      cat > /tmp/test.c <<'EOF'
+      #include <rhash.h>
+      int main(void) { rhash_library_init(); return rhash_get_digest_size(RHASH_SHA256) != 32; }
+      EOF
+      gcc /tmp/test.c $(pkg-config --cflags --libs librhash) -o /tmp/test
+      /tmp/test
+- name: rhash-doc
+  files:
+    include:
+    - '@doc'
+    - '@man'
+    - /usr/share/licenses/rhash-doc/**
+    license:
+    - /usr/share/licenses/rhash-doc/**
+tests:
+- name: hardening
+  stage: build
+  pipeline:
+  - uses: test/hardening-check
