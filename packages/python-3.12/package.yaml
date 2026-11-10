@@ -107,7 +107,7 @@ outputs:
           - -eu
           - -c
           - |
-            python3.12 -c 'import sys; assert sys.version_info[:2] == (3, 13)'
+            python3.12 -c 'import sys; assert sys.version_info[:2] == (3, 12)'
             python3 -c 'import sys; assert sys.version_info[:2] == (3, 14)'
 
   - name: python-3.12-libs
