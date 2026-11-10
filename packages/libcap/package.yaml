@@ -7,7 +7,7 @@ schema: 1
 package:
   name: libcap
   version: "2.78"
-  release: 1
+  release: 2
   summary: POSIX 1003.1e capabilities
   description: |
     libcap implements the POSIX 1003.1e capabilities API, the capsh, getcap,
@@ -37,11 +37,11 @@ build:
     - runs: |
         make -j"$(nproc)" \
           BUILD_CC=gcc CC=gcc \
-          prefix=/usr lib=lib64 sbindir=/usr/bin \
+          prefix=/usr lib=lib64 sbindir=bin \
           PAM_CAP=no GOLANG=no RAISE_SETFCAP=no
     - runs: |
         make \
-          prefix=/usr lib=lib64 sbindir=/usr/bin \
+          prefix=/usr lib=lib64 sbindir=bin \
           PAM_CAP=no GOLANG=no RAISE_SETFCAP=no \
           DESTDIR="$STAGE" install
         chmod 0755 "$STAGE"/usr/lib64/libcap.so.*
