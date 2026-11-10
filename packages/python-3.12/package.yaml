@@ -64,6 +64,8 @@ build:
         # extensions for two interpreters has to install both. Every consumer
         # takes the version: `python3.12-config`, `pkg-config python3.12`.
         rm -f "$STAGE/usr/bin/python3-config" "$STAGE$LIBDIR/pkgconfig/python3.pc"
+        # cgi.py is an importable module, not an executable command.
+        chmod a-x "$STAGE/usr/lib/python3.12/cgi.py"
     - uses: license/copy
       with:
         files: [LICENSE]
@@ -92,6 +94,8 @@ outputs:
           - |
             python3.12 -c 'import sys; print("%d.%d" % sys.version_info[:2])' | grep -qx 3.12
             python3.12 -c 'import bz2, ctypes, decimal, hashlib, json, lzma, sqlite3, unicodedata, zlib; print("modules ok")'
+            python3.12 -c 'import cgi'
+            test ! -x /usr/lib/python3.12/cgi.py
             python3.12 -c 'import ssl; print(ssl.OPENSSL_VERSION)'
             python3.12 -c 'import readline; print("readline ok")'
             python3.12 -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])' | grep -qx /usr/lib/python3.12
