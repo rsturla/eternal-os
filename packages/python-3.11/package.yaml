@@ -146,7 +146,7 @@ outputs:
       run:
         - python-3.11 = ${package.version}-${package.release}
       provides:
-        - python3 = 0
+        - python3 = ${package.version}-${package.release}
       conflicts:
         - python-3.12-default
         - python-3.13-default
