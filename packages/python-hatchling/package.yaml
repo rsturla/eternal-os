@@ -1,0 +1,87 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-hatchling.yaml
+schema: 1
+package:
+  name: python-hatchling
+  version: 1.33.0
+  release: 1
+  summary: Python package build backend for Hatch
+  license: MIT
+  upstream: https://hatch.pypa.io/
+sources:
+- name: hatchling-1.33.0.tar.gz
+  kind: archive
+  digest: sha512:e5bf8b63b80cb49776571a5e3a5161017035dfbc66dac4cc8c4a6b5854ca76aeca84536318dc76484b1e625e048ffaa4f4d3f17c6157c79bf56ef515b971a116
+  locators:
+  - kind: https
+    url: https://files.pythonhosted.org/packages/7a/f1/e47b937226ae3b093bbd0132eb0b7ee5bfad12c2b5324afd10ae49946b05/hatchling-1.33.0.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+matrix:
+  axes:
+    python:
+    - value: '3.13'
+      version: '3.13'
+      slug: py313
+      package: python-3.13
+      capability: python-3.13
+    - value: '3.14'
+      version: '3.14'
+      slug: py314
+      package: python3.14
+      capability: python
+  max-cells: 2
+  release-suffix: true
+build:
+  root:
+    profile: ../../profiles/bootstrap-python.profile.yaml
+  packages:
+  - bash
+  - coreutils
+  - python3.14
+  - ${matrix.python.package}
+  - python-3.14-packaging
+  - python-3.14-pathspec
+  - python-3.14-pluggy
+  - python-3.14-tomlkit
+  - python-3.14-trove-classifiers
+  pipeline:
+  - uses: python/build-wheel
+    with:
+      python: python3.14
+      build-package: python-3.14-build
+  - uses: python/install-wheel
+    with:
+      python: /usr/bin/python${matrix.python.version}
+      pip-python: python3.14
+      script-version: ${matrix.python.version}
+      pip-package: python-3.14-pip
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE.txt
+      outputs:
+      - python-${matrix.python.version}-hatchling
+outputs:
+- name: python-${matrix.python.version}-hatchling
+  arch: noarch
+  files:
+    license:
+    - /usr/share/licenses/python-${matrix.python.version}-hatchling/**
+  dependencies:
+    provides:
+    - ${matrix.python.capability}-hatchling = ${package.version}-${package.release}
+    run:
+    - python-${matrix.python.version}-packaging
+    - python-${matrix.python.version}-pathspec
+    - python-${matrix.python.version}-pluggy
+    - python-${matrix.python.version}-tomlkit
+    - python-${matrix.python.version}-trove-classifiers
+  tests:
+  - name: functional
+    stage: installed
+    argv:
+    - /usr/bin/python${matrix.python.version}
+    - -c
+    - from hatchling.plugin.manager import PluginManager; assert PluginManager().builder.get("wheel")
