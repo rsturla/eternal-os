@@ -7,7 +7,7 @@
 # The version is part of the package name, like glibc and Lua, and the
 # installed tree carries it as well: the standard library lives in
 # `/usr/lib/python3.14`, the shared library is `libpython3.14.so.1.0` and the
-# headers are under `/usr/include/python3.14`. Two streams can therefore be
+# headers are under `/usr/include/python3.14`. Multiple streams can be
 # installed at once, and `python-3.14-default` is the only output that owns the
 # unversioned `/usr/bin/python3`.
 #
@@ -77,7 +77,7 @@ build:
         # The unversioned interpreter name belongs to the -default output.
         ln -sfn python3.14 "$STAGE/usr/bin/python3"
         # `make install` also writes unversioned development names. They would
-        # be claimed by both streams' -devel outputs, and a tree that builds
+        # be claimed by the streams' -devel outputs, and a tree that builds
         # extensions for two interpreters has to install both. Every consumer
         # takes the version: `python3.14-config`, `pkg-config python3.14`.
         rm -f "$STAGE/usr/bin/python3-config" "$STAGE$LIBDIR/pkgconfig/python3.pc"
