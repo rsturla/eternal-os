@@ -1,0 +1,112 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/libuv.yaml
+# Use upstream CMake support for the release archive. Keep static archives separate.
+schema: 1
+package:
+  name: libuv
+  version: 1.53.0
+  release: 1
+  summary: Asynchronous I/O library
+  description: Asynchronous I/O library.
+  license: MIT AND ISC
+  upstream: https://libuv.org/
+sources:
+- name: libuv-1.53.0.tar.gz
+  kind: archive
+  digest: sha512:751837a07bc92e7938c3ebd94535461e65eec918e6ef9591481063107fc3b103dc0ea63e1192178b5107765492a0feb8012afcd984d98b2514afb7cdb0e4014e
+  locators:
+  - kind: https
+    url: https://dist.libuv.org/dist/v1.53.0/libuv-v1.53.0.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  packages:
+  - cmake
+  - gcc
+  - make
+  - bash
+  - coreutils
+  - pkgconf
+  pipeline:
+  - uses: cmake/configure
+    with:
+      args:
+      - -DLIBUV_BUILD_SHARED=ON
+      - -DBUILD_TESTING=OFF
+      - -DLIBUV_BUILD_TESTS=OFF
+      - -DLIBUV_BUILD_BENCH=OFF
+      - -DENABLE_CLANG_TIDY=OFF
+  - uses: cmake/build
+  - uses: cmake/install
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE
+      - LICENSE-extra
+      outputs:
+      - libuv
+      - libuv-devel
+      - libuv-static
+  - uses: strip
+outputs:
+- name: libuv
+  files:
+    license:
+    - /usr/share/licenses/libuv/**
+  tests:
+  - name: load
+    stage: installed
+    packages:
+    - python3
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      python3 -c 'import ctypes; ctypes.CDLL("libuv.so.1")'
+- name: libuv-devel
+  files:
+    include:
+    - '@dev'
+    - /usr/share/licenses/libuv-devel/**
+    license:
+    - /usr/share/licenses/libuv-devel/**
+  dependencies:
+    run:
+    - libuv = ${package.version}-${package.release}
+  tests:
+  - name: compile-and-run
+    stage: installed
+    packages:
+    - gcc
+    - glibc-devel
+    - pkgconf
+    argv:
+    - bash
+    - -eu
+    - -c
+    - |
+      cat > /tmp/test.c <<'EOF'
+      #include <uv.h>
+      int main(void) { uv_loop_t loop; if (uv_loop_init(&loop)) return 1; return uv_loop_close(&loop); }
+      EOF
+      gcc /tmp/test.c $(pkg-config --cflags --libs libuv) -o /tmp/test
+      /tmp/test
+- name: libuv-static
+  files:
+    include:
+    - '@static'
+    - /usr/share/licenses/libuv-static/**
+    license:
+    - /usr/share/licenses/libuv-static/**
+  dependencies:
+    run:
+    - libuv-devel = ${package.version}-${package.release}
+tests:
+- name: hardening
+  stage: build
+  pipeline:
+  - uses: test/hardening-check
