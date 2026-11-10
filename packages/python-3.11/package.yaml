@@ -1,0 +1,217 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+schema: 1
+
+package:
+  name: python-3.11
+  version: "3.11.18"
+  release: 1
+  summary: The Python programming language (version 3.11)
+  description: |
+    Python is an interpreted, interactive, object-oriented programming
+    language. This package provides the 3.11 language stream with a versioned
+    interpreter, standard library, shared library and development files so
+    several Python versions can be installed side by side.
+  license: PSF-2.0
+  upstream: https://www.python.org/
+  cpe:
+    vendor: python
+    product: python
+
+sources:
+  - name: Python-3.11.18.tar.xz
+    kind: archive
+    digest: "sha512:af4a2ddc18de03bf4f25db7934db1534ac580a29a7475ebd82e1cdc229db6781f71ebe0f7288416b9e3b34c0544e82e7534caa4887e49e84b8e75da05dd5ff49"
+    locators:
+      - kind: https
+        url: https://www.python.org/ftp/python/3.11.18/Python-3.11.18.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  packages: [gcc, make, bash, coreutils, pkgconf, sed, grep, diffutils, findutils]
+  sysroot:
+    - bzip2-devel
+    - expat-devel
+    - libffi-devel
+    - ncurses-devel
+    - openssl-devel
+    - readline-devel
+    - sqlite-devel
+    - xz-devel
+    - zlib-devel
+  pipeline:
+    - uses: autotools/configure
+      with:
+        args:
+          - --enable-shared
+          - --without-static-libpython
+          - --disable-test-modules
+          - --without-ensurepip
+          - --with-system-expat
+          - --with-platlibdir=lib
+          - --enable-loadable-sqlite-extensions
+    - uses: make/build
+    - uses: make/install
+    - runs: |
+        set -eu
+        # The unversioned interpreter name belongs to the -default output.
+        ln -sfn python3.11 "$STAGE/usr/bin/python3"
+        # `make install` also writes unversioned development names. They would
+        # be claimed by both streams' -devel outputs, and a tree that builds
+        # extensions for two interpreters has to install both. Every consumer
+        # takes the version: `python3.11-config`, `pkg-config python3.11`.
+        rm -f "$STAGE/usr/bin/python3-config" "$STAGE$LIBDIR/pkgconfig/python3.pc"
+    - uses: license/copy
+      with:
+        files: [LICENSE]
+        outputs: [python-3.11, python-3.11-libs, python-3.11-default, python-3.11-devel, python-3.11-doc]
+    - uses: strip
+
+outputs:
+  - name: python-3.11
+    summary: The Python programming language (version 3.11)
+    files:
+      license:
+        - /usr/share/licenses/python-3.11/LICENSE
+    dependencies:
+      run:
+        - python-3.11-libs = ${package.version}-${package.release}
+      provides:
+        - python-3.11 = ${package.version}-${package.release}
+        - python3.11 = ${package.version}-${package.release}
+    tests:
+      - name: installed
+        stage: installed
+        packages: [bzip2-libs, expat, libffi, libzstd, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
+        argv:
+          - sh
+          - -c
+          - |
+            python3.11 -c 'import sys; print("%d.%d" % sys.version_info[:2])' | grep -qx 3.11
+            python3.11 -c 'import bz2, ctypes, decimal, hashlib, json, lzma, sqlite3, unicodedata, zlib; print("modules ok")'
+            python3.11 -c 'import ssl; print(ssl.OPENSSL_VERSION)'
+            python3.11 -c 'import readline; print("readline ok")'
+            python3.11 -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])' | grep -qx /usr/lib/python3.11
+      - name: coinstall-default
+        stage: installed
+        packages: [python3]
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            python3.11 -c 'import sys; assert sys.version_info[:2] == (3, 13)'
+            python3 -c 'import sys; assert sys.version_info[:2] == (3, 14)'
+
+  - name: python-3.11-libs
+    summary: Python 3.11 runtime library
+    files:
+      include:
+        - /usr/lib*/libpython3.11.so.*
+        - /usr/share/licenses/python-3.11-libs/LICENSE
+      license:
+        - /usr/share/licenses/python-3.11-libs/LICENSE
+    tests:
+      - name: installed
+        stage: installed
+        packages: [bash-binsh]
+        argv:
+          - sh
+          - -c
+          - |
+            for lib in /usr/lib64/libpython3.11.so.* /usr/lib/libpython3.11.so.*; do
+              test -e "$lib" && exit 0
+            done
+            exit 1
+
+  - name: python-3.11-default
+    summary: Unversioned Python 3.11 command names
+    files:
+      include:
+        - /usr/bin/python3
+        - /usr/bin/pydoc3
+        - /usr/share/licenses/python-3.11-default/LICENSE
+      license:
+        - /usr/share/licenses/python-3.11-default/LICENSE
+    dependencies:
+      run:
+        - python-3.11 = ${package.version}-${package.release}
+      provides:
+        - python3 = 0
+      conflicts:
+        - python-3.12-default
+        - python-3.13-default
+        - python-3.14-default
+        - python-3.15-default
+    tests:
+      - name: installed
+        stage: installed
+        packages: [bzip2-libs, expat, libffi, libzstd, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
+        argv:
+          - sh
+          - -c
+          - |
+            python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])' | grep -qx 3.11
+            pydoc3 -h >/dev/null
+
+  - name: python-3.11-devel
+    summary: Development files for Python 3.11
+    files:
+      include:
+        - "@dev"
+        - /usr/include/python3.11/**
+        - /usr/lib*/python3.11/config-3.11/**
+        - /usr/bin/python3.11-config
+        - /usr/share/licenses/python-3.11-devel/LICENSE
+      license:
+        - /usr/share/licenses/python-3.11-devel/LICENSE
+    dependencies:
+      run:
+        - python-3.11-libs = ${package.version}-${package.release}
+    tests:
+      - name: embed
+        stage: installed
+        packages: [gcc, glibc-devel, grep, sed, bash-binsh, coreutils]
+        argv:
+          - sh
+          - -c
+          - |
+            cat > /tmp/embed.c <<'EOF'
+            #include <Python.h>
+            int main(void) {
+              Py_Initialize();
+              PyRun_SimpleString("print('embedded')");
+              return Py_FinalizeEx() == 0 ? 0 : 1;
+            }
+            EOF
+            gcc /tmp/embed.c $(python3.11-config --embed --cflags --ldflags) -o /tmp/embed
+            /tmp/embed | grep -qx embedded
+
+  - name: python-3.11-doc
+    summary: Documentation for Python 3.11
+    files:
+      include:
+        - "@man"
+        - "@doc"
+        - /usr/share/licenses/python-3.11-doc/LICENSE
+      license:
+        - /usr/share/licenses/python-3.11-doc/LICENSE
+
+tests:
+  - name: hardening
+    stage: build
+    pipeline:
+      # The launcher only forwards to Py_BytesMain: it has no stack buffer and
+      # no libc call to fortify, so those two properties cannot appear in it.
+      # They are checked on the library, where the interpreter actually lives.
+      - uses: test/hardening-check
+        with:
+          paths: [/usr/bin/python3.11]
+          skip: [stack-protector, fortify]
+      - uses: test/hardening-check
+        with:
+          paths: [/usr/lib64/libpython3.11.so.1.0]
+          skip: [pie]
