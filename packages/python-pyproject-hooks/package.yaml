@@ -1,0 +1,81 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-pyproject-hooks.yaml
+schema: 1
+package:
+  name: python-pyproject-hooks
+  version: 1.3.3
+  release: 1
+  summary: Interface to Python build backend hooks
+  license: MIT
+  upstream: https://pyproject-hooks.readthedocs.io/
+sources:
+- name: pyproject_hooks-1.3.3.tar.gz
+  kind: archive
+  digest: sha512:02987f247af2d82729ac4814ef1a58f129496434206f65411e7dcd254a4d4d9e4d90347d70708e5e74b2a735d7995f8334fb124a8e81fcab4a10ed4c193bf29b
+  locators:
+  - kind: https
+    url: https://files.pythonhosted.org/packages/6d/5d/f2ddeef4a855a102aaae5e97826a0260007522ab504421b75addfdb1517c/pyproject_hooks-1.3.3.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+matrix:
+  axes:
+    python:
+    - value: '3.13'
+      version: '3.13'
+      slug: py313
+      package: python-3.13
+      capability: python-3.13
+    - value: '3.14'
+      version: '3.14'
+      slug: py314
+      package: python3.14
+      capability: python
+  max-cells: 2
+  release-suffix: true
+build:
+  root:
+    profile: ../../profiles/bootstrap-python.profile.yaml
+  packages:
+  - bash
+  - coreutils
+  - python3.14
+  - ${matrix.python.package}
+  - python-3.14-flit-core
+  pipeline:
+  - uses: python/build-wheel
+    with:
+      frontend: pip
+      build-package: python-3.14-pip
+      python: python3.14
+  - uses: python/install-wheel
+    with:
+      python: /usr/bin/python${matrix.python.version}
+      pip-python: python3.14
+      script-version: ${matrix.python.version}
+      pip-package: python-3.14-pip
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE
+      outputs:
+      - python-${matrix.python.version}-pyproject-hooks
+outputs:
+- name: python-${matrix.python.version}-pyproject-hooks
+  arch: noarch
+  files:
+    license:
+    - /usr/share/licenses/python-${matrix.python.version}-pyproject-hooks/**
+  dependencies:
+    provides:
+    - ${matrix.python.capability}-pyproject-hooks = ${package.version}-${package.release}
+  tests:
+  - name: functional
+    stage: installed
+    argv:
+    - /usr/bin/python${matrix.python.version}
+    - -c
+    - 'from pyproject_hooks import BuildBackendHookCaller; import tempfile, pathlib; p = pathlib.Path(tempfile.mkdtemp());
+      (p / "backend.py").write_text("def get_requires_for_build_wheel(config_settings): return [\"demo>=1\"]\n");
+      c = BuildBackendHookCaller(str(p), "backend", backend_path=["."]); assert c.get_requires_for_build_wheel()
+      == ["demo>=1"]'
