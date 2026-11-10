@@ -1,0 +1,81 @@
+# yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
+# Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-wheel.yaml
+schema: 1
+package:
+  name: python-wheel
+  version: 0.48.0
+  release: 1
+  summary: Tools for working with Python wheel files
+  license: MIT
+  upstream: https://wheel.readthedocs.io/
+sources:
+- name: wheel-0.48.0.tar.gz
+  kind: archive
+  digest: sha512:5890947bc1c4dd02e73f85afddf19122c712d3e5ae67dec96562246e6ac9df7a3380a57c2bb0dde21f103622e8d71e02c36d8ba7bc2fd23c8fdab362a059f653
+  locators:
+  - kind: https
+    url: https://files.pythonhosted.org/packages/d0/20/50ed6bdf27dec98b568a8ae25dc599f35baa3d9709f9e83fd1edb56b9a90/wheel-0.48.0.tar.gz
+  extract:
+    format: tar.gz
+    strip-components: 1
+matrix:
+  axes:
+    python:
+    - value: '3.13'
+      version: '3.13'
+      slug: py313
+      package: python-3.13
+      capability: python-3.13
+    - value: '3.14'
+      version: '3.14'
+      slug: py314
+      package: python3.14
+      capability: python
+  max-cells: 2
+  release-suffix: true
+build:
+  root:
+    profile: ../../profiles/bootstrap-python.profile.yaml
+  packages:
+  - bash
+  - coreutils
+  - python3.14
+  - ${matrix.python.package}
+  - python-3.14-flit-core
+  pipeline:
+  - uses: python/build-wheel
+    with:
+      python: python3.14
+      build-package: python-3.14-build
+  - uses: python/install-wheel
+    with:
+      python: /usr/bin/python${matrix.python.version}
+      pip-python: python3.14
+      script-version: ${matrix.python.version}
+      pip-package: python-3.14-pip
+  - uses: license/copy
+    with:
+      files:
+      - LICENSE.txt
+      outputs:
+      - python-${matrix.python.version}-wheel
+outputs:
+- name: python-${matrix.python.version}-wheel
+  arch: noarch
+  files:
+    license:
+    - /usr/share/licenses/python-${matrix.python.version}-wheel/**
+  dependencies:
+    provides:
+    - ${matrix.python.capability}-wheel = ${package.version}-${package.release}
+    run:
+    - python-${matrix.python.version}-packaging
+  tests:
+  - name: functional
+    stage: installed
+    argv:
+    - /usr/bin/python${matrix.python.version}
+    - -c
+    - from wheel.wheelfile import WheelFile; import tempfile, pathlib; p = pathlib.Path(tempfile.mkdtemp())
+      / "demo-1.0-py3-none-any.whl"; w = WheelFile(p, "w"); w.writestr("demo.py", "value = 42\n"); w.close();
+      assert p.is_file()
