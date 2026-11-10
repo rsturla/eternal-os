@@ -138,6 +138,103 @@ repository needs a new toolchain component.
 
 ## Local loop
 
+### Python packaging tools
+
+Python modules use an rpmx `python` matrix for every interpreter stream in
+`packages/`. The current streams are 3.13 and 3.14. Give each cell an RPM-safe
+slug, such as `py313`, and enable `release-suffix` so each cell has a distinct
+SRPM release.
+
+Name binary outputs `python-3.13-<module>` and `python-3.14-<module>`. The default
+3.14 output provides `python-<module>`. Keep runtime dependencies specific to
+the interpreter. Version installed command names so the two outputs can
+coexist. Use the interpreter ABI and distribution requirements that rpmx
+generates from the installed Python files and wheel metadata.
+Interpreter packages provide the matching `python3.X` build capability.
+
+The packaging tools use `profiles/bootstrap-python.profile.yaml`. This profile
+allows Eternal's 3.13 runtime alongside Fedora's default 3.14 interpreter.
+Fedora's alternate 3.13 interpreter does not provide the required Python ABI
+capability.
+
+Use `python/build-wheel` and `python/install-wheel`. The steps select the PEP
+517 backend from `pyproject.toml`, install for each target interpreter and
+version commands for co-installation. They also keep RPM as the file owner.
+Pure Python wheels can use the default interpreter for the build and pip.
+
+Flit Core builds and installs itself through its upstream bootstrap commands.
+Pip uses Fedora's `python3-pip` explicitly for its initial build and install.
+The other foundation tools use Eternal pip as their wheel frontend. Later
+recipes use the versioned Eternal build frontend and pip.
+This bootstrap seed avoids self-dependencies while Eternal takes ownership of
+these tools. Each matrix cell runs its tests with its target interpreter.
+
+During the initial bootstrap, `scripts/build-all.sh` prepares unpublished
+Python matrix dependencies with `scripts/build-python.py`. The helper builds
+explicit interpreter-qualified package dependencies in dependency order
+and adds the RPMs to a private repository for each invocation. Tests can then
+use new interpreter-specific dependencies before they are published. The
+helper caches tested dependencies under `.work/python-deps/` by architecture,
+recipe hash and build options.
+
+The helper's normal-build integration is temporary.
+[Issue #41](https://github.com/rsturla/eternal-os/issues/41) tracks its retirement
+and the replacement path for new interpreter releases. Publication alone does
+not permit removal. First validate normal builds against published RPMs on
+both architectures. Then remove the automatic dispatch and its cache use from
+normal builds. Keep an explicit bootstrap path until rpmx can build unpublished
+source dependencies for a new interpreter stream.
+
+### Bootstrap a new Python stream
+
+For a new stream such as 3.15, add a versioned `python-3.15` runtime recipe.
+Use a Fedora seed to build the interpreter when required. Keep the existing
+default in `rpmx-defaults.yaml` under `metadata.python.default-stream`.
+Promote a new default only after its package set passes validation. Keep
+command ownership consistent with `docs/packaging.md`.
+Extend every Python module matrix with the new stream. Use `python-3.15` as
+its interpreter package and `python-3.15-<project>` for module outputs.
+The naming check rejects missing streams and incorrect default capabilities.
+
+The bootstrap helper discovers versioned interpreter recipes without a fixed
+version list. It builds a new interpreter before its module dependencies.
+Keep the published build frontend and pip on the existing host interpreter
+while installing wheels for the new target interpreter. Declare backend
+dependencies explicitly, and check each upstream project's interpreter support.
+Use `python/build-wheel` with `frontend: pip` and an existing Eternal pip
+package to break frontend bootstrap cycles. A standalone pip zipapp can be
+selected with `pip-zipapp` and an explicit owning package. Keep a seed's
+archive, digest and provider policy in Eternal recipes and bootstrap profiles.
+The shared rpmx steps wrap upstream tools and do not fetch implicit seeds.
+
+After the new stream's build tools are available, build native extension
+packages with that interpreter and its development files. A wheel built by
+an older interpreter is not a substitute for a native extension rebuild.
+
+For an isolated bootstrap, use a profile that permits the new Eternal runtime
+and module names. Pass it through `--profile` to `scripts/build-python.py`.
+The existing bootstrap profile permits new streams such as 3.15. Its 3.14
+exclusion retains the current Fedora seed. Relative file repositories resolve
+from the selected profile's directory.
+
+```console
+./scripts/package-graph.sh > /tmp/python-bootstrap-graph.json
+./scripts/build-python.py python-hatch-vcs --arch x86_64 \
+  --graph /tmp/python-bootstrap-graph.json --output out/python-hatch-vcs \
+  --profile profiles/bootstrap-python.profile.yaml
+```
+
+Repeat on aarch64. Test the new stream's installed imports and commands, and
+check file ownership alongside existing streams. Publish the runtime and module
+RPMs, then verify normal builds without the private repository. Retire this
+bootstrap implementation only after its replacement passes the same checks
+with an unpublished interpreter stream.
+
+The helper needs `/usr/bin/python3` and PyYAML. Install the `python3-yaml` host
+package for local builds. The CI setup installs the same host dependency.
+
+### Commands
+
 ```console
 ./scripts/lint-all.sh
 ./scripts/build-all.sh --package foo --output out

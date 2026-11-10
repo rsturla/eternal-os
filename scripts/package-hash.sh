@@ -75,7 +75,13 @@ done
 
 declare -A own memo
 work=$(mktemp -d)
-trap 'rm -rf "$work" ${cleanup_graph:+$graph_file}' EXIT
+cleanup() {
+  rm -rf "$work"
+  if ((cleanup_graph)); then
+    rm -f "$graph_file"
+  fi
+}
+trap cleanup EXIT
 
 own_hash_for() {
   local name=$1 inner

@@ -199,9 +199,9 @@ for recipe in "${recipes[@]}"; do
 
   if ((!force)) && [[ -f $stamp ]] && [[ $(cat "$stamp") == "$stamp_value" ]]; then
     if [[ -n $arch ]]; then
-      pattern="$pkg_output/$arch/${name}-*.rpm"
+      pattern="$pkg_output/$arch/*.rpm"
     else
-      pattern="$pkg_output/*/${name}-*.rpm"
+      pattern="$pkg_output/*/*.rpm"
     fi
     if compgen -G "$pattern" >/dev/null; then
       echo "==> skip $name (unchanged: ${hash_of[$name]:0:12})"
@@ -212,6 +212,14 @@ for recipe in "${recipes[@]}"; do
   # One output directory per package: the installed-stage test root must not
   # see RPMs from unrelated packages.
   cmd=("$rpmx" build "$recipe" --output "$pkg_output")
+  # Matrix modules need matching dependencies for every Python interpreter.
+  # Temporary bootstrap support until publication: see issue #41.
+  # Build those recipes locally so tests do not depend on prior publication.
+  if "$rpmx" plan "$recipe" --json | jq -e \
+    'any(.plan.cells[]; .id | startswith("python="))' >/dev/null; then
+    cmd=(/usr/bin/python3 "$root/scripts/build-python.py" "$name"
+      --output "$pkg_output" --graph "$graph_file")
+  fi
   [[ -n $arch ]] && cmd+=(--arch "$arch")
   [[ -n $signing_key ]] && cmd+=(--signing-key "$signing_key")
   [[ -n $build_release ]] && cmd+=(--build-release "$build_release")

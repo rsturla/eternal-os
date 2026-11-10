@@ -21,6 +21,9 @@ while (($# > 0)); do
   shift
 done
 
+python3 -m unittest discover -s "$root/tests" -p 'test_*.py'
+python3 "$root/scripts/check-package-names.py"
+
 found=0
 for recipe in "$root"/packages/*/package.yaml "$root"/bootstrap/recipes/*/package.yaml; do
   [[ -f "$recipe" ]] || continue

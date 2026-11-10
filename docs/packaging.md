@@ -86,6 +86,34 @@ Rules:
 - No `release: 100` or similar hacks to outrank the seed. Bootstrap resolver
   policy belongs in the bootstrap ladder.
 
+### Python module names
+
+Use `python-<project>` for a Python source recipe. Normalize the upstream
+distribution name to lowercase. Replace each run of dots, underscores and
+hyphens with one hyphen.
+For example, `trove_classifiers` becomes `python-trove-classifiers`.
+
+Name each binary module `python-<major.minor>-<project>`. This matches the
+interpreter packages, such as `python-3.14`. Keep the interpreter streams in
+one rpmx matrix and cover every supported interpreter recipe. Set the default
+stream explicitly in `rpmx-defaults.yaml` under `metadata.python.default-stream`.
+Only that stream supplies the unversioned `python-<project>` capability.
+Adding a supported stream does not promote it to the default.
+The selected interpreter's `-default` output provides `python3` at its full
+package version. Other selectors provide `python3 = 0`, so adding a newer
+non-default interpreter does not win the unversioned command capability.
+Other streams provide their own versioned identity. Keep module runtime
+dependencies specific to that interpreter stream.
+
+Commands keep upstream Python spellings, such as `python3.14`. Python ABI and
+distribution requirements also keep their standard spellings. These values
+describe interfaces; they do not set Eternal's RPM names.
+
+Use upstream names for native source packages and the output splits below.
+Seed package names describe the bootstrap environment. They do not establish
+Eternal package naming policy. `scripts/lint-all.sh` checks source identities
+and Python module naming through `scripts/check-package-names.py`.
+
 ### Versioned binaries
 
 GCC is the reference for side-by-side compiler streams. Build with a program
@@ -471,6 +499,9 @@ package:
   `rpmx-defaults.yaml`; a bootstrap stage may override the effective value.
 - `cpe` identifies the **upstream** project, not Eternal. Use `gnu:make`, never
   `eternal:make`.
+- Write a short, functional summary. Omit a description that only repeats it.
+- Point `upstream` at the project homepage or canonical source repository.
+  Keep source downloads and release notes in their own fields or references.
 - Do not put maintainers in every recipe. They live in `rpmx-defaults.yaml`.
 - Prefer content-addressed `sources` with a SHA-512 digest and at least two
   HTTPS mirrors. The digest verifies either mirror, so a slow or unavailable
