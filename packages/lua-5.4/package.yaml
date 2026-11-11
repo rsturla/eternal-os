@@ -26,6 +26,8 @@ sources:
     locators:
       - kind: https
         url: https://www.lua.org/ftp/lua-5.4.9.tar.gz
+      - kind: https
+        url: https://sources.buildroot.net/lua/lua-5.4.9.tar.gz
     extract:
       format: tar.gz
       strip-components: 1
