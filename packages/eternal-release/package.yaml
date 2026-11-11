@@ -70,27 +70,27 @@ outputs:
 tests:
   - name: release-files
     stage: build
-    argv:
-      - sh
-      - -c
-      - |
-        grep -q '^ID=eternal$' os-release
-        grep -q '^VERSION_ID="rolling"$' os-release
-        grep -q '^PRETTY_NAME="Eternal Linux Rolling"$' os-release
-        test -f system-release
-        test -f redhat-release
-        grep -q 'baseurl=https://packages.eternal.sturla.tech/' eternal.repo
-        grep -q '^\[eternal-archive\]$' eternal.repo
-        grep -q 'baseurl=https://packages.eternal.sturla.tech/archive/' eternal.repo
-
-  - name: installed
+    script: |
+      grep -q '^ID=eternal$' os-release
+      grep -q '^VERSION_ID="rolling"$' os-release
+      grep -q '^PRETTY_NAME="Eternal Linux Rolling"$' os-release
+      test -f system-release
+      test -f redhat-release
+      grep -q 'baseurl=https://packages.eternal.sturla.tech/' eternal.repo
+      grep -q '^\[eternal-archive\]$' eternal.repo
+      grep -q 'baseurl=https://packages.eternal.sturla.tech/archive/' eternal.repo
+  - name: identity-and-repositories
     stage: installed
-    packages: [bash-binsh]
-    argv:
-      - sh
-      - -c
-      - |
-        . /etc/os-release
-        test "$ID" = eternal
-        test "$VERSION_ID" = "rolling"
-        test -f /etc/yum.repos.d/eternal.repo
+    packages:
+      - bash
+      - coreutils
+      - grep
+    script: |
+      . /etc/os-release
+      test "$ID" = eternal
+      test "$VERSION_ID" = rolling
+      test "$PRETTY_NAME" = 'Eternal Linux Rolling'
+      test "$(cat /etc/system-release)" = "$(cat /etc/redhat-release)"
+      grep '^\[eternal\]$' /etc/yum.repos.d/eternal.repo
+      grep '^\[eternal-archive\]$' /etc/yum.repos.d/eternal.repo
+      grep '^baseurl=https://packages.eternal.sturla.tech/' /etc/yum.repos.d/eternal.repo
