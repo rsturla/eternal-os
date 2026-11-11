@@ -66,6 +66,13 @@ outputs:
       provides:
         - coreutils-full
         - coreutils-single
+    tests:
+      - name: filesystem-and-text
+        stage: installed
+        packages: []
+        files: tests
+        script: |
+          bash "$TEST_FILES/filesystem-and-text.sh"
 
   - name: coreutils-doc
     summary: GNU core utilities documentation
@@ -79,17 +86,6 @@ outputs:
         - /usr/share/licenses/coreutils-doc/COPYING
 
 tests:
-  - name: build
-    stage: build
-    argv:
-      - sh
-      - -c
-      - test -x "$STAGE/usr/bin/ls" && test -x "$STAGE/usr/bin/cat"
-
-  - name: installed
-    stage: installed
-    argv: [ls, --version]
-
   - name: hardening
     stage: build
     pipeline:
