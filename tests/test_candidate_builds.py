@@ -74,6 +74,7 @@ if os.environ.get('FAIL_FOUNDATION') == name:
 
     def test_candidate_payload_changes_invalidate_build_stamps(self):
         shutil.copy2(ROOT / "scripts/build-all.sh", self.scripts)
+        shutil.copy2(ROOT / "scripts/accept-rpms.py", self.scripts)
         profile = self.root / "runtime.yaml"
         profile.write_text("runtime policy\n")
         recipe = self.root / "packages/openssf-compiler-options/package.yaml"
@@ -96,14 +97,23 @@ import json, os, sys
 from pathlib import Path
 a = sys.argv[1:]
 if a[0] == 'plan':
-    print(json.dumps({'plan': {'cells': [{'id': 'default'}]}}))
-elif a[0] == 'build':
+    print(json.dumps({'plan': {'cells': [{'id': 'default', 'tests': [{}]}]}}))
+elif a[0] in ('build', 'test'):
     with open(os.environ['CANDIDATE_CALLS'], 'a') as log:
         log.write(json.dumps(a) + '\n')
+    if a[0] == 'test':
+        print(json.dumps({'document': 'rpmx-run-report', 'version': 1, 'outcome': 'passed',
+                          'acceptance': 'completed', 'tests': [{'status': os.environ.get('CASE_STATUS', 'passed')}]}))
+        sys.exit(0)
     out = Path(a[a.index('--output') + 1]) / 'x86_64'
     out.mkdir(parents=True, exist_ok=True)
     (out / 'candidate.rpm').write_text('built')
-    Path(a[a.index('--junit') + 1]).write_text('<testsuite/>')
+    (out.parent / 'run-report.json').write_text(json.dumps({
+        'document': 'rpmx-run-report', 'version': 1, 'outcome': 'passed',
+        'build_tests_requested': True, 'build_tests': [], 'evidence': [],
+    }))
+    assert '--junit' not in a
+    (out.parent / 'run-report.xml').write_text('<testsuite/>')
 ''')
         candidates = self.root / "input"
         candidates.mkdir()
@@ -115,17 +125,22 @@ elif a[0] == 'build':
         env = dict(self.env, RPMX=str(rpmx))
         for _ in range(2):
             subprocess.run(command, env=env, check=True, capture_output=True)
-        self.assertEqual(len(self.calls()), 1, "unchanged candidate should use validated stamp")
-        first_profile = self.calls()[0][self.calls()[0].index("--test-profile") + 1]
+        self.assertEqual(len(self.calls()), 2, "unchanged candidate should use validated stamp")
+        self.assertNotIn("--test-profile", self.calls()[0])
+        first_profile = self.calls()[1][self.calls()[1].index("--test-profile") + 1]
         payload.write_text("changed payload")
         subprocess.run(command, env=env, check=True, capture_output=True)
-        self.assertEqual(len(self.calls()), 2)
+        self.assertEqual(len(self.calls()), 4)
         last = self.calls()[-1]
         self.assertNotEqual(first_profile, last[last.index("--test-profile") + 1])
         self.assertNotIn("--profile", last, "candidate policy must not replace build policy")
+        failed = subprocess.run(command + ["--force"], env=dict(env, CASE_STATUS="not-run"), capture_output=True)
+        self.assertEqual(failed.returncode, 1)
+        self.assertFalse((self.root / "out/.stamps/x86_64/openssf-compiler-options").exists())
+        self.assertTrue((self.root / "out/openssf-compiler-options/x86_64/acceptance/results.json").exists())
         rejected = subprocess.run(command + ["--no-tests"], env=env, capture_output=True)
         self.assertEqual(rejected.returncode, 2)
-        self.assertEqual(len(self.calls()), 2)
+        self.assertEqual(len(self.calls()), 6)
 
 
 if __name__ == "__main__":

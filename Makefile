@@ -53,6 +53,7 @@ doctor:
 check:
 	pre-commit run --all-files --show-diff-on-failure
 	./scripts/check-commits.sh --base $(BASE)
+	./scripts/test-tools.sh
 	RPMX=$(RPMX) ./scripts/lint-all.sh
 
 lint:

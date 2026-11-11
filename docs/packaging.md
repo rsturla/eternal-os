@@ -604,9 +604,9 @@ Tests must establish package behavior, error handling and installation correctne
 A file-presence check or version command alone does not establish runtime coverage.
 Use [the testing guide](testing.md) for commands, fixtures and review criteria.
 
-- `stage: build` runs in the build root with the source tree. Use upstream suites and source-level checks here.
-- `stage: installed` uses packaged RPMs in a separate root. Each test has a fresh workspace and empty staging directory.
-- `stage: transaction` uses a private writable root for real RPM installation, upgrade and removal checks.
+- `build.tests` runs named source suites in independent workspace copies. Each case extends the pinned build closure with its own test tools.
+- Output or recipe `tests` use packaged RPMs in a separate root and a fresh workspace.
+- `mode: transaction` selects a private writable root for real RPM installation, upgrade and removal checks.
 
 Choose one execution form: `script`, `argv` or `pipeline`.
 `script` runs Bash with `-euo pipefail`. Shell `-c` commands in `argv` are errors.
@@ -626,7 +626,6 @@ outputs:
   - name: example-devel
     tests:
       - name: compile-and-run
-        stage: installed
         packages: [gcc, glibc-devel, pkgconf]
         files: tests
         script: |
@@ -635,9 +634,12 @@ outputs:
 ```
 
 The `files` directory is relative to the root recipe. rpmx bundles its contents in the SRPM and recipe digest.
-`TEST_FILES` points to a writable copy. Do not use `$STAGE` to test installed behavior.
+`TEST_FILES` points to a private read-only copy. Use `TEST_PACKAGE_ROOT` for
+read-only candidate payload checks. Do not use `$STAGE` to test installed behavior.
 Declare only tools the test uses in `tests[].packages`.
-Build-test tools join the host build root. Installed-test tools join only the test root.
+Source-case tools extend a separate pinned build environment. They do not enter
+the build root. Acceptance tools join only the selected output test root.
+Keep tools needed by configure or compilation in `build.packages`.
 Do not add runtime libraries to test packages to hide missing runtime dependencies.
 
 Tests must not use the external network. Use fixed local input and isolated loopback services when needed.

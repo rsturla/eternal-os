@@ -46,11 +46,13 @@ Install the pinned rpmx revision with `make bootstrap`. Set `RPMX` to use a loca
 ```console
 RPMX=/path/to/rpmx uv run --with pyyaml bash scripts/lint-all.sh --strict
 RPMX=/path/to/rpmx ./scripts/build-all.sh --package zlib --output out
-rpmx test packages/zlib/package.yaml --test zlib-devel/api-behavior
+rpmx test packages/zlib/package.yaml --install-dir out/zlib/x86_64 \
+  --test-profile profiles/eternal.profile.yaml --test zlib-devel/api-behavior
 ```
 
 The selected test name must match the recipe. Inspect `rpmx plan FILE --json` to list its tests.
-`rpmx build` and `rpmx test` without `--install-dir` run build-stage and runtime tests.
+`rpmx build` runs the source cases declared in `build.tests`. It produces RPMs without running package acceptance.
+The shared build script then runs `rpmx test` against those RPMs. Both phases must pass before it records success.
 The bootstrap variants live in `bootstrap/recipes/`. Test those recipes separately from the production recipes.
 
 To test existing production RPMs without rebuilding:
@@ -64,33 +66,32 @@ make test OUT=out ARCH=x86_64
 Input directories use `out/<recipe>/<arch>/`. Keep unrelated RPMs outside those directories.
 The runner writes `out/tests/results.tsv`, package JSON results, JUnit reports, logs and declared artifacts.
 Each package report includes SHA256 manifests for the input RPMs, recipe files
-and rpmx binary. It records the repository's rpmx pin and the supplied root lock's hash.
-rpmx preserves the resolved test dependency locks under each report's `artifacts/environments/` directory.
+and rpmx binary. It records the repository's rpmx pin.
+rpmx reports the exact inputs and resolved environments in `run-report.json`.
 Use `--output DIR` to choose another report directory.
 Missing RPMs, invalid recipes, absent runtime tests, skipped tests and failures produce a nonzero exit.
 
-Normal builds also retain evidence. The shared build script keeps test stdout,
-stderr and declared artifacts in `out/<recipe>/<arch>/test-results/`, including
-source-suite failures. Direct `rpmx build --output DIR` invocations use
-`DIR/<arch>/test-results/`. These files survive build-workspace cleanup.
-`scripts/build-all.sh` writes the package's JUnit report at
-`out/<recipe>/<arch>/junit.xml` and prints its evidence directory. With
-`--arch all`, the shared build script runs each architecture declared in the
-bootstrap profile separately. It preserves each report and attempts the other
-architectures if one fails. It also copies the private compiler-policy seed's
-reports into `out/test-reports/toolchain/<seed-identity>/<arch>/`.
+Build and acceptance have separate reports. `rpmx build --output DIR` writes
+`DIR/run-report.json` and `DIR/run-report.xml`, with retained case evidence.
+The shared build script writes acceptance evidence under
+`out/<recipe>/<arch>/acceptance/`, including `results.json`, JUnit, command logs
+and declared artifacts. Files survive temporary workspace cleanup and CI uploads
+the output tree after failures.
 
-Explicit `scripts/build-python.py` bootstrap runs collect dependency reports
-under `OUTPUT/test-reports/python/<consumer>/<arch>/<dependency>/<input-identity>/`.
-Use `--test-reports DIR` to choose another destination. Cached dependencies
-also contribute their previous reports. The consumer's evidence stays beside
-its RPM outputs. The helper requires one concrete `--arch` value per invocation.
+A report has document `rpmx-run-report`, version 1. Check `outcome`, not just the
+process exit status. Complete acceptance requires `acceptance: completed` and
+all planned cases with status `passed`. `skipped`, `not-run`, and an incomplete
+run do not establish coverage. Skipped or not-run cases make the run incomplete.
+A build report records `build_tests_requested`
+and its source cases separately from acceptance.
 
-Collection runs after successful and failed builds. The identities include
-the relevant recipe inputs and test policy. Reports contain no private dependency RPMs.
-Each rpmx invocation has its own JUnit path; one matrix build aggregates its
-cells into that report. CI uploads the output tree after failures too.
-With `--no-tests`, the scripts do not request or collect test reports.
+The shared scripts gate both phases before stamps, private dependency promotion
+or publication. `--no-tests` skips both phases in these scripts; the direct
+`rpmx build --no-tests` flag skips only `build.tests`. With `--arch all`, the shared
+build script invokes each declared architecture separately and retains their
+reports. Private toolchain and Python bootstrap dependency evidence is copied
+under `out/test-reports/`; private dependency RPMs stay out of that report tree.
+The Python helper accepts one concrete architecture per invocation.
 
 The lint and Python bootstrap helpers require Python and PyYAML. Use a virtual
 environment, or run them through `uv run --with pyyaml` as above.
@@ -168,18 +169,28 @@ from the Eternal repository. For an unpublished interpreter stream, invoke
 both build and test profiles see its private dependency repository.
 [Issue 41](https://github.com/rsturla/eternal-os/issues/41) tracks a replacement
 for this explicit bootstrap path.
-An existing-RPM run does not execute build-stage suites.
+An existing-RPM run never executes source suites.
 
-Use a native machine for each supported architecture. A cross compile does not prove target runtime behavior.
-Use `--runner qemu` when the prepared execution environment supports that runner.
-Use `--root-lock FILE` to provide build and target metadata instead of automatic build-root preparation.
-The shared scripts still use `--test-profile` for runtime repositories.
-For a pinned runtime policy, call `rpmx test` directly with `--test-root-lock FILE` and omit `--test-profile`.
-Fresh runtime roots require online resolution and assembly, including with a pinned lock.
-For an offline run, pass `--test-root ROOT_DIR --install-dir RPM_DIR --offline`
-to `rpmx test FILE`, using an assembled test root and its saved lock.
-`scripts/test-all.sh` prepares fresh roots and does not support offline runs.
-Test commands themselves run without the external network.
+Use a native machine for each supported architecture. A cross compile does not
+prove target runtime behavior. Use `--runner qemu` when the execution environment
+supports that runner.
+
+To save the resolved acceptance environments for an exact replay:
+
+```console
+rpmx test packages/zlib/package.yaml --install-dir out/zlib/x86_64 \
+  --test-profile profiles/eternal.profile.yaml --save-environment out/zlib-environments
+rpmx test packages/zlib/package.yaml --install-dir out/zlib/x86_64 \
+  --replay out/zlib-environments --offline
+```
+
+A saved environment contains the prepared roots and private bindings. An arbitrary
+root directory or bare dependency lock is not a replay input. Replay validates
+its binding to the recipe, selected RPMs and execution policy. Do not combine
+`--replay` with `--test-profile`. Fresh roots require online resolution and
+assembly. `scripts/test-all.sh` prepares fresh roots and does not offer offline
+runs. Commands have no external network by default; requesting network access
+makes the case unavailable in an offline run.
 
 ## Define tests
 
@@ -194,7 +205,6 @@ Choose exactly one execution form:
 ```yaml
 tests:
   - name: reject-missing-match
-    stage: installed
     packages: [grep]
     argv: [grep, missing, /dev/null]
     expect:
@@ -205,22 +215,20 @@ tests:
 
 Shell `-c` commands in `argv` are errors. Move their text to `script`.
 
-Set a custom deadline on the pipeline step with a duration string, such as `timeout: 4h`.
-Use a positive whole number followed by `s`, `m`, or `h` for seconds, minutes, or hours.
-Zero, fractions, missing units, and overflowing durations fail recipe validation.
-A step value overrides `--step-timeout`; other steps inherit that command default.
-Use a `pipeline` containing a `runs` step when a test script needs a custom deadline.
-GCC and glibc source suites allow four hours per step; production binutils allows two hours.
-Other test steps retain the one-hour default unless their measured run time requires a change.
+Set `timeout` on a test to bound the whole case, including all its pipeline steps.
+A step's own deadline can shorten its remaining allowance. Use a positive whole
+number followed by `s`, `m`, or `h`. Zero, fractions, missing units and overflow
+fail recipe validation. GCC and glibc source suites allow four hours per case;
+production binutils allows two hours.
 
 ```yaml
-tests:
-  - name: upstream
-    stage: build
-    pipeline:
-      - runs: |
-          make -C build check
-        timeout: 4h
+build:
+  tests:
+    - name: upstream
+      packages: [dejagnu]
+      timeout: 4h
+      files: tests
+      script: bash "$TEST_FILES/upstream.sh"
 ```
 
 An unchecked command failure fails a strict script. Bash has exceptions for conditions and `&&` or `||` lists.
@@ -230,19 +238,27 @@ Write output to a file, then check the file when that behavior matters.
 
 ## Test environments
 
-| Stage | Available input | Purpose |
+| Declaration | Available input | Purpose |
 | --- | --- | --- |
-| `build` | Source workspace and build tools | Upstream suites, compilation checks and staged hardening checks |
-| `installed` | Selected RPM closure and explicit test tools | Runtime behavior and installed consumer interfaces |
-| `transaction` | Private writable RPM root and supplied binary RPMs | Installation, upgrade, scriptlets, configuration and erase |
+| `build.tests` | Independent source-workspace copy and pinned build closure plus case tools | Upstream source suites |
+| Output or recipe `tests` | Selected RPM closure and explicit case tools | Runtime behavior and installed consumer interfaces |
+| `tests` with `mode: transaction` | Private writable RPM root and supplied binary RPMs | Installation, upgrade, scriptlets, configuration and erase |
 
-Output-level runtime tests select the named output and its declared runtime siblings.
-Recipe-level runtime tests install all outputs. Use these for integration, not for minimal dependency checks.
-Each runtime test has a fresh writable workspace and an empty `STAGE` directory.
-Tests may reuse prepared root data. Writes to a workspace or transaction root must not affect another test.
+`build.tests` and acceptance cases use the same command, fixture and report syntax.
+Source cases reject transaction mode and network access. Each source case extends
+the pinned build closure with its own tools; those tools do not enter the build
+root or another case. Tools needed during configure or compilation remain real
+`build.packages` dependencies.
 
-Put test-only tools in `tests[].packages`. Build-stage test tools join the host build root, including for cross builds.
-Installed-stage tools do not enter the build root or target sysroot.
+Output-level acceptance selects the named output and its declared runtime siblings.
+Recipe-level acceptance installs all outputs. Use these for integration, not for
+minimal dependency checks. Every case has a private writable workspace. The
+candidate RPM payload is exposed read-only as `TEST_PACKAGE_ROOT` for layout and
+ELF checks; dependency payloads are excluded from that view. Do not use `$STAGE`
+to check acceptance. Prepared roots can be shared, but case writes cannot leak.
+
+Declare case-only tools in that case's `packages` list.
+
 Reusable steps add their declared tools. Strict scripts infer Bash and coreutils.
 Add other commands only when the test uses them.
 Tests that look up their user or group need real account data in the root.
@@ -269,12 +285,15 @@ packages/example/
     expected.txt
 ```
 
-Declare `files: tests`. rpmx copies regular files recursively and exposes the writable copy through `TEST_FILES`.
-The recipe digest and SRPM include fixture contents. Fixture changes invalidate build-cache inputs.
+Declare `files: tests`. rpmx copies regular files recursively and exposes a private read-only copy through `TEST_FILES`.
+The recipe digest and SRPM include fixture contents. Internal execution snapshots
+preserve file contents and permission modes, so checkout edits cannot change a running case.
+Fixture changes invalidate build-cache inputs. Copy an input into the case workspace before modifying it.
 Symlinks, parent traversal, missing directories and empty fixture directories are errors.
 RPM fixtures under a recipe's `tests/` directory are trackable in Git.
 Keep their source, checksums and signing-key provenance beside them.
-Do not depend on executable permissions in the SRPM. Invoke shell fixtures with `bash -euo pipefail "$TEST_FILES/check.sh"`.
+Use `bash -euo pipefail "$TEST_FILES/check.sh"` when a fixture is a shell script.
+Executable fixture modes are preserved in the internal snapshot.
 Keep a shebang executable in Git to satisfy the repository's file checks.
 
 Use pinned, checksummed source archives for large upstream test collections.

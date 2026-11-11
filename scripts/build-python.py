@@ -54,7 +54,7 @@ def dependency_order(plans, name, *, include_tests=True):
             for output in cell["outputs"]:
                 dependencies.update(output["requires"])
             if include_tests:
-                for test in cell.get("tests", []):
+                for test in [*cell.get("build_tests", []), *cell.get("tests", [])]:
                     dependencies.update(test.get("packages", []))
                     for step in test.get("pipeline", []):
                         dependencies.update(step.get("needs", []))
@@ -90,6 +90,8 @@ def collect_test_evidence(output, destination, arch):
     for source, target in [
         (test_junit_path(output, arch), destination / "junit.xml"),
         (output / arch / "test-results", destination / "test-results"),
+        (output / arch / "acceptance", destination / "acceptance"),
+        (output / arch / "build", destination / "build"),
     ]:
         if source.is_file():
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -104,23 +106,52 @@ def collect_test_evidence(output, destination, arch):
         print(f"==> test evidence {destination}", file=sys.stderr)
 
 
-def build_with_evidence(command, output, destination, arch, root):
+def build_with_evidence(command, output, destination, arch, root, acceptance=None):
     """Keep the build failure if evidence collection also fails."""
     # An early setup failure must not publish an earlier run's successful tests.
     test_junit_path(output, arch).unlink(missing_ok=True)
     test_junit_path(output, arch).parent.mkdir(parents=True, exist_ok=True)
-    previous_results = [output / arch / "test-results"]
+    previous_results = [output / arch / "test-results", output / arch / "acceptance", output / arch / "build"]
     if destination is not None:
         previous_results.append(destination)
     for previous in previous_results:
         if previous.exists():
             shutil.rmtree(previous)
+    for report in (output / "run-report.json", output / "run-report.xml"):
+        report.unlink(missing_ok=True)
     failure = None
     try:
         subprocess.run(command, check=True, cwd=root)
+        report = json.loads((output / "run-report.json").read_text())
+        if (report["document"] != "rpmx-run-report" or report["version"] != 1
+                or report["outcome"] != "passed" or not report["build_tests_requested"]
+                or any(case["status"] != "passed" for case in report["build_tests"])):
+            raise subprocess.CalledProcessError(1, command)
+        if acceptance is not None:
+            subprocess.run(acceptance, check=True, cwd=root)
     except subprocess.CalledProcessError as error:
         failure = error
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        print(f"invalid build report in {output}: {error}", file=sys.stderr)
+        failure = subprocess.CalledProcessError(1, command)
     try:
+        if (output / "run-report.xml").is_file():
+            shutil.copy2(output / "run-report.xml", test_junit_path(output, arch))
+        report_path = output / "run-report.json"
+        if report_path.is_file():
+            build_reports = output / arch / "build"
+            build_reports.mkdir(parents=True, exist_ok=True)
+            for report_file in (report_path, output / "run-report.xml"):
+                if report_file.is_file():
+                    shutil.copy2(report_file, build_reports / report_file.name)
+            for evidence in json.loads(report_path.read_text()).get("evidence", []):
+                source = Path(evidence)
+                target = build_reports / "evidence" / source.resolve().relative_to(output.resolve())
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if source.is_dir():
+                    shutil.copytree(source, target, dirs_exist_ok=True)
+                elif source.is_file():
+                    shutil.copy2(source, target)
         if destination is not None:
             collect_test_evidence(output, destination, arch)
         else:
@@ -215,9 +246,14 @@ def main():
                     "--output", str(output),
                 ]
                 if "--no-tests" not in build_args:
-                    command.extend(["--test-profile", str(test_profile_file),
-                                    "--junit", str(test_junit_path(output, args.arch))])
-                    build_with_evidence([*command, *build_args], output, reports, args.arch, root)
+                    acceptance = [sys.executable, str(root / "scripts/accept-rpms.py"),
+                                  str(root / "packages" / name / "package.yaml"),
+                                  "--install-dir", str(output / args.arch),
+                                  "--output", str(output / args.arch / "acceptance"),
+                                  "--arch", args.arch, "--test-profile", str(test_profile_file)]
+                    if "--build-release" in build_args:
+                        acceptance.extend(["--build-release", build_args[build_args.index("--build-release") + 1]])
+                    build_with_evidence([*command, *build_args], output, reports, args.arch, root, acceptance)
                 else:
                     subprocess.run([*command, *build_args], check=True, cwd=root)
                 if name != args.name:

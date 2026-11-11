@@ -86,7 +86,7 @@ class CandidateRPMs(unittest.TestCase):
             (directory / "stage").mkdir()
             recipe = directory / "package.yaml"
             recipe.write_text(yaml.safe_dump({
-                "schema": 1,
+                "schema": 2,
                 "package": {"name": name, "version": version, "release": 1,
                             "summary": summary, "license": "MIT", "source-date-epoch": 1704067200},
                 "outputs": [{"name": name, "arch": arch, "metapackage": True}],

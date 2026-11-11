@@ -85,12 +85,17 @@ class PythonBootstrap(unittest.TestCase):
             "packages": ["python-3.15-installer"],
             "pipeline": [{"needs": ["python-3.15-wheel"]}],
         }]
+        consumer["cells"][0]["build_tests"] = [{
+            "packages": ["python-3.15-source-tool"], "pipeline": [],
+        }]
         plans = {
             "python-demo": consumer,
+            "python-source-tool": plan("python-3.15-source-tool"),
             "python-installer": plan("python-3.15-installer"),
             "python-wheel": plan("python-3.15-wheel"),
         }
         order = bootstrap.dependency_order(plans, "python-demo")
+        self.assertLess(order.index("python-source-tool"), order.index("python-demo"))
         self.assertLess(order.index("python-installer"), order.index("python-demo"))
         self.assertLess(order.index("python-wheel"), order.index("python-demo"))
         self.assertEqual(
@@ -131,6 +136,14 @@ class PythonBootstrap(unittest.TestCase):
                     return "".join(name + " " + hashes[name] + "\n" for name in command[1:])
 
                 def run(command, **kwargs):
+                    if command[1].endswith("accept-rpms.py"):
+                        runtime = yaml.safe_load(Path(command[command.index("--test-profile") + 1]).read_text())
+                        published = next(r for r in runtime["repositories"] if r["id"] == "published")
+                        self.assertEqual(published["baseurl"], f"file://{root / 'profiles/repo'}")
+                        if Path(command[2]).parent.name == "python-demo":
+                            self.assertEqual(runtime["repositories"][0]["id"], "python-local")
+                            self.assertIn("python-3.15-tool", published["exclude"])
+                        return
                     if command[1] != "build":
                         return
                     name = Path(command[2]).parent.name
@@ -141,8 +154,7 @@ class PythonBootstrap(unittest.TestCase):
                         self.assertNotIn("--junit", command)
                         self.assertIn("--no-tests", command)
                     else:
-                        runtime = Path(command[command.index("--test-profile") + 1])
-                        policies.append(yaml.safe_load(runtime.read_text()))
+                        self.assertNotIn("--test-profile", command)
                     for settings in policies:
                         published = next(r for r in settings["repositories"] if r["id"] == "published")
                         self.assertEqual(published["baseurl"], f"file://{root / 'profiles/repo'}")
@@ -155,6 +167,10 @@ class PythonBootstrap(unittest.TestCase):
                     output = Path(command[command.index("--output") + 1]) / "x86_64"
                     output.mkdir(parents=True, exist_ok=True)
                     (output / (name + ".rpm")).write_text("fixture RPM")
+                    (output.parent / "run-report.json").write_text(json.dumps({
+                        "document": "rpmx-run-report", "version": 1, "outcome": "passed",
+                        "build_tests_requested": True, "build_tests": [], "evidence": [],
+                    }))
 
                 args = ["build-python.py", "python-demo",
                         "--arch", "x86_64", "--output", str(root / "out"),
@@ -207,9 +223,10 @@ class PythonBootstrap(unittest.TestCase):
                     if command[1] != "build":
                         return
                     name = Path(command[2]).parent.name
-                    junit = Path(command[command.index("--junit") + 1])
-                    calls.append((name, junit))
+                    self.assertNotIn("--junit", command)
                     output = Path(command[command.index("--output") + 1])
+                    junit = output / "run-report.xml"
+                    calls.append((name, junit))
                     arch = command[command.index("--arch") + 1]
                     artifacts = output / arch / "test-results/assertion/artifacts"
                     artifacts.mkdir(parents=True)
@@ -219,6 +236,10 @@ class PythonBootstrap(unittest.TestCase):
                     if name == failed_name:
                         raise subprocess.CalledProcessError(7, command)
                     (output / arch / (name + ".rpm")).write_text("private RPM")
+                    (output / "run-report.json").write_text(json.dumps({
+                        "document": "rpmx-run-report", "version": 1, "outcome": "passed",
+                        "build_tests_requested": True, "build_tests": [], "evidence": [],
+                    }))
 
                 args = ["build-python.py", "python-demo", "--arch", "x86_64",
                         "--output", str(root / "out/python-demo"),
@@ -330,6 +351,7 @@ class BuildAllCache(unittest.TestCase):
             (root / "profiles/bootstrap.profile.yaml").write_text("archs: [aarch64, x86_64]\n")
             original = Path(__file__).resolve().parents[1] / "scripts/build-all.sh"
             shutil.copy2(original, scripts / "build-all.sh")
+            shutil.copy2(original.parent / "accept-rpms.py", scripts)
             for name in ("demo", "openssf-compiler-options"):
                 recipe = root / "packages" / name / "package.yaml"
                 recipe.parent.mkdir(parents=True)
@@ -354,7 +376,7 @@ with open(os.environ['BUILD_CACHE_LOG'], 'a') as log:
     log.write(json.dumps(args) + '\n')
 if args[0] == 'plan':
     cell = 'python=3.15' if os.environ.get('BUILD_CACHE_MATRIX') else 'default'
-    print(json.dumps({'plan': {'cells': [{'id': cell}]}}))
+    print(json.dumps({'plan': {'cells': [{'id': cell, 'tests': [{}]}]}}))
 elif args[0] == 'build':
     output = Path(args[args.index('--output') + 1])
     arch = args[args.index('--arch') + 1]
@@ -363,8 +385,19 @@ elif args[0] == 'build':
         sys.exit(7)
     (output / arch).mkdir(parents=True, exist_ok=True)
     (output / arch / 'fixture.rpm').write_text('fixture RPM')
-    if '--junit' in args:
-        junit = Path(args[args.index('--junit') + 1])
+    evidence_paths = []
+    for case in ('first', 'second'):
+        evidence = output / 'evidence' / case
+        evidence.mkdir(parents=True, exist_ok=True)
+        (evidence / 'stdout.log').write_text(case + ' evidence')
+        evidence_paths.append(str(evidence))
+    (output / 'run-report.json').write_text(json.dumps({
+        'document': 'rpmx-run-report', 'version': 1, 'outcome': 'passed',
+        'build_tests_requested': True, 'build_tests': [], 'evidence': evidence_paths,
+    }))
+    if '--no-tests' not in args:
+        assert '--junit' not in args
+        junit = output / 'run-report.xml'
         junit.write_text('<testsuite name="' + name + '" arch="' + arch + '"/>\n')
         evidence = output / arch / 'test-results/assertion/artifacts'
         evidence.mkdir(parents=True, exist_ok=True)
@@ -379,6 +412,10 @@ elif args[0] == 'build':
             (report / arch).write_text('block evidence directory creation')
     if name == os.environ.get('BUILD_CACHE_FAIL'):
         sys.exit(7)
+elif args[0] == 'test':
+    print(json.dumps({'document': 'rpmx-run-report', 'version': 1, 'outcome': 'passed',
+                      'acceptance': 'completed', 'tests': [{'status': 'passed'}]}))
+    Path(args[args.index('--junit') + 1]).write_text('<testsuite/>')
 elif args[0] == 'repo':
     output = Path(args[args.index('--output') + 1]) / 'repodata'
     output.mkdir(parents=True, exist_ok=True)
@@ -416,11 +453,14 @@ elif args[0] == 'repo':
             expect_builds(2, profiles[0], "build seed and consumer without tests", no_tests=True)
             expect_builds(0, profiles[0], "reuse an unchanged untested build", no_tests=True)
             tested = expect_builds(2, profiles[0], "enabling tests must invalidate both stamps")
-            self.assertEqual(len({call[call.index("--junit") + 1] for call in tested}), 2)
+            self.assertTrue(all("--junit" not in call for call in tested))
             summaries = list((root / "out/test-reports").rglob("upstream.sum"))
             self.assertEqual(len(summaries), 1)
             self.assertEqual(summaries[0].read_text(), "openssf-compiler-options results\n")
             self.assertTrue((root / "out/demo/x86_64/junit.xml").is_file())
+            for case in ("first", "second"):
+                self.assertEqual((root / "out/demo/x86_64/build/evidence/evidence" / case / "stdout.log").read_text(),
+                                 case + " evidence")
             expect_builds(0, profiles[0], "reuse an unchanged tested build")
             # Evidence collection errors on cache hits must fail explicitly.
             seed_report = next((root / "out/test-reports/toolchain").iterdir())
@@ -471,7 +511,8 @@ elif args[0] == 'repo':
                     expected = ["openssf-compiler-options"]
                     self.assertEqual(sorted(p.read_text().split()[0] for p in summaries),
                                      [] if copy_error else sorted(expected))
-                    self.assertEqual(len(list((failed_output / "test-reports").rglob("junit.xml"))), len(expected))
+                    self.assertEqual(len(list((failed_output / "test-reports").rglob("junit.xml"))),
+                                     2 if failed_name == "demo" else 1)
                     self.assertFalse(list((failed_output / "test-reports").rglob("*.rpm")))
                     self.assertFalse((failed_output / ".stamps/x86_64/demo").exists())
                     if failed_name == "demo":
@@ -529,8 +570,8 @@ raise SystemExit('normal matrix builds must not invoke the Python bootstrap help
             (root / "out/.stamps/aarch64/demo").unlink()
             calls = expect_builds(1, profiles[1], "build the matrix consumer directly with rpmx", arch="aarch64")
             self.assertEqual(Path(calls[0][1]), root / "packages/demo/package.yaml")
-            self.assertEqual(Path(calls[0][calls[0].index("--junit") + 1]),
-                             root / "out/demo/aarch64/junit.xml")
+            self.assertNotIn("--junit", calls[0])
+            self.assertTrue((root / "out/demo/aarch64/junit.xml").is_file())
             self.assertNotIn("--fingerprint", calls[0])
             self.assertEqual((root / "out/demo/aarch64/test-results/assertion/artifacts/upstream.sum").read_text(),
                              "demo results\n")

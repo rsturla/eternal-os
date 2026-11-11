@@ -123,7 +123,7 @@ materialization, artifact transfer between jobs and object-storage credentials.
 - `prepare` selects changed packages and computes their content hashes
   (`scripts/affected.sh`, `scripts/package-hash.sh`);
 - a matrix builds only the affected packages in parallel, which runs the
-  recipe's tests by default, and uploads per-package artifacts.
+  source suites, then explicitly accepts the built RPMs before uploading artifacts.
 
 Recipes declare upstream build suites, installed consumer tests and private
 RPM transaction tests. Test fixtures belong to the recipe and contribute to
@@ -131,7 +131,8 @@ its content hash. The Python bootstrap helper also hashes the local dependencies
 and test tools that it builds for an unpublished matrix consumer.
 See [package testing](testing.md) for isolation rules, reports and coverage.
 `make test` runs installed and transaction tests against existing RPMs in `out/`.
-Build-stage suites require a build or `rpmx test` without `--install-dir`.
+Source suites are declared in `build.tests` and run only during build.
+Standalone `rpmx test` requires existing RPMs through `--install-dir`.
 
 `release.yml` runs on `main`, on `v*` tags and on demand:
 

@@ -111,7 +111,7 @@ Build one package, or only the packages touched since a ref:
 ```
 
 Per-package artifacts land in `out/<package>/<arch>/`. Keeping package outputs
-separate matters: an installed-stage test root must not see RPMs from unrelated
+separate matters: a package acceptance root must not see RPMs from unrelated
 packages.
 
 See [the testing guide](docs/testing.md) for strict scripts, external fixtures,

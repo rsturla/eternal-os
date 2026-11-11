@@ -31,7 +31,7 @@ is not yet buildable from the self-hosted root belongs in
 ## Recipe anatomy
 
 ```yaml
-schema: 1
+schema: 2
 
 package:
   name: foo
@@ -52,6 +52,10 @@ build:
     - runs: |
         install -D -m 0755 foo "$STAGE/usr/bin/foo"
     - uses: strip
+  tests:
+    - name: upstream-suite
+      pipeline:
+        - uses: make/check
 
 outputs:
   # The first output is the main package. It receives everything the later
@@ -59,18 +63,11 @@ outputs:
   - name: foo
     tests:
       - name: installed-smoke
-        stage: installed
         packages: [diffutils]
         files: tests
         script: |
           foo "$TEST_FILES/input" > actual
           cmp "$TEST_FILES/expected" actual
-
-tests:
-  - name: upstream-suite
-    stage: build
-    pipeline:
-      - uses: make/check
 ```
 
 Rules that matter:
@@ -116,12 +113,18 @@ Use `script` for strict Bash checks. Use `argv` with `expect` for direct command
 Shell `-c` commands in `argv` are not supported.
 Put compiler inputs and sample data in `tests/`, then set `files: tests` on the test.
 The script reads them through `TEST_FILES`.
-Declare test tools in `tests[].packages`, including tools for build-stage suites.
+Declare case tools in each `packages` list, including `build.tests` source suites.
+They do not become build dependencies.
 
 Tests with the same output and dependencies reuse prepared root data, but their writable workspaces do not share state.
 `tests[].environment` sets test variables. A pipeline step's own `env` values take precedence.
 
-Select one output test with `rpmx test --test OUTPUT/NAME`.
+Select an output case with:
+
+```console
+rpmx test packages/NAME/package.yaml --install-dir out/NAME/ARCH --test OUTPUT/NAME
+```
+
 Use `scripts/test-all.sh` to test previously built RPMs without rebuilding.
 Inspect its status report before treating a run as complete.
 

@@ -40,7 +40,7 @@ usage: build-all.sh [options]
   --build-release N  Append +buildN to rebuilt packages (rolling releases)
   --jobs N           Parallel build jobs exported to steps as JOBS
   --locked           Refuse recipe, source or root drift
-  --no-tests         Build without running the recipe's tests
+  --no-tests         Skip source suites and package acceptance
   --test-profile FILE Repository policy for runtime tests (default: Eternal)
   --test-rpms DIR    Prefer these candidate binary RPMs in isolated test roots
   -h, --help         Show this help
@@ -130,7 +130,7 @@ if [[ -n $package && $selection == affected ]]; then
   exit 2
 fi
 
-# rpmx cannot write JUnit for a multi-architecture invocation. Run the same
+# Run the same
 # entry point once per declared architecture, retaining each report and failure.
 if [[ $arch == all ]]; then
   declared_arches=$(python3 - "$root/profiles/bootstrap.profile.yaml" <<'PY'
@@ -196,7 +196,7 @@ test_junit_path() {
 collect_test_evidence() {
   local build_output=$1 reports=$2 directory target junit collected=0
   junit=$(test_junit_path "$build_output")
-  local -a directories=("$build_output/${arch:-$(uname -m)}/test-results")
+  local -a directories=("$build_output/${arch:-$(uname -m)}/test-results" "$build_output/${arch:-$(uname -m)}/acceptance" "$build_output/${arch:-$(uname -m)}/build")
   if [[ -f $junit ]]; then
     mkdir -p "$reports" || return
     cp -- "$junit" "$reports/junit.xml" || return
@@ -220,16 +220,58 @@ run_build() {
   if ((no_tests == 0)); then
     # Clear test evidence only. Retain package outputs and other architectures.
     # A build that fails before tests must not publish older successful tests.
-    rm -f -- "$(test_junit_path "$build_output")"
+    rm -f -- "$(test_junit_path "$build_output")" "$build_output/run-report.json" "$build_output/run-report.xml"
     mkdir -p "$(dirname "$(test_junit_path "$build_output")")"
     if [[ -n $reports ]]; then
       rm -rf -- "$reports"
       mkdir -p "$reports"
     fi
-    rm -rf -- "$build_output/${arch:-$(uname -m)}/test-results"
+    rm -rf -- "$build_output/${arch:-$(uname -m)}/test-results" "$build_output/${arch:-$(uname -m)}/acceptance" "$build_output/${arch:-$(uname -m)}/build"
   fi
   "$@" || status=$?
+  if ((status == 0 && no_tests == 0)); then
+    if ! jq -e '.document == "rpmx-run-report" and .version == 1 and .outcome == "passed" and .build_tests_requested == true and all(.build_tests[]; .status == "passed")' "$build_output/run-report.json" >/dev/null; then
+      echo "build did not produce complete passing source evidence: $build_output/run-report.json" >&2
+      status=1
+    fi
+  fi
+  if ((status == 0 && no_tests == 0)); then
+    local recipe
+    recipe=$3
+    local -a acceptance=(python3 "$root/scripts/accept-rpms.py" "$recipe"
+      --install-dir "$build_output/${arch:-$(uname -m)}"
+      --output "$build_output/${arch:-$(uname -m)}/acceptance"
+      --arch "${arch:-$(uname -m)}" --test-profile "$test_profile")
+    local argument previous='' effective_build_release=''
+    for argument in "$@"; do
+      [[ $previous != --build-release ]] || effective_build_release=$argument
+      previous=$argument
+    done
+    [[ -z $effective_build_release ]] || acceptance+=(--build-release "$effective_build_release")
+    RPMX="$rpmx" "${acceptance[@]}" || status=$?
+  fi
   if ((no_tests == 0)); then
+    [[ ! -f $build_output/run-report.xml ]] || cp -- "$build_output/run-report.xml" "$(test_junit_path "$build_output")"
+    if [[ -f $build_output/run-report.json ]]; then
+      local source_reports="$build_output/${arch:-$(uname -m)}/build"
+      mkdir -p "$source_reports"
+      cp -- "$build_output/run-report.json" "$source_reports/"
+      [[ ! -f $build_output/run-report.xml ]] || cp -- "$build_output/run-report.xml" "$source_reports/"
+      while IFS= read -r evidence; do
+        [[ -e $evidence ]] || continue
+        local relative
+        relative=$(realpath --relative-to="$build_output" -- "$evidence")
+        if [[ $relative == ../* || $relative == .. ]]; then
+          echo "build evidence escapes output: $evidence" >&2
+          ((status != 0)) || status=1
+          continue
+        fi
+        mkdir -p "$source_reports/evidence"
+        local destination
+        destination=$(realpath -- "$source_reports/evidence")
+        (cd "$build_output" && cp -a --parents -- "$relative" "$destination/") || { ((status != 0)) || status=1; }
+      done < <(jq -r '.evidence[]' "$build_output/run-report.json")
+    fi
     if [[ -z $reports ]]; then
       echo "==> test evidence $build_output" >&2
     elif ! collect_test_evidence "$build_output" "$reports"; then
@@ -270,10 +312,6 @@ ensure_toolchain_repo() {
   [[ -n $arch ]] && args+=(--arch "$arch")
   [[ -n $jobs ]] && args+=(--jobs "$jobs")
   ((no_tests)) && args+=(--no-tests)
-  ((no_tests)) || args+=(--test-profile "$test_profile")
-  if ((no_tests == 0)); then
-    args+=(--junit "$(test_junit_path "$toolchain_out")")
-  fi
   run_build "$toolchain_out" "$reports" "${args[@]}"
 
   find "$toolchain_out" -type f -name '*.rpm' ! -name '*.src.rpm' \
@@ -331,14 +369,13 @@ for recipe in "${recipes[@]}"; do
   name=$(basename "$(dirname "$recipe")")
   pkg_output="$output/$name"
   stamp="$stamp_dir/$name"
-  # One output directory per package: the installed-stage test root must not
+  # One output directory per package: the acceptance root must not
   # see RPMs from unrelated packages.
   cmd=("$rpmx" build "$recipe" --output "$pkg_output")
   [[ -n $arch ]] && cmd+=(--arch "$arch")
   [[ -n $signing_key ]] && cmd+=(--signing-key "$signing_key")
   [[ -n $build_release ]] && cmd+=(--build-release "$build_release")
   [[ -n $jobs ]] && cmd+=(--jobs "$jobs")
-  ((no_tests)) || cmd+=(--test-profile "$test_profile")
   cmd+=("${extra[@]}")
 
   stamp_hash=${hash_of[$name]:-missing}
@@ -360,9 +397,6 @@ for recipe in "${recipes[@]}"; do
   echo "==> build ${recipe#"$root"/} (${stamp_hash:0:12}) -> $pkg_output"
   # A failed forced rebuild must not leave an earlier successful stamp.
   rm -f -- "$stamp"
-  if ((no_tests == 0)); then
-    cmd+=(--junit "$(test_junit_path "$pkg_output")")
-  fi
   run_build "$pkg_output" "" "${cmd[@]}"
 
   mkdir -p "$stamp_dir"

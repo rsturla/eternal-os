@@ -19,6 +19,7 @@ class RuntimeReports(unittest.TestCase):
             scripts = root / "scripts"
             scripts.mkdir()
             shutil.copy2(ROOT / "scripts/test-all.sh", scripts)
+            shutil.copy2(ROOT / "scripts/accept-rpms.py", scripts)
             recipe = root / "packages/demo/package.yaml"
             recipe.parent.mkdir(parents=True)
             recipe.write_text("fixture recipe\n")
@@ -30,11 +31,11 @@ class RuntimeReports(unittest.TestCase):
             rpmx.write_text('''#!/usr/bin/env python3
 import json, sys
 if sys.argv[1] == 'plan':
-    print(json.dumps({'plan': {'cells': [{'tests': [{'stage': 'installed'}]}]}}))
+    print(json.dumps({'plan': {'cells': [{'tests': [{}]}]}}))
 else:
-    print(json.dumps({'ok': False, 'diagnostics': [{
+    print(json.dumps({'document': 'rpmx-run-report', 'version': 1, 'outcome': 'failed', 'acceptance': 'running', 'tests': [], 'primary': {
         'code': 'RPMX-ROOT-002', 'message': 'builder image digest differs from the lock',
-    }]}))
+    }}))
     sys.exit(1)
 ''')
             rpmx.chmod(0o755)
@@ -45,9 +46,10 @@ else:
             ], env=dict(os.environ, RPMX=str(rpmx)), capture_output=True, text=True)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("RPMX-ROOT-002: builder image digest differs from the lock", result.stderr)
+            self.assertIn("RPMX-ROOT-002", result.stderr)
+            self.assertIn("builder image digest differs from the lock", result.stderr)
             report = json.loads((root / "reports/demo/x86_64/results.json").read_text())
-            self.assertFalse(report["ok"])
+            self.assertEqual(report["outcome"], "failed")
             self.assertIn("demo\tx86_64\tfailed\t", (root / "reports/results.tsv").read_text())
 
 
