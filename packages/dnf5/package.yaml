@@ -8,7 +8,7 @@ schema: 1
 package:
   name: dnf5
   version: "5.4.7.0"
-  release: 1
+  release: 2
   summary: Package manager based on libdnf5 and libsolv
   description: |
     dnf5 is the next generation of the DNF package manager. It uses libdnf5
@@ -68,7 +68,7 @@ build:
     - xz-devel
     - zchunk-devel
     - zlib-devel
-    - libzstd-devel
+    - zstd-devel
   pipeline:
     - uses: cmake/configure
       with:
