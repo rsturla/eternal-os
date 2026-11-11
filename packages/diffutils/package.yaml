@@ -55,18 +55,13 @@ outputs:
       license:
         - /usr/share/licenses/diffutils/COPYING
     tests:
-      - name: installed
+      - name: comparison
         stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            printf 'a\n' > a
-            printf 'b\n' > b
-            if diff a b > /dev/null; then exit 1; fi
-            printf 'a\n' > b
-            diff a b
+        packages:
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/comparison.sh"
 
   - name: diffutils-doc
     summary: GNU diff utilities documentation
@@ -78,3 +73,11 @@ outputs:
         - /usr/share/licenses/diffutils-doc/COPYING
       license:
         - /usr/share/licenses/diffutils-doc/COPYING
+
+tests:
+  - name: upstream
+    stage: build
+    packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+    artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+    pipeline:
+      - uses: make/check
