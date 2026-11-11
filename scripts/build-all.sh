@@ -143,10 +143,6 @@ ensure_toolchain_repo() {
   printf '%s\n' "$hash" >"$stamp"
 }
 
-if [[ $package != openssf-compiler-options ]]; then
-  ensure_toolchain_repo
-fi
-
 recipes=()
 if [[ -n $package ]]; then
   recipe="$root/packages/$package/package.yaml"
@@ -204,6 +200,11 @@ for recipe in "${recipes[@]}"; do
       echo "==> skip $name (unchanged: ${hash_of[$name]:0:12})"
       continue
     fi
+  fi
+
+  # Cached outputs do not need a build root or the compiler policy repository.
+  if [[ $name != openssf-compiler-options ]]; then
+    ensure_toolchain_repo
   fi
 
   # One output directory per package: the installed-stage test root must not
