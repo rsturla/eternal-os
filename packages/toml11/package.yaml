@@ -52,20 +52,12 @@ outputs:
     - /usr/share/licenses/toml11-devel/**
   arch: noarch
   tests:
-  - name: compile-and-run
+  - name: api-behavior
     stage: installed
     packages:
-      - gcc-c++
-      - glibc-devel
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.cc <<'EOF'
-      #include <toml.hpp>
-      #include <sstream>
-      int main(void) { std::istringstream s("answer = 42\n"); auto v = toml::parse(s, "test.toml"); return toml::find<int>(v, "answer") != 42; }
-      EOF
-      g++ /tmp/test.cc -std=c++11 -o /tmp/test
-      /tmp/test
+    - gcc-c++
+    - glibc-devel
+    files: tests
+    script: |
+      g++ -std=c++17 -Wall -Wextra  "$TEST_FILES/behavior.cc"  -o behavior
+      ./behavior
