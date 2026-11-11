@@ -67,11 +67,7 @@ outputs:
   tests:
   - name: suffix
     stage: installed
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       test "$(psl --use-builtin-data --print-reg-domain example.co.uk)" = "example.co.uk: example.co.uk"
 - name: libpsl-libs
   files:
@@ -84,16 +80,12 @@ outputs:
     run:
     - libunistring
   tests:
-  - name: load
+  - name: runtime-linkage
     stage: installed
-    packages:
-    - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("libpsl.so.5")'
+    pipeline:
+      - uses: test/runtime-linkage
+        with:
+          libraries: ["libpsl.so.*"]
 - name: libpsl-devel
   files:
     include:
@@ -106,23 +98,17 @@ outputs:
     run:
     - libpsl-libs = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
+  - name: api-behavior
     stage: installed
     packages:
     - gcc
     - glibc-devel
     - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.c <<'EOF'
-      #include <libpsl.h>
-      int main(void) { const psl_ctx_t *p = psl_builtin(); return !p || !psl_is_public_suffix(p, "com"); }
-      EOF
-      gcc /tmp/test.c $(pkg-config --cflags --libs libpsl) -o /tmp/test
-      /tmp/test
+    files: tests
+    script: |
+      pkg-config --exists libpsl
+      gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libpsl) "$TEST_FILES/behavior.c" $(pkg-config --libs libpsl) -o behavior
+      ./behavior
 - name: libpsl-doc
   files:
     include:
@@ -136,3 +122,12 @@ tests:
   stage: build
   pipeline:
   - uses: test/hardening-check
+- name: upstream
+  stage: build
+  packages:
+  - diffutils
+  artifacts:
+  - test-suite.log
+  - tests/test-suite.log
+  pipeline:
+  - uses: make/check
