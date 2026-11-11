@@ -1,0 +1,14 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "eternal-fixture"
+dynamic = ["version"]
+description = "Offline version-control fixture"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "eternal_fixture/_version.py"
