@@ -59,17 +59,14 @@ outputs:
       license:
         - /usr/share/licenses/findutils/COPYING
     tests:
-      - name: installed
+      - name: selection-and-exec
         stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            mkdir -p /tmp/tree/a
-            touch /tmp/tree/a/file
-            test "$(find /tmp/tree -name file)" = /tmp/tree/a/file
-            test "$(printf 'one\ntwo\n' | xargs -n1 printf '%s,')" = one,two,
+        packages:
+          - coreutils
+          - bash-binsh
+        files: tests
+        script: |
+          bash "$TEST_FILES/selection-and-exec.sh"
 
   - name: findutils-locate
     summary: findutils locate and updatedb
@@ -86,16 +83,13 @@ outputs:
       run:
         - findutils = ${package.version}-${package.release}
     tests:
-      - name: installed
+      - name: database
         stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            locate --version
-            test -x /usr/bin/updatedb
-            test -x /usr/libexec/findutils/frcode
+        packages:
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/database.sh"
 
   - name: findutils-doc
     summary: GNU find utilities documentation
@@ -107,3 +101,11 @@ outputs:
         - /usr/share/licenses/findutils-doc/COPYING
       license:
         - /usr/share/licenses/findutils-doc/COPYING
+
+tests:
+  - name: upstream
+    stage: build
+    packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+    artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+    pipeline:
+      - uses: make/check
