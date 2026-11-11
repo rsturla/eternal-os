@@ -12,7 +12,7 @@ schema: 1
 package:
   name: glibc-2.43
   version: "2.43"
-  release: 1
+  release: 2
   summary: The GNU C Library
   description: |
     The GNU C Library provides the C runtime, dynamic loader interfaces,
@@ -177,6 +177,7 @@ outputs:
         - glibc-2.43 = ${package.version}-${package.release}
       provides:
         - ld-linux = ${package.version}-${package.release}
+        - rtld(GNU_HASH)
 
   - name: libc-bin-2.43
     summary: GNU C Library binaries
@@ -274,6 +275,7 @@ outputs:
     dependencies:
       run:
         - glibc >= ${package.version}
+        - kernel-headers
       provides:
         - glibc-devel = ${package.version}-${package.release}
     tests:
@@ -281,11 +283,15 @@ outputs:
         stage: installed
         packages:
           - bash-binsh
+          - binutils
           - coreutils
+          - gcc
+          - grep
         argv:
           - sh
           - -c
           - |
+            set -eu
             libdir=/usr/lib64
             [ -d "$libdir" ] || libdir=/usr/lib
             test -f "$libdir/libc.so-2.43"
@@ -309,6 +315,13 @@ outputs:
               test -f "$libdir/$so" || { echo "$libdir/$so is not a regular file"; exit 1; }
               test ! -L "$libdir/$so" || { echo "$libdir/$so is still a symlink"; exit 1; }
             done
+            cat > /tmp/glibc-devel-test.c <<'EOF'
+            #include <pthread.h>
+            int main(void) { return pthread_equal(pthread_self(), pthread_self()) ? 0 : 1; }
+            EOF
+            gcc -pthread -Wl,--hash-style=gnu -o /tmp/glibc-devel-test /tmp/glibc-devel-test.c
+            readelf -d /tmp/glibc-devel-test | grep -q GNU_HASH
+            /tmp/glibc-devel-test
 
   - name: glibc-2.43-static
     summary: GNU C Library static libraries
