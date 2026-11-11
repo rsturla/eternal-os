@@ -49,6 +49,7 @@ build:
     - coreutils
     - bison
     - flex
+    - file
     - gawk
     - sed
     - grep
@@ -61,6 +62,7 @@ build:
     - tar
     - gzip
   sysroot:
+    - libstdc++-devel
     - gmp-devel
     - mpfr-devel
     - libmpc-devel
@@ -178,6 +180,7 @@ outputs:
     dependencies:
       run:
         - gcc-16 = ${package.version}-${package.release}
+        - libstdc++-16-devel = ${package.version}-${package.release}
       conflicts:
         - gcc-13-default
         - gcc-14-default
@@ -187,6 +190,18 @@ outputs:
         - gcc-c++ = ${package.version}-${package.release}
         - cpp = ${package.version}-${package.release}
         - cc = ${package.version}-${package.release}
+    tests:
+      - name: cxx-link
+        stage: installed
+        packages: [bash-binsh, coreutils]
+        argv:
+          - sh
+          - -eu
+          - -c
+          - |
+            printf '#include <iostream>\nint main() { std::cout << "ok"; }\n' > /tmp/gcc-cxx-test.cc
+            c++ /tmp/gcc-cxx-test.cc -o /tmp/gcc-cxx-test
+            test "$(/tmp/gcc-cxx-test)" = ok
 
   - name: libstdc++-16
     summary: GNU Standard C++ Library
