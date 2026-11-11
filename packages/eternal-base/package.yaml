@@ -56,3 +56,17 @@ outputs:
         - tzdata
         - util-linux
         - shadow-utils
+tests:
+  - name: base-system-closure
+    stage: installed
+    packages:
+      - bash
+    script: |
+      . /etc/os-release
+      test "$ID" = eternal
+      for command in sh date dnf5 useradd mount; do command -v "$command"; done
+      /bin/sh -c 'test "$((6 * 7))" = 42'
+      dnf5 --version
+      test -s /etc/ssl/certs/ca-certificates.crt
+      test -f /usr/share/zoneinfo/UTC
+      test -d /var/lib/eternal
