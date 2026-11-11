@@ -71,13 +71,14 @@ outputs:
 tests:
   - name: layout
     stage: build
-    argv:
-      - sh
-      - -c
-      - |
-        test -d "$STAGE/etc/eternal"
-        test -d "$STAGE/usr/lib/eternal"
-        test -d "$STAGE/usr/share/eternal"
-        test -d "$STAGE/var/lib/eternal"
-        test -d "$STAGE/var/log/eternal"
-        test -f "$STAGE/usr/lib/eternal/baselayout"
+    files: tests
+    script: |
+      bash "$TEST_FILES/layout.sh" "$STAGE"
+  - name: installed-layout
+    stage: installed
+    packages:
+      - bash
+      - coreutils
+    files: tests
+    script: |
+      bash "$TEST_FILES/layout.sh" /
