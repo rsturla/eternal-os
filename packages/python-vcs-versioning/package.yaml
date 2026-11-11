@@ -80,11 +80,10 @@ outputs:
     run:
     - python-${matrix.python.version}-packaging
   tests:
-  - name: functional
+  - name: behavior
     stage: installed
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - 'from vcs_versioning import PyProjectData, infer_version_string; import os, tempfile; os.chdir(tempfile.mkdtemp());
-      p = PyProjectData.for_testing(tool_name="vcs-versioning"); version = infer_version_string("demo", p,
-      {"root": ".", "fallback_root": ".", "fallback_version": "1.2.3"}); assert version == "1.2.3", version'
+    files: tests
+    packages:
+    - git
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/test_behavior.py" "${matrix.python.version}" "vcs-versioning" "${package.version}"
