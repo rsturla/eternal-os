@@ -12,7 +12,7 @@ schema: 1
 package:
   name: glibc-2.44
   version: "2.44"
-  release: 2
+  release: 3
   summary: The GNU C Library
   description: |
     The GNU C Library provides the C runtime, dynamic loader interfaces,
@@ -100,6 +100,17 @@ build:
       with:
         dir: build
     - runs: |
+        # Supply the small UTF-8 locale used by build tools without requiring
+        # the full locale source package in every root.
+        mkdir -p "$STAGE$LIBDIR/locale"
+        set -- "$STAGE$LIBDIR"/ld-linux*.so.*
+        test "$#" -eq 1
+        LC_ALL=C I18NPATH="$PWD/localedata/locales" \
+          GCONV_PATH="$STAGE$LIBDIR/gconv" \
+          "$1" --library-path "$STAGE$LIBDIR" "$STAGE/usr/bin/localedef" \
+          --no-archive -i C -f "$PWD/localedata/charmaps/UTF-8" \
+          "$STAGE$LIBDIR/locale/C.utf8"
+    - runs: |
         # ld.so.cache is host state, not package payload.
         rm -f "$STAGE/etc/ld.so.cache"
 
@@ -130,7 +141,7 @@ build:
     - uses: license/copy
       with:
         files: [COPYINGv2, COPYING.LIB]
-        outputs: [glibc-2.44, ld-linux-2.44, libc-bin-2.44, glibc-2.44-iconv, glibc-2.44-locales, nss-db-2.44, glibc-2.44-devel, glibc-2.44-static, glibc-2.44-doc]
+        outputs: [glibc-2.44, ld-linux-2.44, libc-bin-2.44, glibc-2.44-iconv, glibc-2.44-locales, glibc-2.44-locale-posix, nss-db-2.44, glibc-2.44-devel, glibc-2.44-static, glibc-2.44-doc]
     - runs: |
         # The loader configuration is owned by ld-linux-2.44, not by the
         # library package.
@@ -155,6 +166,7 @@ outputs:
     dependencies:
       run:
         - ld-linux-2.44 = ${package.version}-${package.release}
+        - glibc-2.44-locale-posix = ${package.version}-${package.release}
       conflicts:
         - glibc-2.43
       provides:
@@ -216,6 +228,19 @@ outputs:
         - glibc-2.44 = ${package.version}-${package.release}
       provides:
         - glibc-iconv = ${package.version}-${package.release}
+
+  - name: glibc-2.44-locale-posix
+    summary: POSIX UTF-8 locale data for glibc
+    files:
+      include:
+        - /usr/lib*/locale/C.utf8/**
+        - /usr/share/licenses/glibc-2.44-locale-posix/**
+      license:
+        - /usr/share/licenses/glibc-2.44-locale-posix/COPYINGv2
+        - /usr/share/licenses/glibc-2.44-locale-posix/COPYING.LIB
+    dependencies:
+      provides:
+        - glibc-locale-posix = ${package.version}-${package.release}
 
   - name: glibc-2.44-locales
     summary: GNU C Library locale data and translations
@@ -316,6 +341,7 @@ outputs:
             cat >/tmp/glibc-devel-test.c <<'EOF'
             #define _GNU_SOURCE
             #include <gnu/libc-version.h>
+            #include <locale.h>
             #include <math.h>
             #include <pthread.h>
             #include <stdio.h>
@@ -327,6 +353,7 @@ outputs:
             }
 
             int main(void) {
+              if (setlocale(LC_ALL, "C.UTF-8") == NULL) return 1;
               pthread_t thread;
               if (pthread_create(&thread, NULL, worker, NULL) != 0) return 1;
               pthread_join(thread, NULL);
