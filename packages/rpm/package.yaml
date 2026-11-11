@@ -7,7 +7,7 @@ schema: 1
 package:
   name: rpm
   version: "6.1.0"
-  release: 2
+  release: 3
   summary: The RPM package manager
   description: |
     RPM is a powerful command line driven package management system capable of
@@ -19,6 +19,8 @@ package:
   cpe:
     vendor: rpm
     product: rpm
+
+context: files
 
 sources:
   - name: rpm-6.1.0.tar.gz
@@ -43,8 +45,8 @@ build:
     - libcap-devel
     - libselinux-devel
     - lua-devel
-    - openssl-devel
     - popt-devel
+    - rpm-sequoia-devel
     - sqlite-devel
     - xz-devel
     - zlib-devel
@@ -69,8 +71,7 @@ build:
           - -DWITH_FSVERITY=OFF
           - -DWITH_IMAEVM=OFF
           - -DWITH_FAPOLICYD=OFF
-          - -DWITH_SEQUOIA=OFF
-          - -DWITH_OPENSSL=ON
+          - -DWITH_SEQUOIA=ON
           - -DWITH_READLINE=OFF
           - -DWITH_BZIP2=ON
           - -DWITH_ICONV=ON
@@ -80,6 +81,8 @@ build:
           - -DWITH_LIBLZMA=ON
     - uses: cmake/build
     - uses: cmake/install
+    - runs: |
+        install -Dm0644 macros.eternal "$STAGE/usr/lib/rpm/macros.d/macros.eternal"
     - uses: license/copy
       with:
         files: [COPYING]
@@ -94,6 +97,11 @@ outputs:
         - /usr/bin/*
         - /usr/lib/rpm/**
         - /usr/share/licenses/rpm/**
+      exclude:
+        - /usr/lib/rpm/rpmrc
+        - /usr/lib/rpm/macros
+        - /usr/lib/rpm/macros.d/**
+        - /usr/lib/rpm/platform/**
       license:
         - /usr/share/licenses/rpm/**
     dependencies:
@@ -102,17 +110,70 @@ outputs:
         - rpm-build-libs = ${package.version}-${package.release}
         - popt
     tests:
-      - name: installed
+      - name: macros-and-query
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            rpm --version
-            rpmbuild --version
-            rpm --eval '%{_libdir}' | grep -Fx /usr/lib64
-
+        packages:
+          - bash
+        script: |
+          rpm --version
+          rpmbuild --version
+          rpm -q rpm
+          test "$(rpm --eval '%{expr:6*7}')" = 42
+          test "$(rpm --eval '%{_prefix}')" = /usr
+          if rpm -q eternal-rpmx-deliberately-absent; then exit 1; fi
+      - name: openpgp-signatures
+        stage: installed
+        packages: [coreutils, grep]
+        files: tests
+        script: |
+          bash "$TEST_FILES/signatures.sh"
+        artifacts:
+          - untrusted.verify
+          - trusted.verify
+          - tampered.verify
+      - name: build-install-upgrade-verify-erase
+        stage: transaction
+        packages:
+          - bash
+          - coreutils
+          - grep
+        files: tests
+        script: |
+          mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+          for version in 1 2; do
+           rpmbuild -bb "$TEST_FILES/probe.spec" --define "_topdir $PWD/rpmbuild" \
+             --define "probe_version $version" --define '__os_install_post %{nil}'
+          done
+          rpm -K --nosignature rpmbuild/RPMS/noarch/eternal-rpmx-probe-1-1.noarch.rpm
+          cp rpmbuild/RPMS/noarch/eternal-rpmx-probe-1-1.noarch.rpm corrupt.rpm
+          size=$(stat -c %s corrupt.rpm)
+          last=$(od -An -tu1 -j "$((size - 1))" -N1 corrupt.rpm)
+          printf -v octal '%03o' "$((last ^ 255))"
+          printf '%b' "\\$octal" | dd of=corrupt.rpm bs=1 seek="$((size - 1))" conv=notrunc status=none
+          if rpm -K --nosignature corrupt.rpm > corrupt.verify 2>&1; then
+            echo 'RPM accepted a corrupted payload' >&2
+            exit 1
+          fi
+          test -s corrupt.verify
+          rpm -i --nosignature rpmbuild/RPMS/noarch/eternal-rpmx-probe-1-1.noarch.rpm
+          test "$(rpm -q --qf '%{VERSION}' eternal-rpmx-probe)" = 1
+          test "$(cat /usr/share/eternal-rpmx-probe/payload)" = payload-1
+          rpm -V eternal-rpmx-probe
+          printf 'operator setting\n' > /etc/eternal-rpmx-probe.conf
+          if rpm -V eternal-rpmx-probe > modified.txt; then exit 1; fi
+          grep '/etc/eternal-rpmx-probe.conf' modified.txt
+          rpm -U --nosignature rpmbuild/RPMS/noarch/eternal-rpmx-probe-2-1.noarch.rpm
+          test "$(rpm -q --qf '%{VERSION}' eternal-rpmx-probe)" = 2
+          test "$(cat /usr/share/eternal-rpmx-probe/payload)" = payload-2
+          test "$(cat /etc/eternal-rpmx-probe.conf)" = 'operator setting'
+          test "$(cat /etc/eternal-rpmx-probe.conf.rpmnew)" = default-2
+          rpm -e eternal-rpmx-probe
+          if rpm -q eternal-rpmx-probe; then exit 1; fi
+          test ! -e /usr/share/eternal-rpmx-probe/payload
+          test "$(cat /etc/eternal-rpmx-probe.conf.rpmsave)" = 'operator setting'
+        artifacts:
+          - modified.txt
+          - corrupt.verify
   - name: rpm-libs
     summary: Libraries for manipulating RPM packages
     files:
@@ -120,6 +181,11 @@ outputs:
         - /usr/lib*/librpm.so.*
         - /usr/lib*/librpmio.so.*
         - /usr/lib*/librpmsign.so.*
+        # librpm consumers initialize these defaults without the rpm CLI.
+        - /usr/lib/rpm/rpmrc
+        - /usr/lib/rpm/macros
+        - /usr/lib/rpm/macros.d/**
+        - /usr/lib/rpm/platform/**
         - /usr/share/licenses/rpm-libs/**
       license:
         - /usr/share/licenses/rpm-libs/**
@@ -133,25 +199,39 @@ outputs:
         - libselinux
         - libstdc++
         - lua-libs
-        - openssl-libs
         - popt
+        - rpm-sequoia >= 1.9.0
         - sqlite-libs
         - xz-libs
         - zlib
         - zstd-libs
     tests:
-      - name: installed
+      - name: runtime-loader
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/librpm.so.* /usr/lib/librpm.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+        packages:
+          - bash
+          - python3
+        script: |
+          python3 -I - <<'PYTHON'
+          import ctypes, glob, os
+          for name in ['librpm', 'librpmio', 'librpmsign']:
+              paths=glob.glob('/usr/lib*/' + name + '.so.*')
+              assert paths, name
+              ctypes.CDLL(paths[0], mode=os.RTLD_NOW)
+          PYTHON
+      - name: runtime-closure
+        stage: installed
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["librpm.so.*", "librpmio.so.*", "librpmsign.so.*"]
+      - name: runtime-configuration
+        stage: installed
+        packages:
+          - python3
+        files: tests
+        script: |
+          python3 -I "$TEST_FILES/runtime-configuration.py"
   - name: rpm-build-libs
     summary: Libraries for building RPM packages
     files:
@@ -164,18 +244,25 @@ outputs:
       run:
         - rpm-libs = ${package.version}-${package.release}
     tests:
-      - name: installed
+      - name: runtime-loader
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/librpmbuild.so.* /usr/lib/librpmbuild.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+        packages:
+          - bash
+          - python3
+        script: |
+          python3 -I - <<'PYTHON'
+          import ctypes, glob, os
+          for name in ['librpmbuild']:
+              paths=glob.glob('/usr/lib*/' + name + '.so.*')
+              assert paths, name
+              ctypes.CDLL(paths[0], mode=os.RTLD_NOW)
+          PYTHON
+      - name: runtime-closure
+        stage: installed
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["librpmbuild.so.*"]
   - name: rpm-devel
     summary: Development files for RPM
     files:
@@ -199,17 +286,16 @@ outputs:
         - zlib-devel
         - zstd-devel
     tests:
-      - name: link
+      - name: macro-and-transaction-api
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '#include <rpm/rpmlib.h>\nint main(void){return 0;}\n' > /tmp/rpm.c
-            gcc /tmp/rpm.c $(pkg-config --cflags --libs rpm) -o /tmp/rpm-test
-            /tmp/rpm-test
-
+        packages:
+          - bash
+          - gcc
+          - pkgconf
+        files: tests
+        script: |
+          gcc "$TEST_FILES/api.c" $(pkg-config --cflags --libs rpm) -o api
+          ./api
   - name: rpm-doc
     summary: Documentation for RPM
     files:
