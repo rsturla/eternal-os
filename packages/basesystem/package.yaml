@@ -45,7 +45,17 @@ outputs:
 tests:
   - name: license
     stage: build
-    argv:
-      - sh
-      - -c
-      - test -f "$STAGE/usr/share/licenses/basesystem/LICENSE"
+    script: |-
+      test -f "$STAGE/usr/share/licenses/basesystem/LICENSE"
+  - name: installed-layout-closure
+    stage: installed
+    packages:
+      - bash
+      - coreutils
+    script: |
+      test -d /etc/eternal
+      test -d /usr/lib/eternal
+      test -d /usr/share/eternal
+      test -d /var/lib/eternal
+      test -L /bin
+      test "$(readlink /bin)" = usr/bin
