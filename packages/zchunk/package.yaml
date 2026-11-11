@@ -68,17 +68,14 @@ outputs:
       run:
         - zchunk-libs = ${package.version}-${package.release}
     tests:
-      - name: installed
+      - name: roundtrip
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            printf 'zchunk test data\n' > /tmp/zchunk-test
-            zck -o /tmp/zchunk-test.zck /tmp/zchunk-test
-            test -s /tmp/zchunk-test.zck
-            zck_read_header /tmp/zchunk-test.zck >/dev/null
+        packages:
+          - coreutils
+          - diffutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/roundtrip.sh"
 
   - name: zchunk-libs
     summary: Libraries for zchunk
@@ -93,17 +90,19 @@ outputs:
         - openssl-libs
         - zstd-libs
     tests:
-      - name: installed
+      - name: minimal-runtime-dependencies
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libzck.so.* /usr/lib/libzck.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libzck.so.[0-9]*"]
+      - name: runtime
+        stage: installed
+        packages:
+          - python3
+        files: tests
+        script: |
+          python3 "$TEST_FILES/runtime.py"
 
   - name: zchunk-devel
     summary: Development files for zchunk
@@ -119,13 +118,13 @@ outputs:
         - zstd-devel
         - openssl-devel
     tests:
-      - name: link
+      - name: zchunk-api
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '#include <zck.h>\nint main(void){return 0;}\n' > /tmp/zck.c
-            gcc /tmp/zck.c $(pkg-config --cflags --libs zck) -o /tmp/zck-test
-            /tmp/zck-test
+        packages:
+          - gcc
+          - glibc-devel
+          - coreutils
+          - pkgconf
+        files: tests
+        script: |
+          bash "$TEST_FILES/zchunk-api.sh"
