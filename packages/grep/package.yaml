@@ -54,17 +54,31 @@ outputs:
       license:
         - /usr/share/licenses/grep/COPYING
     tests:
-      - name: installed
+      - name: patterns
         stage: installed
-        packages: [bash-binsh, coreutils]
+        packages:
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/patterns.sh"
+      - name: no-match
+        stage: installed
         argv:
-          - sh
-          - -c
-          - |
-            printf 'alpha\nbeta\n' > file
-            test "$(grep beta file)" = beta
-            test "$(grep -c . file)" = 2
-            printf 'abc123\n' | grep -P '\d+' > /dev/null
+          - grep
+          - missing
+          - /dev/null
+        expect:
+          exit-code: 1
+          stdout: ''
+      - name: invalid-expression
+        stage: installed
+        argv:
+          - grep
+          - '['
+          - /dev/null
+        expect:
+          exit-code: 2
+          stdout: ''
 
   - name: grep-doc
     summary: GNU grep pattern matcher documentation
@@ -76,3 +90,11 @@ outputs:
         - /usr/share/licenses/grep-doc/COPYING
       license:
         - /usr/share/licenses/grep-doc/COPYING
+
+tests:
+  - name: upstream
+    stage: build
+    packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+    artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+    pipeline:
+      - uses: make/check
