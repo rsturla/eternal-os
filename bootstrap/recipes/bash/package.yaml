@@ -99,14 +99,13 @@ outputs:
       provides:
         - /bin/bash
     tests:
-      - name: installed
+      - name: language
         stage: installed
-        packages: [grep]
-        argv:
-          - bash
-          - -c
-          - |
-            bash --version | grep -q 'version 5.3.9'
+        packages:
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/language.sh"
 
   - name: bash-binsh
     summary: /bin/sh provided by Bash
@@ -122,16 +121,12 @@ outputs:
       provides:
         - /bin/sh
     tests:
-      - name: installed
+      - name: posix-shell
         stage: installed
-        packages: [grep]
-        argv:
-          - sh
-          - -c
-          - |
-            test -L /usr/bin/sh
-            test -x /usr/bin/sh
-            sh -c 'echo ok' | grep -q ok
+        packages: []
+        files: tests
+        script: |
+          bash "$TEST_FILES/posix-shell.sh"
 
   - name: bash-doc
     summary: Bash documentation
@@ -156,6 +151,15 @@ outputs:
     dependencies:
       run:
         - bash = ${package.version}-${package.release}
+    tests:
+      - name: builtin
+        stage: installed
+        packages:
+          - gcc
+          - glibc-devel
+        files: tests
+        script: |
+          bash "$TEST_FILES/builtin.sh"
 
   - name: bash-builtins
     summary: Bash loadable builtins
@@ -168,11 +172,10 @@ outputs:
     dependencies:
       run:
         - bash = ${package.version}-${package.release}
-
-tests:
-  - name: build
-    stage: build
-    argv:
-      - sh
-      - -c
-      - ./bash --version | grep -q 'version 5.3.9'
+    tests:
+      - name: loadable
+        stage: installed
+        packages: []
+        files: tests
+        script: |
+          bash "$TEST_FILES/loadable.sh"
