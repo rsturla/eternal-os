@@ -111,11 +111,7 @@ repositories:
       - autoconf*
       - automake*
       - libtool*
-      # Texinfo currently links Fedora libperl 5.42; keep its library and
-      # optional modules available until Texinfo is rebuilt with Eternal Perl.
-      - perl
-      - perl-devel
-      - perl-interpreter
+      - perl*
       - texinfo*
       - glibc*
       - gcc
@@ -179,11 +175,7 @@ repositories:
       - autoconf*
       - automake*
       - libtool*
-      # Texinfo currently links Fedora libperl 5.42; keep its library and
-      # optional modules available until Texinfo is rebuilt with Eternal Perl.
-      - perl
-      - perl-devel
-      - perl-interpreter
+      - perl*
       - texinfo*
       - glibc*
       - gcc
