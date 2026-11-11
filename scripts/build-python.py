@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Prepare unpublished Python dependencies during the initial bootstrap.
 
-Temporary normal-build integration. Retain new-interpreter bootstrap support
+Explicit bootstrap support for unpublished interpreter streams. Retain it
 until rpmx can prepare unpublished source dependencies.
 Track removal at https://github.com/rsturla/eternal-os/issues/41.
 """

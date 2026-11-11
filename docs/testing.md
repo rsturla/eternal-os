@@ -77,23 +77,20 @@ source-suite failures. Direct `rpmx build --output DIR` invocations use
 `out/<recipe>/<arch>/junit.xml` and prints its evidence directory. With
 `--arch all`, the shared build script runs each architecture declared in the
 bootstrap profile separately. It preserves each report and attempts the other
-architectures if one fails. It collects reports
-from private builds under `out/test-reports/`:
+architectures if one fails. It also copies the private compiler-policy seed's
+reports into `out/test-reports/toolchain/<seed-identity>/<arch>/`.
 
-- `toolchain/<seed-identity>/` contains the compiler-policy seed's reports.
-- `python/<consumer>/<arch>/<dependency>/<input-identity>/` contains reports for
-  each private Python dependency, with copied test results. The consumer's
-  evidence stays beside its RPM outputs.
+Explicit `scripts/build-python.py` bootstrap runs collect dependency reports
+under `OUTPUT/test-reports/python/<consumer>/<arch>/<dependency>/<input-identity>/`.
+Use `--test-reports DIR` to choose another destination. Cached dependencies
+also contribute their previous reports. The consumer's evidence stays beside
+its RPM outputs. The helper requires one concrete `--arch` value per invocation.
 
-Collection runs after successful and failed builds. Cached Python dependencies
-also contribute their previous reports. The identities include the relevant
-recipe inputs and test policy. Reports contain no private dependency RPMs.
+Collection runs after successful and failed builds. The identities include
+the relevant recipe inputs and test policy. Reports contain no private dependency RPMs.
 Each rpmx invocation has its own JUnit path; one matrix build aggregates its
 cells into that report. CI uploads the output tree after failures too.
 With `--no-tests`, the scripts do not request or collect test reports.
-For direct `scripts/build-python.py` calls, reports default to
-`OUTPUT/test-reports/`; use `--test-reports DIR` to choose another destination.
-The Python bootstrap helper requires one concrete `--arch` value per invocation.
 
 The lint and Python bootstrap helpers require Python and PyYAML. Use a virtual
 environment, or run them through `uv run --with pyyaml` as above.
@@ -165,10 +162,12 @@ selection does not rebuild or publish these foundations. Without `--test-rpms`,
 foundation dependencies resolve from the selected test profile's repositories.
 A source recipe fix does not repair dependency metadata that is already published.
 
-Python matrix builds prepare unpublished interpreter and module dependencies
-through `scripts/build-python.py`. Its ordering includes test tools. Both build
-and test profiles see the private dependency repository. This bootstrap helper
-remains subject to the removal gates in [issue 41](https://github.com/rsturla/eternal-os/issues/41).
+Normal Python matrix builds use published interpreter-qualified dependencies
+from the Eternal repository. For an unpublished interpreter stream, invoke
+`scripts/build-python.py` explicitly. Its dependency ordering includes test tools;
+both build and test profiles see its private dependency repository.
+[Issue 41](https://github.com/rsturla/eternal-os/issues/41) tracks a replacement
+for this explicit bootstrap path.
 An existing-RPM run does not execute build-stage suites.
 
 Use a native machine for each supported architecture. A cross compile does not prove target runtime behavior.

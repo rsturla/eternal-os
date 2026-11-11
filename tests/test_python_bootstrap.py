@@ -518,29 +518,25 @@ elif args[0] == 'repo':
             del env["BUILD_CACHE_EARLY_FAIL"], env["BUILD_CACHE_EARLY_FAIL_ARCH"]
             expect_builds(2, profiles[1], "restore arm after its failed all-architecture build", arch="aarch64")
 
-            # A matrix consumer must check its local dependency identity before
-            # the outer stamp can skip the Python bootstrap helper.
+            # Normal matrix builds use published dependencies. The explicit
+            # bootstrap helper must never run, even to calculate a fingerprint.
             env["BUILD_CACHE_MATRIX"] = "1"
             dependency = root / "local-dependency.hash"
             dependency.write_text("first-local-test-tool")
-            (scripts / "build-python.py").write_text(r"""import json, os, sys
-from pathlib import Path
-args = sys.argv[1:]
-root = Path(__file__).resolve().parents[1]
-if '--fingerprint' in args:
-    print((root / 'local-dependency.hash').read_text())
-else:
-    with open(os.environ['BUILD_CACHE_LOG'], 'a') as log:
-        log.write(json.dumps(['build', 'matrix-helper', *args]) + '\n')
-    output = Path(args[args.index('--output') + 1]) / args[args.index('--arch') + 1]
-    output.mkdir(parents=True, exist_ok=True)
-    (output / 'fixture.rpm').write_text('matrix fixture RPM')
+            (scripts / "build-python.py").write_text(r"""
+raise SystemExit('normal matrix builds must not invoke the Python bootstrap helper')
 """)
             (root / "out/.stamps/aarch64/demo").unlink()
-            expect_builds(1, profiles[1], "build the matrix consumer with a local test tool", arch="aarch64")
-            expect_builds(0, profiles[1], "reuse an unchanged matrix dependency closure", arch="aarch64")
+            calls = expect_builds(1, profiles[1], "build the matrix consumer directly with rpmx", arch="aarch64")
+            self.assertEqual(Path(calls[0][1]), root / "packages/demo/package.yaml")
+            self.assertEqual(Path(calls[0][calls[0].index("--junit") + 1]),
+                             root / "out/demo/aarch64/junit.xml")
+            self.assertNotIn("--fingerprint", calls[0])
+            self.assertEqual((root / "out/demo/aarch64/test-results/assertion/artifacts/upstream.sum").read_text(),
+                             "demo results\n")
+            expect_builds(0, profiles[1], "reuse an unchanged published-dependency matrix build", arch="aarch64")
             dependency.write_text("changed-local-test-tool")
-            expect_builds(1, profiles[1], "a changed local test tool must rebuild its consumer", arch="aarch64")
+            expect_builds(0, profiles[1], "unselected local dependencies do not replace published packages", arch="aarch64")
 
 
 
