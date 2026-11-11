@@ -22,7 +22,7 @@ schema: 1
 package:
   name: python-3.13
   version: "3.13.18"
-  release: 3
+  release: 4
   summary: The Python programming language (version 3.13)
   description: |
     Python is an interpreted, interactive, object-oriented programming
@@ -103,7 +103,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        packages: [bzip2-libs, expat, libffi, libzstd, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
+        packages: [bzip2-libs, expat, libffi, zstd-libs, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
         argv:
           - sh
           - -c
@@ -168,7 +168,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        packages: [bzip2-libs, expat, libffi, libzstd, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
+        packages: [bzip2-libs, expat, libffi, zstd-libs, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
         argv:
           - sh
           - -c
