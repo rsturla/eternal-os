@@ -371,9 +371,11 @@ Use `artifacts` to preserve literal workspace paths such as `build/meson-logs` o
 Missing artifact paths are ignored. Artifact paths cannot escape the workspace.
 Generated relative symlinks are preserved without following them, including contained dangling links.
 Absolute links, targets outside the workspace and special files are errors.
-Full stdout and stderr remain in separate test log files. JUnit includes bounded output tails.
+Full stdout and stderr remain in separate test log files. JUnit records failures
+and evidence paths.
 
-JSON results distinguish `passed`, `failed`, `error` and `skipped`.
+JSON case results distinguish `passed`, `failed`, `skipped` and `not-run`.
+Skipped and not-run cases make the run `incomplete`.
 Environment errors and missing input RPMs are not passes. A declared test that has not run is not a pass.
 Record the RPM identity, architecture, rpmx revision and dependency-root evidence with the report.
 
