@@ -81,14 +81,9 @@ outputs:
     - python-${matrix.python.version}-packaging
     - python-${matrix.python.version}-pyproject-hooks
   tests:
-  - name: functional
+  - name: offline-behavior
     stage: installed
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - from build import ProjectBuilder; import tempfile, pathlib; p = pathlib.Path(tempfile.mkdtemp()); (p
-      / "pyproject.toml").write_text("[build-system]\nrequires = [\"flit_core\"]\nbuild-backend = \"flit_core.buildapi\"\n[project]\nname
-      = \"demo\"\nversion = \"1.0\"\ndescription = \"smoke\"\n"); (p / "demo.py").write_text("answer = 42\n");
-      assert pathlib.Path(ProjectBuilder(str(p)).build("wheel", str(p / "dist"))).is_file()
-    packages:
-    - python-${matrix.python.version}-flit-core
+    files: tests
+    packages: ["python-${matrix.python.version}-flit-core"]
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/check.py" "${matrix.python.version}" "build" "${package.version}"
