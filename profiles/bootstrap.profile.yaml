@@ -48,11 +48,7 @@ repositories:
       - libatomic-*
       - nss-db-*
       - expat*
-      - zstd*
       # New recipes held out of the shared root until their integration lands.
-      - acl*
-      - attr*
-      - audit*
       - autoconf*
       - automake*
       - bison*
@@ -72,23 +68,17 @@ repositories:
       - json-c*
       - kernel-headers*
       - libarchive*
-      - libcap*
       - librepo*
-      - libselinux*
       - libsemanage*
-      - libsepol*
       - libsolv*
       - libtool*
       - libunistring*
-      - libxcrypt*
       - libxml2*
       - libxslt*
       - lua*
       - meson*
-      - ncurses*
       - ninja*
       - openssl3*
-      - pam*
       - perl*
       - popt*
       - python-3.13*
@@ -113,10 +103,102 @@ repositories:
     # These package names are already produced by Eternal. Hiding the Fedora
     # copies is what makes the build root consume the published Eternal
     # repository instead of only using it for metadata.
-    exclude: [bash, bash-binsh, binutils, coreutils, coreutils-single, filesystem, make, pkgconf, pkgconf-m4, pkgconf-pkg-config, libpkgconf, zlib, zlib-devel, zlib-static, zlib-ng-compat, zlib-ng-compat-devel, zlib-ng-compat-static]
+    exclude:
+      - acl*
+      - attr*
+      - audit*
+      - libacl*
+      - libattr*
+      - libcap*
+      - libselinux*
+      - libsepol*
+      - libxcrypt*
+      - pam*
+      - ncurses*
+      - zstd*
+      - libzstd*
+      - xz
+      - xz-*
+      - gmp*
+      - mpfr*
+      - libmpc*
+      - isl*
+      - bash
+      - bash-binsh
+      - binutils
+      - coreutils
+      - coreutils-single
+      - diffutils
+      - diffutils-*
+      - filesystem
+      - findutils
+      - findutils-*
+      - grep
+      - grep-*
+      - make
+      - pcre2
+      - pcre2-*
+      - tar
+      - tar-*
+      - pkgconf
+      - pkgconf-m4
+      - pkgconf-pkg-config
+      - libpkgconf
+      - zlib
+      - zlib-devel
+      - zlib-static
+      - zlib-ng-compat
+      - zlib-ng-compat-devel
+      - zlib-ng-compat-static
   - id: updates
     metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch
-    exclude: [bash, bash-binsh, binutils, coreutils, coreutils-single, filesystem, make, pkgconf, pkgconf-m4, pkgconf-pkg-config, libpkgconf, zlib, zlib-devel, zlib-static, zlib-ng-compat, zlib-ng-compat-devel, zlib-ng-compat-static]
+    exclude:
+      - acl*
+      - attr*
+      - audit*
+      - libacl*
+      - libattr*
+      - libcap*
+      - libselinux*
+      - libsepol*
+      - libxcrypt*
+      - pam*
+      - ncurses*
+      - zstd*
+      - libzstd*
+      - xz
+      - xz-*
+      - gmp*
+      - mpfr*
+      - libmpc*
+      - isl*
+      - bash
+      - bash-binsh
+      - binutils
+      - coreutils
+      - coreutils-single
+      - diffutils
+      - diffutils-*
+      - filesystem
+      - findutils
+      - findutils-*
+      - grep
+      - grep-*
+      - make
+      - pcre2
+      - pcre2-*
+      - tar
+      - tar-*
+      - pkgconf
+      - pkgconf-m4
+      - pkgconf-pkg-config
+      - libpkgconf
+      - zlib
+      - zlib-devel
+      - zlib-static
+      - zlib-ng-compat
+      - zlib-ng-compat-devel
+      - zlib-ng-compat-static
   - id: eternal-toolchain
     baseurl: file://../.work/toolchain-repo
 packages:
