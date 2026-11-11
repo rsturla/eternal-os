@@ -17,7 +17,7 @@ schema: 1
 package:
   name: openssf-compiler-options
   version: "20261109"
-  release: 2
+  release: 3
   summary: OpenSSF compiler hardening options
   description: |
     GCC wrapper scripts and versioned spec files that apply the OpenSSF
@@ -78,33 +78,31 @@ outputs:
 tests:
   - name: layout
     stage: build
-    argv:
-      - sh
-      - -c
-      - |
-        test -L "$STAGE/usr/libexec/eternal/gcc/bin/gcc"
-        test "$(readlink "$STAGE/usr/libexec/eternal/gcc/bin/gcc")" = gcc-wrapper
-        for version in 13 14 15 16; do
-          test -f "$STAGE/usr/lib/eternal/gcc/openssf-$version.spec"
-          test -f "$STAGE/usr/lib/eternal/gcc/openssf-soft-format-$version.spec"
-          grep -q -- '-Werror=format-security' \
-            "$STAGE/usr/lib/eternal/gcc/openssf-$version.spec"
-          ! grep -q -- '-Werror=format-security' \
-            "$STAGE/usr/lib/eternal/gcc/openssf-soft-format-$version.spec"
-        done
-        test -f "$STAGE/usr/lib/eternal/gcc/openssf-arch-x86_64.spec"
-        test -f "$STAGE/usr/lib/eternal/gcc/openssf-arch-aarch64.spec"
-        grep -q -- '-fPIE' \
-          "$STAGE/usr/lib/eternal/gcc/openssf-16.spec"
-        grep -q -- '-fzero-init-padding-bits=all' \
-          "$STAGE/usr/lib/eternal/gcc/openssf-16.spec"
-        ! grep -q -- '-fzero-init-padding-bits=all' \
-          "$STAGE/usr/lib/eternal/gcc/openssf-13.spec"
-        grep -q -- '-march=x86-64-v2' \
-          "$STAGE/usr/lib/eternal/gcc/openssf-arch-x86_64.spec"
-        grep -q -- '-mbranch-protection=standard' \
-          "$STAGE/usr/lib/eternal/gcc/openssf-arch-aarch64.spec"
-
+    script: |
+      test -L "$STAGE/usr/libexec/eternal/gcc/bin/gcc"
+      test "$(readlink "$STAGE/usr/libexec/eternal/gcc/bin/gcc")" = gcc-wrapper
+      for version in 13 14 15 16; do
+        test -f "$STAGE/usr/lib/eternal/gcc/openssf-$version.spec"
+        test -f "$STAGE/usr/lib/eternal/gcc/openssf-soft-format-$version.spec"
+        grep -q -- '-Werror=format-security' \
+          "$STAGE/usr/lib/eternal/gcc/openssf-$version.spec"
+        ! grep -q -- '-Werror=format-security' \
+          "$STAGE/usr/lib/eternal/gcc/openssf-soft-format-$version.spec"
+      done
+      test -f "$STAGE/usr/lib/eternal/gcc/openssf-arch-x86_64.spec"
+      test -f "$STAGE/usr/lib/eternal/gcc/openssf-arch-aarch64.spec"
+      grep -q -- '-fPIE' \
+        "$STAGE/usr/lib/eternal/gcc/openssf-16.spec"
+      grep -q -- '-fzero-init-padding-bits=all' \
+        "$STAGE/usr/lib/eternal/gcc/openssf-16.spec"
+      ! grep -q -- '-fzero-init-padding-bits=all' \
+        "$STAGE/usr/lib/eternal/gcc/openssf-13.spec"
+      grep -q -- '-march=x86-64-v2' \
+        "$STAGE/usr/lib/eternal/gcc/openssf-arch-x86_64.spec"
+      grep -q -- '-mbranch-protection=standard' \
+        "$STAGE/usr/lib/eternal/gcc/openssf-arch-aarch64.spec"
+      grep -q -- '-fuse-ld=bfd' \
+        "$STAGE/usr/lib/eternal/gcc/openssf-arch-aarch64.spec"
   - name: default-wrapper
     stage: installed
     packages: [gcc]
@@ -115,46 +113,59 @@ tests:
         with:
           cc: cc
 
+  - name: linker-selection
+    stage: installed
+    packages: [gcc, grep]
+    files: tests
+    environment:
+      PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    script: |
+      bash "$TEST_FILES/linker-selection.sh"
+
   - name: spec-13
     stage: installed
-    packages: [gcc]
+    packages:
+      - gcc-13
     environment:
       PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       GCC_SPEC_FILE: openssf-13.spec
     pipeline:
       - uses: test/compiler-hardening-check
         with:
-          cc: cc
+          cc: gcc-13
 
   - name: spec-14
     stage: installed
-    packages: [gcc]
+    packages:
+      - gcc-14
     environment:
       PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       GCC_SPEC_FILE: openssf-14.spec
     pipeline:
       - uses: test/compiler-hardening-check
         with:
-          cc: cc
+          cc: gcc-14
 
   - name: spec-15
     stage: installed
-    packages: [gcc]
+    packages:
+      - gcc-15
     environment:
       PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       GCC_SPEC_FILE: openssf-15.spec
     pipeline:
       - uses: test/compiler-hardening-check
         with:
-          cc: cc
+          cc: gcc-15
 
   - name: spec-16
     stage: installed
-    packages: [gcc]
+    packages:
+      - gcc-16
     environment:
       PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       GCC_SPEC_FILE: openssf-16.spec
     pipeline:
       - uses: test/compiler-hardening-check
         with:
-          cc: cc
+          cc: gcc-16
