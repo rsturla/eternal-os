@@ -53,17 +53,14 @@ outputs:
       license:
         - /usr/share/licenses/patch/COPYING
     tests:
-      - name: installed
+      - name: apply-and-reverse
         stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            printf 'old\n' > file
-            printf '%s\n' '--- file' '+++ file' '@@ -1 +1 @@' '-old' '+new' > change.diff
-            patch file < change.diff
-            test "$(cat file)" = new
+        packages:
+          - coreutils
+          - diffutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/apply-and-reverse.sh"
 
   - name: patch-doc
     summary: GNU patch documentation
@@ -75,3 +72,11 @@ outputs:
         - /usr/share/licenses/patch-doc/COPYING
       license:
         - /usr/share/licenses/patch-doc/COPYING
+
+tests:
+  - name: upstream
+    stage: build
+    packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+    artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+    pipeline:
+      - uses: make/check
