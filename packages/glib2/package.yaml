@@ -85,20 +85,22 @@ outputs:
         - pcre2
         - zlib
     tests:
-      - name: installed
+      - name: runtime-linkage
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf]
-        argv:
-          - sh
-          - -c
-          - |
-            gdbus --help >/dev/null
-            glib-compile-schemas --help >/dev/null
-            for lib in /usr/lib64/libglib-2.0.so.* /usr/lib/libglib-2.0.so.*; do
-              test -e "$lib" && exit 0
-            done
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libglib-2.0.so.*", "libgobject-2.0.so.*", "libgio-2.0.so.*", "libgmodule-2.0.so.*"]
+      - name: schema-compile-and-query
+        stage: installed
+        files: tests
+        script: |
+          glib-compile-schemas --strict "$TEST_FILES"
+          test "$(gsettings --schemadir "$TEST_FILES" get org.eternal.fixture answer)" = 42
+          if glib-compile-schemas --strict "$TEST_FILES/invalid"; then
+            echo "accepted invalid schema" >&2
             exit 1
-
+          fi
   - name: glib2-devel
     summary: Development files for GLib
     files:
@@ -111,13 +113,14 @@ outputs:
       run:
         - glib2 = ${package.version}-${package.release}
     tests:
-      - name: link
+      - name: api-behavior
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '#include <glib.h>\nint main(void){return 0;}\n' > /tmp/glib.c
-            gcc /tmp/glib.c $(pkg-config --cflags --libs glib-2.0) -o /tmp/glib-test
-            /tmp/glib-test
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists glib-2.0 gobject-2.0 gio-2.0
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags glib-2.0 gobject-2.0 gio-2.0) "$TEST_FILES/behavior.c" $(pkg-config --libs glib-2.0 gobject-2.0 gio-2.0) -o behavior
+          ./behavior
