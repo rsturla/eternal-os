@@ -27,7 +27,7 @@ usage() {
 usage: build-all.sh [options]
 
   --package NAME     Build packages/NAME only
-  --affected         Build only packages affected by a diff (plus build dependents)
+  --affected         Build only packages affected by a diff
   --since REF        Base ref for --affected (default: origin/HEAD)
   --all              Consider every package (the default)
   --force            Rebuild even when the content hash matches
@@ -209,14 +209,6 @@ for recipe in "${recipes[@]}"; do
   # One output directory per package: the installed-stage test root must not
   # see RPMs from unrelated packages.
   cmd=("$rpmx" build "$recipe" --output "$pkg_output")
-  # Matrix modules need matching dependencies for every Python interpreter.
-  # Temporary bootstrap support until publication: see issue #41.
-  # Build those recipes locally so tests do not depend on prior publication.
-  if "$rpmx" plan "$recipe" --json | jq -e \
-    'any(.plan.cells[]; .id | startswith("python="))' >/dev/null; then
-    cmd=(/usr/bin/python3 "$root/scripts/build-python.py" "$name"
-      --output "$pkg_output")
-  fi
   [[ -n $arch ]] && cmd+=(--arch "$arch")
   [[ -n $signing_key ]] && cmd+=(--signing-key "$signing_key")
   [[ -n $build_release ]] && cmd+=(--build-release "$build_release")
