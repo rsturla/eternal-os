@@ -303,6 +303,9 @@ Do not enable the external network to make a test pass.
 
 Use independent checks for round trips. Two operations can share the same defect.
 For static-link tests, check the resulting executable rather than only the archive's presence.
+For a consumer installation check, let the tested output pull in its own required
+headers, libraries and interpreters. Declare independent test tools in `packages`.
+Installing a missing runtime requirement explicitly can make a broken output pass.
 For representative tests, deliberately break an expectation or fixture and confirm a failure.
 Run tests twice when a previous failure suggests shared state or ordering dependence.
 
