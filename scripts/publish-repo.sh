@@ -18,8 +18,8 @@
 #     RPM-GPG-KEY-eternal        (when --public-key is given)
 #     RELEASE/<arch>/            RPMs + repodata
 #     RELEASE/SRPMS/             source RPMs + repodata
-#     ARCHIVE/<arch>/            historical RPMs + repodata (when requested)
-#     ARCHIVE/SRPMS/             historical source RPMs + repodata
+#     ARCHIVE/<arch>/            metadata, plus RPMs with --archive-packages
+#     ARCHIVE/SRPMS/             source metadata, plus RPMs with --archive-packages
 set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -27,6 +27,7 @@ rpmx=${RPMX:-rpmx}
 
 packages=
 archive_packages=
+archive_metadata=
 output=site
 release=rolling
 archive_release=
@@ -40,6 +41,7 @@ usage: publish-repo.sh --packages DIR [options]
 
   --packages DIR           Current artifacts root produced by build-all.sh
   --archive-packages DIR   Historical artifacts root; adds the archive repository
+  --archive-metadata DIR   Previous <arch>/repodata trees; merge with current RPMs
   --output DIR             Repository mirror to write (default: site)
   --release VER            Current release directory (default: rolling)
   --archive-release VER    Historical release directory (default: archive)
@@ -58,6 +60,10 @@ while (($# > 0)); do
       ;;
     --archive-packages)
       archive_packages=${2:?--archive-packages needs a directory}
+      shift 2
+      ;;
+    --archive-metadata)
+      archive_metadata=${2:?--archive-metadata needs a directory}
       shift 2
       ;;
     --output)
@@ -104,22 +110,107 @@ done
   echo "artifacts directory not found: $packages" >&2
   exit 1
 }
-if [[ -n $archive_release && -z $archive_packages ]]; then
-  echo "--archive-release needs --archive-packages" >&2
+if [[ -n $archive_packages && -n $archive_metadata ]]; then
+  echo "--archive-packages and --archive-metadata are mutually exclusive" >&2
   exit 2
 fi
-if [[ -n $archive_packages && -z $archive_release ]]; then
-  echo "--archive-packages needs --archive-release" >&2
+if [[ -n $archive_release && -z $archive_packages && -z $archive_metadata ]]; then
+  echo "--archive-release needs --archive-packages or --archive-metadata" >&2
+  exit 2
+fi
+if [[ ( -n $archive_packages || -n $archive_metadata ) && -z $archive_release ]]; then
+  echo "archive inputs need --archive-release" >&2
+  exit 2
+fi
+if [[ -n $archive_metadata && ! -d $archive_metadata ]]; then
+  echo "archive metadata directory not found: $archive_metadata" >&2
+  exit 1
+fi
+if [[ ! $release =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ||
+  ( -n $archive_release && ! $archive_release =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ) ||
+  $release == "$archive_release" ]]; then
+  echo "release names must be distinct directory names" >&2
   exit 2
 fi
 if [[ -n $archive_packages && ! -d $archive_packages ]]; then
   echo "archive artifacts directory not found: $archive_packages" >&2
   exit 1
 fi
+if [[ -n $archive_metadata ]]; then
+  metadata_input=$(realpath "$archive_metadata")
+  for channel in "$release" "$archive_release"; do
+    destination=$(realpath -m "$output/$channel")
+    if [[ $metadata_input == "$destination" || $metadata_input == "$destination/"* ||
+      $destination == "$metadata_input/"* ]]; then
+      echo "--archive-metadata must not overlap the output repositories" >&2
+      exit 2
+    fi
+  done
+fi
 
 stage_root=$(mktemp -d)
 trap 'rm -rf "$stage_root"' EXIT
 mkdir -p "$output"
+
+merge_archive() {
+  local repo arch dest previous signature kind href
+  local signing_home="$stage_root/gnupg"
+  local -A seen=()
+  local -a cmd
+
+  if [[ -n $signing_key ]]; then
+    install -d -m 0700 "$signing_home"
+    gpg --homedir "$signing_home" --batch --import "$signing_key"
+    if [[ -n $public_key ]]; then
+      gpg --homedir "$signing_home" --batch --import "$public_key"
+    fi
+  fi
+  rm -rf "${output:?}/${archive_release:?}"
+  for repo in "$archive_metadata"/* "$output/$release"/*; do
+    [[ -d $repo ]] || continue
+    arch=$(basename "$repo")
+    [[ -z ${seen[$arch]:-} ]] || continue
+    seen[$arch]=1
+    dest="$output/$archive_release/$arch"
+    previous="$archive_metadata/$arch"
+    cmd=(mergerepo_c --all --omit-baseurl --no-database --unique-md-filenames --nogroups --noupdateinfo
+      --compress-type=gz --outputdir "$dest")
+    if [[ -d "$previous" ]]; then
+      python3 "$root/scripts/repodata-files.py" --verify "$previous/repodata/repomd.xml"
+      signature="$previous/repodata/repomd.xml.asc"
+      if [[ -f $signature ]]; then
+        if [[ -z $signing_key ]]; then
+          echo "cannot update a signed archive without --signing-key" >&2
+          exit 1
+        fi
+        gpg --homedir "$signing_home" --batch --verify "$signature" "$previous/repodata/repomd.xml"
+      fi
+      # Keep the historical record if an immutable NEVRA occurs in both inputs.
+      cmd+=(--repo "$(realpath "$previous")")
+    fi
+    if [[ -f "$output/$release/$arch/repodata/repomd.xml" ]]; then
+      cmd+=(--repo "$(realpath "$output/$release/$arch")")
+    fi
+    echo "==> merge $archive_release/$arch metadata"
+    "${cmd[@]}"
+    if [[ -d "$previous" ]]; then
+      # mergerepo_c writes an empty updateinfo file. Retain the archive's
+      # policy records separately; rpmx supplies only package metadata.
+      python3 "$root/scripts/repodata-files.py" --additional "$previous/repodata/repomd.xml" \
+        >"$stage_root/additional-metadata"
+      while IFS=$'\t' read -r kind href; do
+        modifyrepo_c --mdtype "$kind" --new-name "$kind.xml.gz" \
+          --compress --compress-type=gz --unique-md-filenames \
+          "$previous/$href" "$dest/repodata"
+      done <"$stage_root/additional-metadata"
+    fi
+    if [[ -n $signing_key ]]; then
+      gpg --homedir "$signing_home" --batch --yes --pinentry-mode error \
+        --armor --detach-sign --output "$dest/repodata/repomd.xml.asc" \
+        "$dest/repodata/repomd.xml"
+    fi
+  done
+}
 
 assemble_repo() {
   local packages_root=$1 repo_release=$2
@@ -158,6 +249,7 @@ assemble_repo() {
     source_found=$((source_found + 1))
   done < <(find "$packages_root" -type f -name '*.src.rpm' -print0)
 
+  rm -rf "${output:?}/${repo_release:?}"
   for arch in "${!seen[@]}"; do
     local dest="$output/$repo_release/$arch"
     rm -rf "$dest"
@@ -181,7 +273,9 @@ assemble_repo() {
 }
 
 assemble_repo "$packages" "$release"
-if [[ -n $archive_release ]]; then
+if [[ -n $archive_metadata ]]; then
+  merge_archive
+elif [[ -n $archive_release ]]; then
   assemble_repo "$archive_packages" "$archive_release"
 fi
 

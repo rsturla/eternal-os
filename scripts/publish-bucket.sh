@@ -3,7 +3,8 @@
 #
 # The rolling repository is replaced on each run. The archive repository is
 # append-only: current RPMs are copied into it, older objects are retained, and
-# its repodata is regenerated from the downloaded history plus the new build.
+# its repodata is merged from the current metadata plus the new build.
+# Run only one publisher per destination bucket at a time, including manual runs.
 #
 # This script expects AWS CLI credentials in the environment. For Cloudflare
 # R2, set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY to an R2 access key and
@@ -111,6 +112,18 @@ command -v aws >/dev/null || {
   echo "the AWS CLI is required to publish the repository" >&2
   exit 127
 }
+for tool in mergerepo_c modifyrepo_c python3 jq; do
+  command -v "$tool" >/dev/null || {
+    echo "$tool is required to publish the archive" >&2
+    exit 127
+  }
+done
+if [[ -n $signing_key ]]; then
+  command -v gpg >/dev/null || {
+    echo "gpg is required to sign the archive metadata" >&2
+    exit 127
+  }
+fi
 
 bucket=${bucket#s3://}
 bucket=${bucket%/}
@@ -124,49 +137,43 @@ export AWS_RESPONSE_CHECKSUM_VALIDATION=${AWS_RESPONSE_CHECKSUM_VALIDATION:-when
 aws_cmd=(aws)
 [[ -n $endpoint ]] && aws_cmd+=(--endpoint-url "$endpoint")
 
-s3_has_objects() {
-  "${aws_cmd[@]}" s3 ls "$1" 2>/dev/null | grep -q .
-}
-
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 mapfile -t arches < <("$root/scripts/list-arches.sh" | jq -r '.[]')
 
-# Rebuild the historical input from the bucket plus this run's artifacts.
-archive_root="$work/archive"
-mkdir -p "$archive_root"
-for arch in "${arches[@]}"; do
-  mkdir -p "$archive_root/$arch"
-  prefix="$bucket_uri/$archive/$arch/"
-  if s3_has_objects "$prefix"; then
-    echo "==> fetch archive/$arch"
-    "${aws_cmd[@]}" s3 sync "$prefix" "$archive_root/$arch/" \
-      --exclude 'repodata/*' --only-show-errors
+# Fetch only the current snapshot. Retained snapshots and RPMs stay in S3.
+# Listing errors must fail the run, rather than look like an empty repository.
+archive_metadata="$work/archive"
+mkdir -p "$archive_metadata"
+for arch in "${arches[@]}" SRPMS; do
+  prefix="$archive/$arch/"
+  objects=$("${aws_cmd[@]}" s3api list-objects-v2 --bucket "$bucket" \
+    --prefix "$prefix" --max-keys 1 --no-paginate)
+  if [[ $(jq '.Contents | length' <<<"$objects") == 0 ]]; then
+    continue
+  fi
+  dest="$archive_metadata/$arch"
+  mkdir -p "$dest/repodata"
+  echo "==> fetch $archive/$arch metadata"
+  # An existing prefix without an index is an error, not a first publication.
+  "${aws_cmd[@]}" s3 cp "$bucket_uri/${prefix}repodata/repomd.xml" \
+    "$dest/repodata/repomd.xml" --only-show-errors
+  python3 "$root/scripts/repodata-files.py" "$dest/repodata/repomd.xml" >"$work/metadata-files"
+  while IFS= read -r href; do
+    "${aws_cmd[@]}" s3 cp "$bucket_uri/$prefix$href" "$dest/$href" --only-show-errors
+  done <"$work/metadata-files"
+  signature="${prefix}repodata/repomd.xml.asc"
+  objects=$("${aws_cmd[@]}" s3api list-objects-v2 --bucket "$bucket" \
+    --prefix "$signature" --max-keys 1 --no-paginate)
+  if jq -e --arg key "$signature" 'any(.Contents[]?; .Key == $key)' <<<"$objects" >/dev/null; then
+    "${aws_cmd[@]}" s3 cp "$bucket_uri/$signature" "$dest/repodata/repomd.xml.asc" --only-show-errors
   fi
 done
-mkdir -p "$archive_root/SRPMS"
-if s3_has_objects "$bucket_uri/$archive/SRPMS/"; then
-  echo "==> fetch archive/SRPMS"
-  "${aws_cmd[@]}" s3 sync "$bucket_uri/$archive/SRPMS/" "$archive_root/SRPMS/" \
-    --exclude 'repodata/*' --only-show-errors
-fi
-
-# Add this run's binary and source RPMs to the historical input.
-while IFS= read -r -d '' rpm; do
-  arch=$(basename "$(dirname "$rpm")")
-  [[ $arch == src ]] && continue
-  mkdir -p "$archive_root/$arch"
-  cp -f "$rpm" "$archive_root/$arch/"
-done < <(find "$packages" -mindepth 2 -maxdepth 3 -type f -name '*.rpm' ! -name '*.src.rpm' -print0)
-
-while IFS= read -r -d '' rpm; do
-  cp -f "$rpm" "$archive_root/SRPMS/"
-done < <(find "$packages" -type f -name '*.src.rpm' -print0)
 
 repo_args=(
   --packages "$packages"
-  --archive-packages "$archive_root"
+  --archive-metadata "$archive_metadata"
   --output "$output"
   --release "$release"
   --archive-release "$archive"

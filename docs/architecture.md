@@ -136,6 +136,13 @@ materialization, artifact transfer between jobs and object-storage credentials.
 3. uploads `rolling` and appends the new RPMs to `archive` in S3-compatible
    object storage.
 
+The archive publisher reads its previous index and referenced metadata from
+object storage. `mergerepo_c` merges those records with the new rolling
+metadata, so historical RPMs never need a local copy. It retains old EVRs,
+groups, and advisories, then signs the merged index with GnuPG. Publication
+runs one at a time across all refs. Manual publishers must use the same
+single-writer policy.
+
 Image composition is a separate pipeline. It consumes the published package
 repository; it is not a step in `release.yml`.
 

@@ -34,7 +34,8 @@ Add them under **Settings → Secrets and variables → Actions**. The release
 workflow:
 
 1. writes `RPMX_SIGNING_KEY` to a mode-0600 temporary file;
-2. passes it to `rpmx build --signing-key` and `rpmx repo --signing-key`;
+2. passes it to `rpmx build --signing-key` and `rpmx repo --signing-key`, then
+   imports it into a temporary GnuPG keyring to sign the merged archive index;
 3. publishes `RPMX_PUBLIC_KEY` as `RPM-GPG-KEY-eternal`;
 4. writes `gpgcheck=1` into the published `eternal.repo`;
 5. uploads `rolling` and the append-only `archive` repository to the bucket.
@@ -50,6 +51,11 @@ The bucket, endpoint and public URL are repository **variables**, not secrets:
 
 CI keys must not have a passphrase. Keep the passphrase-protected copy for
 manual releases, or use `--signing-passphrase-env` locally.
+
+The metadata merge uses an isolated temporary GnuPG keyring. Its signing key
+must have no passphrase. The publisher verifies existing archive signatures
+with the supplied private and public keys. Include the old public key during
+rotation. A signed archive cannot receive an unsigned update.
 
 ## Sign locally
 

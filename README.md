@@ -177,6 +177,28 @@ the files and environment directly:
   --public-key ~/eternal-signing-key.asc.pub
 ```
 
+Bucket publication also needs the AWS CLI, `mergerepo_c` from `createrepo-c`,
+Python 3.11 or later, `jq`, and GnuPG when signing is enabled.
+The publisher downloads only the archive's current index and referenced
+metadata files. It merges those records with the new rolling metadata,
+including SRPM records. Historical RPMs stay in the bucket. The local
+`site/archive/` tree contains metadata only.
+
+Checksums and existing archive signatures must verify before publication.
+Comps groups and updateinfo advisories survive the merge; SQLite and zchunk
+caches are omitted. Unsupported metadata types stop publication. New RPMs
+must use immutable filenames, as the build timestamp release suffix provides.
+
+Only one publisher may write to a bucket at a time. CI serializes publication
+across branches and tags. Coordinate manual runs with CI. RPMs and immutable
+metadata upload before the index; old objects remain available to clients.
+The detached signature and index are separate uploads, so clients can observe
+a brief signature mismatch during publication and must retry.
+
+Run the publication tests with `python3 -m unittest discover -s tests -p test_publish.py -v`.
+They require `rpmx`, `rpmbuild`, the `createrepo-c` tools, GnuPG, and `jq`.
+When run as root with `dnf5`, they also test package upgrades and metadata signature checks.
+
 ## How a release works
 
 `ci.yml` runs on pull requests and on demand. A `configure` job reads the
