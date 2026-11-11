@@ -7,7 +7,7 @@ schema: 1
 package:
   name: rpm
   version: "6.1.0"
-  release: 1
+  release: 2
   summary: The RPM package manager
   description: |
     RPM is a powerful command line driven package management system capable of
@@ -48,7 +48,7 @@ build:
     - sqlite-devel
     - xz-devel
     - zlib-devel
-    - libzstd-devel
+    - zstd-devel
   pipeline:
     - uses: cmake/configure
       with:
@@ -138,7 +138,7 @@ outputs:
         - sqlite-libs
         - xz-libs
         - zlib
-        - libzstd
+        - zstd-libs
     tests:
       - name: installed
         stage: installed
@@ -197,7 +197,7 @@ outputs:
         - sqlite-devel
         - xz-devel
         - zlib-devel
-        - libzstd-devel
+        - zstd-devel
     tests:
       - name: link
         stage: installed
