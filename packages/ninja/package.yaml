@@ -4,7 +4,7 @@ schema: 1
 package:
   name: ninja
   version: 1.13.2
-  release: 1
+  release: 2
   summary: Small build system focused on speed
   description: Small build system focused on speed.
   license: Apache-2.0
@@ -56,7 +56,6 @@ outputs:
   dependencies:
     run:
     - libstdc++
-    - libgcc
     - bash-binsh
     provides:
     - ninja-build = ${package.version}-${package.release}
