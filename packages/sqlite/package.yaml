@@ -71,12 +71,8 @@ outputs:
       - name: installed
         stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            sqlite3 /tmp/sqlite-test.db 'create table t(v text); insert into t values (char(111,107)); select v from t;' | grep -Fx ok
-
+        script: |
+          sqlite3 /tmp/sqlite-test.db 'create table t(v text); insert into t values (char(111,107)); select v from t;' | grep -Fx ok
   - name: sqlite-libs
     summary: Shared libraries for SQLite
     files:
@@ -86,18 +82,12 @@ outputs:
       license:
         - /usr/share/licenses/sqlite-libs/**
     tests:
-      - name: installed
+      - name: runtime-linkage
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libsqlite3.so.* /usr/lib/libsqlite3.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libsqlite3.so.*"]
   - name: sqlite-devel
     summary: Development files for SQLite
     files:
@@ -110,23 +100,17 @@ outputs:
       run:
         - sqlite-libs = ${package.version}-${package.release}
     tests:
-      - name: link
+      - name: api-behavior
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            cat > /tmp/sqlite-test.c <<'EOF'
-            #include <sqlite3.h>
-            int main(void) {
-                sqlite3 *db = 0;
-                return sqlite3_open(":memory:", &db) == SQLITE_OK ? 0 : 1;
-            }
-            EOF
-            gcc /tmp/sqlite-test.c $(pkg-config --cflags --libs sqlite3) -o /tmp/sqlite-test
-            /tmp/sqlite-test
-
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists sqlite3
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags sqlite3) "$TEST_FILES/behavior.c" $(pkg-config --libs sqlite3) -o behavior
+          ./behavior
   - name: sqlite-doc
     summary: Documentation for SQLite
     files:
