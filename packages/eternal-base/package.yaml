@@ -8,7 +8,7 @@
 # Today most of these names come from Fedora 44. As each one gains an in-tree
 # recipe with the same package name, this file does not change; only the
 # repositories in profiles/eternal.profile.yaml do.
-schema: 1
+schema: 2
 
 package:
   name: eternal-base
@@ -58,7 +58,6 @@ outputs:
         - shadow-utils
 tests:
   - name: base-system-closure
-    stage: installed
     packages:
       - bash
     script: |

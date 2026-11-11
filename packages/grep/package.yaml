@@ -2,7 +2,7 @@
 #
 # GNU grep pattern matcher. Part of the minimal Eternal userland and the
 # bootstrap tool set. The source is the upstream release tarball.
-schema: 1
+schema: 2
 
 package:
   name: grep
@@ -47,6 +47,13 @@ build:
         outputs: [grep, grep-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+      artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: grep
     summary: GNU grep pattern matcher
@@ -55,14 +62,12 @@ outputs:
         - /usr/share/licenses/grep/COPYING
     tests:
       - name: patterns
-        stage: installed
         packages:
           - coreutils
         files: tests
         script: |
           bash "$TEST_FILES/patterns.sh"
       - name: no-match
-        stage: installed
         argv:
           - grep
           - missing
@@ -71,7 +76,6 @@ outputs:
           exit-code: 1
           stdout: ''
       - name: invalid-expression
-        stage: installed
         argv:
           - grep
           - '['
@@ -90,11 +94,3 @@ outputs:
         - /usr/share/licenses/grep-doc/COPYING
       license:
         - /usr/share/licenses/grep-doc/COPYING
-
-tests:
-  - name: upstream
-    stage: build
-    packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
-    artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
-    pipeline:
-      - uses: make/check

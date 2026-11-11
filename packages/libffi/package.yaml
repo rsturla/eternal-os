@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # Portable foreign function interface library. A dependency for the minimal Eternal build root.
-schema: 1
+schema: 2
 
 package:
   name: libffi
@@ -45,6 +45,22 @@ build:
         outputs: [libffi, libffi-devel, libffi-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      environment:
+        USER: rpmx-test
+        LOGNAME: rpmx-test
+      packages:
+        - dejagnu
+        - diffutils
+      artifacts:
+        - test/test-suite.log
+        - test-suite.log
+        - testsuite/libffi.log
+        - testsuite/libffi.sum
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: libffi
     summary: Portable foreign function interface library
@@ -53,7 +69,6 @@ outputs:
         - /usr/share/licenses/libffi/LICENSE
     tests:
       - name: runtime-linkage
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -72,7 +87,6 @@ outputs:
 
     tests:
       - name: api-behavior
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -92,21 +106,3 @@ outputs:
         - /usr/share/licenses/libffi-doc/LICENSE
       license:
         - /usr/share/licenses/libffi-doc/LICENSE
-
-tests:
-  - name: upstream
-    stage: build
-    # DejaGNU uses this label in reports; the sandbox UID need not be in passwd.
-    environment:
-      USER: rpmx-test
-      LOGNAME: rpmx-test
-    packages:
-      - dejagnu
-      - diffutils
-    artifacts:
-      - test/test-suite.log
-      - test-suite.log
-      - testsuite/libffi.log
-      - testsuite/libffi.sum
-    pipeline:
-      - uses: make/check

@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # Library for downloading and verifying rpm repository metadata.
-schema: 1
+schema: 2
 
 package:
   name: librepo
@@ -73,7 +73,6 @@ outputs:
         - zchunk-libs
     tests:
       - name: runtime-linkage
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -91,7 +90,6 @@ outputs:
         - librepo = ${package.version}-${package.release}
     tests:
       - name: api-behavior
-        stage: installed
         packages:
           - gcc
           - glibc-devel

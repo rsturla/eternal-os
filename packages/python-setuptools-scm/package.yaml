@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-setuptools-scm.yaml
-schema: 1
+schema: 2
 package:
   name: python-setuptools-scm
   version: 10.3.4
@@ -83,7 +83,6 @@ outputs:
     - python-${matrix.python.version}-packaging
   tests:
   - name: behavior
-    stage: installed
     files: tests
     packages:
     - git

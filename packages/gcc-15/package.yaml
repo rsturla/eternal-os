@@ -9,7 +9,7 @@
 # compiler) and without Fortran for the first import. The runtime libraries are
 # split the same way Wolfi splits them: libstdc++, libatomic and the compiler
 # proper are independent outputs.
-schema: 1
+schema: 2
 
 package:
   name: gcc-15
@@ -134,6 +134,33 @@ build:
         ln -sf gcc-15 "$STAGE/usr/bin/c99"
     - uses: strip
 
+  tests:
+    - name: upstream
+      environment:
+        USER: rpmx-test
+        LOGNAME: rpmx-test
+      packages:
+        - dejagnu
+        - expect
+      pipeline:
+        - runs: |
+            status=0
+            make -C build -j2 -k check-gcc check-target-libstdc++-v3 || status=$?
+            mkdir -p upstream-reports
+            find build -type f \( -name '*.sum' -o -name '*.log' \) -exec cp --parents '{}' upstream-reports/ \;
+            test "$status" = 0
+            for suite in gcc g++ libstdc++; do
+              find build -type f -name "$suite.sum" -exec cat '{}' + > "upstream-reports/$suite.summary"
+              grep -E '# of expected passes[[:space:]]+[1-9][0-9]*' "upstream-reports/$suite.summary"
+              if grep -E '^(FAIL|XPASS|ERROR|UNRESOLVED):' "upstream-reports/$suite.summary"; then
+                echo "unexpected DejaGNU result in $suite" >&2
+                exit 1
+              fi
+            done
+      artifacts:
+        - upstream-reports
+      timeout: 4h
+
 outputs:
   - name: gcc-15
     summary: GCC 15 compiler and runtime
@@ -158,7 +185,6 @@ outputs:
 
     tests:
       - name: c-runtime
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -179,7 +205,6 @@ outputs:
         artifacts:
           - coverage.c.gcov
       - name: linker-lto-and-diagnostics
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -206,7 +231,6 @@ outputs:
         artifacts:
           - invalid.stderr
       - name: target-runtime-branch-protection
-        stage: installed
         packages: [bash, binutils, coreutils, grep]
         files: tests
         script: |
@@ -214,7 +238,6 @@ outputs:
         artifacts:
           - branch-protection
       - name: runtime-closure
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -258,7 +281,6 @@ outputs:
 
     tests:
       - name: default-command-links
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -292,7 +314,6 @@ outputs:
 
     tests:
       - name: containers-exceptions-and-threads
-        stage: installed
         packages:
           - bash
           - gcc-15
@@ -302,7 +323,6 @@ outputs:
           g++-15 -std=c++17 -O2 -Wall -Wextra -Werror -pthread "$TEST_FILES/containers.cc" -o containers
           ./containers
       - name: runtime-closure
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -334,7 +354,6 @@ outputs:
 
     tests:
       - name: containers-exceptions-and-threads
-        stage: installed
         packages:
           - bash
           - gcc-15
@@ -362,7 +381,6 @@ outputs:
 
     tests:
       - name: static-cxx-runtime
-        stage: installed
         packages:
           - bash
           - gcc-15
@@ -391,7 +409,6 @@ outputs:
 
     tests:
       - name: non-lock-free-atomics
-        stage: installed
         packages:
           - bash
           - gcc-15
@@ -400,7 +417,6 @@ outputs:
           gcc-15 "$TEST_FILES/atomic.c" -latomic -o atomic
           ./atomic
       - name: runtime-closure
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -416,32 +432,3 @@ outputs:
         - /usr/share/licenses/gcc-15-doc/COPYING3
         - /usr/share/licenses/gcc-15-doc/COPYING3.LIB
         - /usr/share/licenses/gcc-15-doc/COPYING.RUNTIME
-
-tests:
-  - name: upstream
-    stage: build
-    # DejaGNU uses this label in reports; the sandbox UID need not be in passwd.
-    environment:
-      USER: rpmx-test
-      LOGNAME: rpmx-test
-    packages:
-      - dejagnu
-      - expect
-    pipeline:
-      - runs: |
-          status=0
-          make -C build -j2 -k check-gcc check-target-libstdc++-v3 || status=$?
-          mkdir -p upstream-reports
-          find build -type f \( -name '*.sum' -o -name '*.log' \) -exec cp --parents '{}' upstream-reports/ \;
-          test "$status" = 0
-          for suite in gcc g++ libstdc++; do
-            find build -type f -name "$suite.sum" -exec cat '{}' + > "upstream-reports/$suite.summary"
-            grep -E '# of expected passes[[:space:]]+[1-9][0-9]*' "upstream-reports/$suite.summary"
-            if grep -E '^(FAIL|XPASS|ERROR|UNRESOLVED):' "upstream-reports/$suite.summary"; then
-              echo "unexpected DejaGNU result in $suite" >&2
-              exit 1
-            fi
-          done
-        timeout: 4h
-    artifacts:
-      - upstream-reports

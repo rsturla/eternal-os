@@ -7,7 +7,7 @@
 # The loader, binaries, iconv modules and development files are separate
 # outputs. `glibc-2.44` is the runtime library set; `ld-linux-2.44` owns the
 # ELF interpreter and loader configuration; `libc-bin-2.44` owns the utilities.
-schema: 1
+schema: 2
 
 package:
   name: glibc-2.44
@@ -153,6 +153,22 @@ build:
           > "$STAGE/etc/ld.so.conf"
     - uses: strip
 
+  tests:
+    - name: upstream
+      files: tests
+      packages:
+        - perl
+        - gawk
+        # NSS tests need real passwd/group records for root and the runner user.
+        - setup
+      pipeline:
+        - runs: |
+            bash "$TEST_FILES/upstream.sh"
+      artifacts:
+        - build/tests.sum
+        - upstream-reports
+      timeout: 4h
+
 outputs:
   - name: glibc-2.44
     summary: The GNU C Library runtime
@@ -173,7 +189,6 @@ outputs:
 
     tests:
       - name: posix-runtime
-        stage: installed
         packages:
           - bash
           - gcc
@@ -188,7 +203,6 @@ outputs:
           readelf -d runtime > dynamic.txt
           if grep -F '.so-' dynamic.txt; then exit 1; fi
       - name: runtime-closure
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -213,7 +227,6 @@ outputs:
 
     tests:
       - name: loader-resolution
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -255,7 +268,6 @@ outputs:
 
     tests:
       - name: utilities
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -289,7 +301,6 @@ outputs:
 
     tests:
       - name: character-conversion
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -321,7 +332,6 @@ outputs:
 
     tests:
       - name: locale-encoding-numbers-and-dates
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -357,7 +367,6 @@ outputs:
 
     tests:
       - name: locale-encoding-numbers-and-dates
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -393,7 +402,6 @@ outputs:
 
     tests:
       - name: locale-encoding-numbers-and-dates
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -429,7 +437,6 @@ outputs:
 
     tests:
       - name: locale-encoding-numbers-and-dates
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -465,7 +472,6 @@ outputs:
 
     tests:
       - name: locale-encoding-numbers-and-dates
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -501,7 +507,6 @@ outputs:
 
     tests:
       - name: locale-encoding-numbers-and-dates
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -544,7 +549,6 @@ outputs:
 
     tests:
       - name: locale-encoding-numbers-and-dates
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -578,7 +582,6 @@ outputs:
 
     tests:
       - name: compile-locale
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -606,7 +609,6 @@ outputs:
 
     tests:
       - name: build-and-read-rpc-database
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -656,7 +658,6 @@ outputs:
         - glibc-devel = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages:
           - binutils
           - gcc
@@ -722,7 +723,6 @@ outputs:
             echo "test binary links a pinned library soname"; exit 1
           fi
       - name: startup-object-branch-protection
-        stage: installed
         packages:
           - binutils
           - grep
@@ -732,7 +732,6 @@ outputs:
         artifacts:
           - crt-branch-protection
       - name: headers-and-linker-inputs
-        stage: installed
         packages:
           - bash
           - gcc
@@ -772,7 +771,6 @@ outputs:
 
     tests:
       - name: static-runtime
-        stage: installed
         packages:
           - bash
           - gcc
@@ -797,33 +795,17 @@ outputs:
         - /usr/share/licenses/glibc-2.44-doc/COPYING.LIB
 
 tests:
-  - name: upstream
-    stage: build
-    files: tests
-    packages:
-      - perl
-      - gawk
-      # NSS tests need real passwd/group records for root and the runner user.
-      - setup
-    pipeline:
-      - runs: |
-          bash "$TEST_FILES/upstream.sh"
-        timeout: 4h
-    artifacts:
-      - build/tests.sum
-      - upstream-reports
-  - name: build
-    stage: build
+  - name: payload-layout
     script: |
       case "${arch}" in
-        x86_64) loader="$STAGE/usr/lib64/ld-linux-x86-64.so.2" ;;
-        aarch64) loader="$STAGE/usr/lib/ld-linux-aarch64.so.1" ;;
+        x86_64) loader="$TEST_PACKAGE_ROOT/usr/lib64/ld-linux-x86-64.so.2" ;;
+        aarch64) loader="$TEST_PACKAGE_ROOT/usr/lib/ld-linux-aarch64.so.1" ;;
         *) echo "unsupported arch"; exit 1 ;;
       esac
       test -x "$loader"
       test ! -L "$loader"
-      test -f "$STAGE/usr/lib64/libc.so.6" || test -f "$STAGE/usr/lib/libc.so.6"
-      test -f "$STAGE/etc/ld.so.conf"
-      test -f "$STAGE/etc/rpc"
-      test -f "$STAGE/usr/share/i18n/locales/C"
-      test -f "$STAGE/var/db/Makefile"
+      test -f "$TEST_PACKAGE_ROOT/usr/lib64/libc.so.6" || test -f "$TEST_PACKAGE_ROOT/usr/lib/libc.so.6"
+      test -f "$TEST_PACKAGE_ROOT/etc/ld.so.conf"
+      test -f "$TEST_PACKAGE_ROOT/etc/rpc"
+      test -f "$TEST_PACKAGE_ROOT/usr/share/i18n/locales/C"
+      test -f "$TEST_PACKAGE_ROOT/var/db/Makefile"

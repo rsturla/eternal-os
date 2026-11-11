@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # bzip2 compression library and tools.
-schema: 1
+schema: 2
 
 package:
   name: bzip2
@@ -57,6 +57,12 @@ build:
         outputs: [bzip2, bzip2-libs, bzip2-devel, bzip2-static, bzip2-doc]
     - uses: strip
 
+  tests:
+    - name: upstream-samples
+      packages: [diffutils]
+      script: |
+        make test
+
 outputs:
   - name: bzip2
     summary: bzip2 compression tools
@@ -74,7 +80,6 @@ outputs:
         - bzip2-libs = ${package.version}-${package.release}
     tests:
       - name: roundtrip
-        stage: installed
         packages:
           - coreutils
           - diffutils
@@ -92,7 +97,6 @@ outputs:
         - /usr/share/licenses/bzip2-libs/**
     tests:
       - name: minimal-runtime-dependencies
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -110,7 +114,6 @@ outputs:
         - bzip2-libs = ${package.version}-${package.release}
     tests:
       - name: compression-api
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -132,7 +135,6 @@ outputs:
         - bzip2-devel = ${package.version}-${package.release}
     tests:
       - name: static-compression-api
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -150,10 +152,3 @@ outputs:
         - /usr/share/licenses/bzip2-doc/**
       license:
         - /usr/share/licenses/bzip2-doc/**
-
-tests:
-  - name: upstream-samples
-    stage: build
-    packages: [diffutils]
-    script: |
-      make test

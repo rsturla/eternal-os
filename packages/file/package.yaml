@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
-schema: 1
+schema: 2
 package:
   name: file
   version: '5.48'
@@ -67,7 +67,6 @@ outputs:
     - file-libs = ${package.version}-${package.release}
   tests:
     - name: classification
-      stage: installed
       packages:
         - coreutils
       files: tests
@@ -84,13 +83,11 @@ outputs:
     - /usr/share/licenses/file-libs/**
   tests:
     - name: minimal-runtime-dependencies
-      stage: installed
       pipeline:
         - uses: test/runtime-linkage
           with:
             libraries: ["libmagic.so.[0-9]*"]
     - name: runtime
-      stage: installed
       packages:
         - python3
       files: tests
@@ -109,7 +106,6 @@ outputs:
     - file-libs = ${package.version}-${package.release}
   tests:
     - name: magic-api
-      stage: installed
       packages:
         - gcc
         - glibc-devel
@@ -130,6 +126,5 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check

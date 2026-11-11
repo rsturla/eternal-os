@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Use source-based split names. curl-devel provides libcurl-devel.
 # Trust roots are optional, as in Wolfi. Recommend ca-certificates-bundle.
-schema: 1
+schema: 2
 package:
   name: curl
   version: 8.23.0
@@ -92,7 +92,6 @@ outputs:
         - ca-certificates-bundle
     tests:
       - name: http-tls-transfers-redirects-and-errors
-        stage: installed
         packages:
           - bash
           - python3
@@ -103,7 +102,6 @@ outputs:
         script: |
           python3 -I "$TEST_FILES/http.py"
       - name: file-transfer
-        stage: installed
         packages:
           - bash
           - diffutils
@@ -131,14 +129,12 @@ outputs:
         - libcurl = ${package.version}-${package.release}
     tests:
       - name: load-library-and-version
-        stage: installed
         packages:
           - bash
           - python3
         script: |
           python3 -I -c 'import ctypes; lib=ctypes.CDLL("libcurl.so.4"); lib.curl_version.restype=ctypes.c_char_p; assert b"libcurl/" in lib.curl_version()'
       - name: runtime-closure
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -158,7 +154,6 @@ outputs:
         - libcurl-devel = ${package.version}-${package.release}
     tests:
       - name: transfer-api
-        stage: installed
         packages:
           - bash
           - gcc
@@ -180,7 +175,6 @@ outputs:
         - /usr/share/licenses/curl-doc/**
 tests:
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check
 patches:

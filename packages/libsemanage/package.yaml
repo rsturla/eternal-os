@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Omit the migration script, which needs optional Python bindings.
-schema: 1
+schema: 2
 package:
   name: libsemanage
   version: '3.11'
@@ -93,7 +93,6 @@ outputs:
     - bzip2-libs
   tests:
   - name: runtime-linkage
-    stage: installed
     pipeline:
       - uses: test/runtime-linkage
         with:
@@ -110,7 +109,6 @@ outputs:
     - libsemanage = ${package.version}-${package.release}
   tests:
   - name: api-behavior
-    stage: installed
     packages:
     - gcc
     - glibc-devel
@@ -134,7 +132,6 @@ outputs:
     - bzip2-devel
   tests:
   - name: static-api-behavior
-    stage: installed
     packages:
     - gcc
     - glibc-devel
@@ -164,7 +161,6 @@ outputs:
     - /usr/share/licenses/libsemanage-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check
 patches:

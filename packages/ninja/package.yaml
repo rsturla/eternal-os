@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Upstream publishes source tags but no separate release tarball.
-schema: 1
+schema: 2
 package:
   name: ninja
   version: 1.13.2
@@ -62,7 +62,6 @@ outputs:
         - ninja-build = ${package.version}-${package.release}
     tests:
       - name: dependency-incremental-clean-and-failure
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -98,6 +97,5 @@ outputs:
           - failure.stderr
 tests:
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check

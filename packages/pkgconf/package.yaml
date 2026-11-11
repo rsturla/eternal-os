@@ -2,7 +2,7 @@
 #
 # An implementation of pkg-config. Part of the minimal Eternal userland and the
 # bootstrap tool set. The source is the upstream release tarball.
-schema: 1
+schema: 2
 
 package:
   name: pkgconf
@@ -59,7 +59,6 @@ outputs:
         - pkgconf-pkg-config = ${package.version}-${package.release}
     tests:
       - name: dependency-resolution
-        stage: installed
         packages:
           - coreutils
         files: tests
@@ -76,13 +75,11 @@ outputs:
         - /usr/share/licenses/pkgconf-libs/COPYING
     tests:
       - name: minimal-runtime-dependencies
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
               libraries: ["libpkgconf.so.[0-9]*"]
       - name: runtime
-        stage: installed
         packages:
           - python3
         files: tests
@@ -102,7 +99,6 @@ outputs:
         - pkgconf-libs = ${package.version}-${package.release}
     tests:
       - name: pkgconf-api
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -125,7 +121,6 @@ outputs:
         - pkgconf-devel = ${package.version}-${package.release}
     tests:
       - name: static-pkgconf-api
-        stage: installed
         packages:
           - gcc
           - glibc-devel

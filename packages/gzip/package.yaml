@@ -2,7 +2,7 @@
 #
 # GNU gzip compression utility. Part of the minimal Eternal userland and the
 # bootstrap tool set. The source is the upstream release tarball.
-schema: 1
+schema: 2
 
 package:
   name: gzip
@@ -54,6 +54,13 @@ build:
         outputs: [gzip, gzip-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+      artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: gzip
     summary: GNU gzip compression utility
@@ -62,7 +69,6 @@ outputs:
         - /usr/share/licenses/gzip/COPYING
     tests:
       - name: roundtrip
-        stage: installed
         packages:
           - coreutils
           - diffutils
@@ -80,11 +86,3 @@ outputs:
         - /usr/share/licenses/gzip-doc/COPYING
       license:
         - /usr/share/licenses/gzip-doc/COPYING
-
-tests:
-  - name: upstream
-    stage: build
-    packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
-    artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
-    pipeline:
-      - uses: make/check

@@ -2,7 +2,7 @@
 #
 # GNU find utilities. Part of the minimal Eternal userland and the
 # bootstrap tool set. The source is the upstream release tarball.
-schema: 1
+schema: 2
 
 package:
   name: findutils
@@ -52,6 +52,13 @@ build:
         outputs: [findutils, findutils-locate, findutils-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+      artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: findutils
     summary: GNU find utilities
@@ -60,7 +67,6 @@ outputs:
         - /usr/share/licenses/findutils/COPYING
     tests:
       - name: selection-and-exec
-        stage: installed
         packages:
           - coreutils
           - bash-binsh
@@ -84,7 +90,6 @@ outputs:
         - findutils = ${package.version}-${package.release}
     tests:
       - name: database
-        stage: installed
         packages:
           - coreutils
         files: tests
@@ -101,11 +106,3 @@ outputs:
         - /usr/share/licenses/findutils-doc/COPYING
       license:
         - /usr/share/licenses/findutils-doc/COPYING
-
-tests:
-  - name: upstream
-    stage: build
-    packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
-    artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
-    pipeline:
-      - uses: make/check

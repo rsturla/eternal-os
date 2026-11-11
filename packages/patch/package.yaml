@@ -2,7 +2,7 @@
 #
 # GNU patch. Part of the minimal Eternal userland and the
 # bootstrap tool set. The source is the upstream release tarball.
-schema: 1
+schema: 2
 
 package:
   name: patch
@@ -46,6 +46,13 @@ build:
         outputs: [patch, patch-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+      artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: patch
     summary: GNU patch
@@ -54,7 +61,6 @@ outputs:
         - /usr/share/licenses/patch/COPYING
     tests:
       - name: apply-and-reverse
-        stage: installed
         packages:
           - coreutils
           - diffutils
@@ -72,11 +78,3 @@ outputs:
         - /usr/share/licenses/patch-doc/COPYING
       license:
         - /usr/share/licenses/patch-doc/COPYING
-
-tests:
-  - name: upstream
-    stage: build
-    packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
-    artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
-    pipeline:
-      - uses: make/check

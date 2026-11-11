@@ -8,7 +8,7 @@
 # Only `usr/include` is packaged. The kernel build tree, the arch-specific
 # `asm` links and the internal headers are not installed; `make headers`
 # performs the UAPI sanitising that upstream requires.
-schema: 1
+schema: 2
 
 package:
   name: kernel-headers
@@ -68,7 +68,6 @@ outputs:
 
     tests:
       - name: userspace-abi-headers
-        stage: installed
         packages:
           - bash
           - gcc
@@ -78,7 +77,6 @@ outputs:
           ./uapi
 tests:
   - name: headers
-    stage: installed
     packages: [gcc, glibc-devel, bash-binsh, coreutils, bash]
     script: |
       for header in linux/types.h linux/ioctl.h linux/fs.h asm/types.h; do

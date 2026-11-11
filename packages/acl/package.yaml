@@ -3,7 +3,7 @@
 # Access control list utilities and the libacl runtime. Coreutils links
 # against libacl, and the utilities are the reference implementation for
 # inspecting and editing ACLs.
-schema: 1
+schema: 2
 
 package:
   name: acl
@@ -62,7 +62,6 @@ outputs:
         - libacl = ${package.version}-${package.release}
     tests:
       - name: permissions
-        stage: installed
         packages:
           - coreutils
         files: tests
@@ -79,13 +78,11 @@ outputs:
         - /usr/share/licenses/libacl/**
     tests:
       - name: minimal-runtime-dependencies
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
               libraries: ["libacl.so.[0-9]*"]
       - name: runtime
-        stage: installed
         packages:
           - python3
         files: tests
@@ -105,7 +102,6 @@ outputs:
         - libacl = ${package.version}-${package.release}
     tests:
       - name: acl-api
-        stage: installed
         packages:
           - gcc
           - glibc-devel

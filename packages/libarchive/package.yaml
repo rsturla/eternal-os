@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
-schema: 1
+schema: 2
 package:
   name: libarchive
   version: 3.8.11
@@ -68,6 +68,34 @@ build:
       - libarchive-devel
       - libarchive-doc
   - uses: strip
+  tests:
+  - name: upstream
+    packages:
+    - diffutils
+    - gzip
+    - bzip2
+    - xz
+    - zstd
+    # Exercise external-filter fallbacks without changing production features.
+    - lz4
+    - lzop
+    # Match the Fedora libc used by this recipe's bootstrap build profile.
+    - glibc-common
+    - glibc-locale-source
+    - glibc-gconv-extra
+    - nss_wrapper-libs
+    files: tests
+    artifacts:
+    - test-suite.log
+    - libarchive_test.log
+    - bsdtar_test.log
+    - bsdcpio_test.log
+    - bsdcat_test.log
+    - bsdunzip_test.log
+    - upstream-results
+    script: |
+      bash "$TEST_FILES/upstream.sh"
+
 outputs:
 - name: libarchive
   files:
@@ -78,7 +106,6 @@ outputs:
     - libarchive-libs = ${package.version}-${package.release}
   tests:
   - name: round-trip
-    stage: installed
     script: |
       mkdir /tmp/archive-test
       printf "payload\n" > /tmp/archive-test/payload
@@ -103,7 +130,6 @@ outputs:
     - zstd-libs
   tests:
   - name: runtime-linkage
-    stage: installed
     pipeline:
       - uses: test/runtime-linkage
         with:
@@ -120,7 +146,6 @@ outputs:
     - libarchive-libs = ${package.version}-${package.release}
   tests:
   - name: api-behavior
-    stage: installed
     packages:
     - gcc
     - glibc-devel
@@ -141,33 +166,5 @@ outputs:
     - /usr/share/licenses/libarchive-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check
-- name: upstream
-  stage: build
-  packages:
-  - diffutils
-  - gzip
-  - bzip2
-  - xz
-  - zstd
-  # Exercise external-filter fallbacks without changing production features.
-  - lz4
-  - lzop
-  # Match the Fedora libc used by this recipe's bootstrap build profile.
-  - glibc-common
-  - glibc-locale-source
-  - glibc-gconv-extra
-  - nss_wrapper-libs
-  files: tests
-  artifacts:
-  - test-suite.log
-  - libarchive_test.log
-  - bsdtar_test.log
-  - bsdcpio_test.log
-  - bsdcat_test.log
-  - bsdunzip_test.log
-  - upstream-results
-  script: |
-    bash "$TEST_FILES/upstream.sh"

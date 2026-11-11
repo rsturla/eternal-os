@@ -7,7 +7,7 @@
 # This bootstrap variant exists because the ladder hides the seed filesystem
 # provider while a stage builds this package. The production recipe is in
 # packages/filesystem/package.yaml.
-schema: 1
+schema: 2
 
 package:
   name: filesystem
@@ -106,17 +106,15 @@ outputs:
 
 tests:
   - name: layout
-    stage: build
     script: |
-      test -L "$STAGE/bin" && test "$(readlink "$STAGE/bin")" = usr/bin
-      test -L "$STAGE/sbin" && test "$(readlink "$STAGE/sbin")" = usr/sbin
-      test -L "$STAGE/lib" && test "$(readlink "$STAGE/lib")" = usr/lib
-      test -L "$STAGE/lib64" && test "$(readlink "$STAGE/lib64")" = usr/lib64
-      test -d "$STAGE/usr/bin" && test -d "$STAGE/usr/lib64"
-      test "$(stat -c %a "$STAGE/tmp")" = 1777
-      test "$(stat -c %a "$STAGE/root")" = 700
+      test -L "$TEST_PACKAGE_ROOT/bin" && test "$(readlink "$TEST_PACKAGE_ROOT/bin")" = usr/bin
+      test -L "$TEST_PACKAGE_ROOT/sbin" && test "$(readlink "$TEST_PACKAGE_ROOT/sbin")" = usr/sbin
+      test -L "$TEST_PACKAGE_ROOT/lib" && test "$(readlink "$TEST_PACKAGE_ROOT/lib")" = usr/lib
+      test -L "$TEST_PACKAGE_ROOT/lib64" && test "$(readlink "$TEST_PACKAGE_ROOT/lib64")" = usr/lib64
+      test -d "$TEST_PACKAGE_ROOT/usr/bin" && test -d "$TEST_PACKAGE_ROOT/usr/lib64"
+      test "$(stat -c %a "$TEST_PACKAGE_ROOT/tmp")" = 1777
+      test "$(stat -c %a "$TEST_PACKAGE_ROOT/root")" = 700
   - name: installed-merged-usr-and-permissions
-    stage: installed
     packages:
       - bash
       - coreutils

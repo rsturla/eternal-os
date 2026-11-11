@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # Zchunk compressed file format library and tools.
-schema: 1
+schema: 2
 
 package:
   name: zchunk
@@ -69,7 +69,6 @@ outputs:
         - zchunk-libs = ${package.version}-${package.release}
     tests:
       - name: roundtrip
-        stage: installed
         packages:
           - coreutils
           - diffutils
@@ -91,13 +90,11 @@ outputs:
         - zstd-libs
     tests:
       - name: minimal-runtime-dependencies
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
               libraries: ["libzck.so.[0-9]*"]
       - name: runtime
-        stage: installed
         packages:
           - python3
         files: tests
@@ -119,7 +116,6 @@ outputs:
         - openssl-devel
     tests:
       - name: zchunk-api
-        stage: installed
         packages:
           - gcc
           - glibc-devel

@@ -11,7 +11,7 @@
 # This bootstrap variant exists because the ladder hides the seed bash provider
 # while a stage builds this package. The production recipe is in
 # packages/bash/package.yaml.
-schema: 1
+schema: 2
 
 package:
   name: bash
@@ -100,7 +100,6 @@ outputs:
         - /bin/bash
     tests:
       - name: language
-        stage: installed
         packages:
           - coreutils
         files: tests
@@ -122,7 +121,6 @@ outputs:
         - /bin/sh
     tests:
       - name: posix-shell
-        stage: installed
         packages: []
         files: tests
         script: |
@@ -153,7 +151,6 @@ outputs:
         - bash = ${package.version}-${package.release}
     tests:
       - name: builtin
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -174,7 +171,6 @@ outputs:
         - bash = ${package.version}-${package.release}
     tests:
       - name: loadable
-        stage: installed
         packages: []
         files: tests
         script: |

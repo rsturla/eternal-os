@@ -6,7 +6,7 @@
 # on `basesystem` even as the provider changes from Fedora to Eternal.
 #
 # The bootstrap variant lives in bootstrap/recipes/basesystem/package.yaml.
-schema: 1
+schema: 2
 
 package:
   name: basesystem
@@ -44,11 +44,9 @@ outputs:
 
 tests:
   - name: license
-    stage: build
     script: |-
-      test -f "$STAGE/usr/share/licenses/basesystem/LICENSE"
+      test -f "$TEST_PACKAGE_ROOT/usr/share/licenses/basesystem/LICENSE"
   - name: installed-layout-closure
-    stage: installed
     packages:
       - bash
       - coreutils

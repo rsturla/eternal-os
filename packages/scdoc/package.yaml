@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # scdoc.pc locates the generator. It is runtime metadata, not a library interface.
-schema: 1
+schema: 2
 package:
   name: scdoc
   version: 1.11.5
@@ -51,7 +51,6 @@ outputs:
     - /usr/share/licenses/scdoc/**
   tests:
     - name: rendering
-      stage: installed
       packages:
         - coreutils
       files: tests
@@ -68,6 +67,5 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check

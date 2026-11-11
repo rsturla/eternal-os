@@ -2,7 +2,7 @@
 #
 # XML parser library. A build dependency for gettext and other tooling in the
 # minimal Eternal userland.
-schema: 1
+schema: 2
 
 package:
   name: expat
@@ -51,6 +51,16 @@ build:
         outputs: [expat, expat-libs, expat-devel, expat-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages:
+        - diffutils
+      artifacts:
+        - test-suite.log
+        - tests/test-suite.log
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: expat
     summary: XML parser tools
@@ -62,7 +72,6 @@ outputs:
         - expat-libs = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         script: |
           trap 'printf "line %s: %s\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
           xmlwf -v
@@ -83,7 +92,6 @@ outputs:
         - /usr/share/licenses/expat-libs/COPYING
     tests:
       - name: runtime-linkage
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -102,7 +110,6 @@ outputs:
 
     tests:
       - name: api-behavior
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -121,14 +128,3 @@ outputs:
         - /usr/share/licenses/expat-doc/COPYING
       license:
         - /usr/share/licenses/expat-doc/COPYING
-
-tests:
-  - name: upstream
-    stage: build
-    packages:
-      - diffutils
-    artifacts:
-      - test-suite.log
-      - tests/test-suite.log
-    pipeline:
-      - uses: make/check

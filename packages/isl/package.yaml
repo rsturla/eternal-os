@@ -2,7 +2,7 @@
 #
 # Integer set library for the polyhedral model. A build dependency for the GNU toolchain and the
 # rest of the minimal Eternal userland.
-schema: 1
+schema: 2
 
 package:
   name: isl
@@ -52,6 +52,16 @@ build:
         outputs: [isl, isl-devel]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages:
+        - diffutils
+      artifacts:
+        - test-suite.log
+        - tests/test-suite.log
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: isl
     summary: Integer set library for the polyhedral model
@@ -60,7 +70,6 @@ outputs:
         - /usr/share/licenses/isl/LICENSE
     tests:
       - name: runtime-linkage
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -80,7 +89,6 @@ outputs:
 
     tests:
       - name: api-behavior
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -90,13 +98,3 @@ outputs:
           pkg-config --exists isl
           gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags isl) "$TEST_FILES/behavior.c" $(pkg-config --libs isl) -o behavior
           ./behavior
-tests:
-  - name: upstream
-    stage: build
-    packages:
-      - diffutils
-    artifacts:
-      - test-suite.log
-      - tests/test-suite.log
-    pipeline:
-      - uses: make/check

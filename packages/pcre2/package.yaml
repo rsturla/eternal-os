@@ -2,7 +2,7 @@
 #
 # Perl-compatible regular expression library. A build dependency for grep and
 # the rest of the minimal Eternal userland.
-schema: 1
+schema: 2
 
 package:
   name: pcre2
@@ -50,6 +50,16 @@ build:
         outputs: [pcre2, pcre2-libs, pcre2-devel, pcre2-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages:
+        - diffutils
+      artifacts:
+        - test-suite.log
+        - tests/test-suite.log
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: pcre2
     summary: Perl-compatible regular expression library tools
@@ -61,7 +71,6 @@ outputs:
         - pcre2-libs = ${package.version}-${package.release}
     tests:
       - name: regex-cli
-        stage: installed
         script: |
           test "$(printf '%s\n' 'abc123' 'nomatch' | pcre2grep '\d+')" = abc123
           result=$(printf '%s\n' '/([a-z]+)-([0-9]+)/' 'hello-42' '' '/a+/' 'bbb' | pcre2test -q)
@@ -69,7 +78,6 @@ outputs:
           result=$(printf '%s\n' '/[/' | pcre2test -q)
           [[ $result == *'Failed: error'* ]]
       - name: no-match
-        stage: installed
         argv:
           - pcre2grep
           - missing
@@ -88,7 +96,6 @@ outputs:
         - /usr/share/licenses/pcre2-libs/COPYING
     tests:
       - name: runtime-linkage
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -108,7 +115,6 @@ outputs:
 
     tests:
       - name: api-behavior
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -132,14 +138,3 @@ outputs:
         - /usr/share/licenses/pcre2-doc/COPYING
       license:
         - /usr/share/licenses/pcre2-doc/COPYING
-
-tests:
-  - name: upstream
-    stage: build
-    packages:
-      - diffutils
-    artifacts:
-      - test-suite.log
-      - tests/test-suite.log
-    pipeline:
-      - uses: make/check

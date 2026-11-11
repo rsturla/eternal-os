@@ -2,7 +2,7 @@
 #
 # Multiple-precision floating-point library. A build dependency for the GNU toolchain and the
 # rest of the minimal Eternal userland.
-schema: 1
+schema: 2
 
 package:
   name: mpfr
@@ -51,6 +51,16 @@ build:
         outputs: [mpfr, mpfr-devel, mpfr-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages:
+        - diffutils
+      artifacts:
+        - test-suite.log
+        - tests/test-suite.log
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: mpfr
     summary: Multiple-precision floating-point library
@@ -62,7 +72,6 @@ outputs:
         - gmp
     tests:
       - name: runtime-linkage
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -82,7 +91,6 @@ outputs:
 
     tests:
       - name: api-behavior
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -102,14 +110,3 @@ outputs:
         - /usr/share/licenses/mpfr-doc/COPYING.LESSER
       license:
         - /usr/share/licenses/mpfr-doc/COPYING.LESSER
-
-tests:
-  - name: upstream
-    stage: build
-    packages:
-      - diffutils
-    artifacts:
-      - test-suite.log
-      - tests/test-suite.log
-    pipeline:
-      - uses: make/check

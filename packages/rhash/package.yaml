@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/rhash.yaml
 # Link OpenSSL directly, as in Wolfi. Keep the library independent of the commands.
-schema: 1
+schema: 2
 package:
   name: rhash
   version: 1.4.6
@@ -70,7 +70,6 @@ outputs:
     - rhash-libs = ${package.version}-${package.release}
   tests:
   - name: digest
-    stage: installed
     packages:
     - grep
     script: |
@@ -89,7 +88,6 @@ outputs:
     - openssl-libs
   tests:
   - name: runtime-linkage
-    stage: installed
     pipeline:
       - uses: test/runtime-linkage
         with:
@@ -106,7 +104,6 @@ outputs:
     - rhash-libs = ${package.version}-${package.release}
   tests:
   - name: api-behavior
-    stage: installed
     packages:
     - gcc
     - glibc-devel
@@ -126,6 +123,5 @@ outputs:
     - /usr/share/licenses/rhash-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check

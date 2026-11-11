@@ -2,7 +2,7 @@
 #
 # IANA timezone data. The zoneinfo tree is compiled at build time with the zic
 # shipped by the same release, so the package does not depend on a host zic.
-schema: 1
+schema: 2
 
 package:
   name: tzdata
@@ -60,7 +60,6 @@ outputs:
         - /usr/share/licenses/tzdata/**
     tests:
       - name: historical-dst-and-unusual-offsets
-        stage: installed
         packages:
           - bash
           - coreutils

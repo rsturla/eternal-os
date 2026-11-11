@@ -7,7 +7,7 @@
 # The release tarball ships the pre-generated parser and the info page, so the
 # build does not need flex, texinfo or help2man. Those belong to a git
 # checkout, not to the artifact upstream publishes.
-schema: 1
+schema: 2
 
 package:
   name: bison
@@ -72,7 +72,6 @@ outputs:
         - m4
     tests:
       - name: parser
-        stage: installed
         packages:
           - coreutils
           - gcc
@@ -94,6 +93,5 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check

@@ -15,7 +15,7 @@
 # reader back ends and without static libraries: all three would drag in build
 # tools this distribution does not carry yet. `autopoint` still needs `xz` to
 # unpack the infrastructure archive it installs, so that is a run dependency.
-schema: 1
+schema: 2
 
 package:
   name: gettext
@@ -85,7 +85,6 @@ outputs:
         - xz
     tests:
       - name: catalogs
-        stage: installed
         packages:
           - coreutils
         files: tests
@@ -110,7 +109,6 @@ outputs:
         - ncurses-libs
     tests:
       - name: minimal-runtime-dependencies
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -138,7 +136,6 @@ outputs:
         - gettext-libs = ${package.version}-${package.release}
     tests:
       - name: gettext-api
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -160,6 +157,5 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check

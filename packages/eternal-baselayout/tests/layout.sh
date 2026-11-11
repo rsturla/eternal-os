@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verify staged or installed paths against the package's directory policy.
+# Verify RPM payload or installed paths against the directory policy.
 set -euo pipefail
 root=${1%/}
 fail() {

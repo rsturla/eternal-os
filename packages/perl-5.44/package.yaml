@@ -19,7 +19,7 @@
 # `cpan/`: the vendored trees are removed before configuration, which is what
 # Fedora and Wolfi do, and it keeps the compression modules on the same
 # libraries as the rest of the distribution.
-schema: 1
+schema: 2
 
 package:
   name: perl-5.44
@@ -131,6 +131,16 @@ build:
         outputs: [perl-5.44, perl-5.44-default, perl-5.44-devel, perl-5.44-utils, perl-5.44-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages: [gcc-c++, nss_wrapper-libs, setup]
+      files: tests
+      script: |
+        bash "$TEST_FILES/upstream.sh"
+      artifacts:
+        - perl-test.log
+        - upstream-hosts
+
 outputs:
   - name: perl-5.44
     summary: Practical Extraction and Report Language (version 5.44)
@@ -156,7 +166,6 @@ outputs:
         - perl(:VERSION) = ${package.version}
     tests:
       - name: core-and-compression
-        stage: installed
         packages:
           - bash
         files: tests
@@ -180,7 +189,6 @@ outputs:
         - perl-interpreter = ${package.version}-${package.release}
     tests:
       - name: default-command
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -207,7 +215,6 @@ outputs:
         - perl-5.44 = ${package.version}-${package.release}
     tests:
       - name: embed
-        stage: installed
         packages:
           - bash
           - gcc
@@ -251,7 +258,6 @@ outputs:
         - perl-5.44 = ${package.version}-${package.release}
     tests:
       - name: prove-and-shasum
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -277,18 +283,7 @@ outputs:
         - perl-5.44 = ${package.version}-${package.release}
 
 tests:
-  - name: upstream
-    stage: build
-    # Real root/nobody account records activate the upstream NSS account tests.
-    packages: [gcc-c++, nss_wrapper-libs, setup]
-    files: tests
-    script: |
-      bash "$TEST_FILES/upstream.sh"
-    artifacts:
-      - perl-test.log
-      - upstream-hosts
   - name: hardening
-    stage: build
     pipeline:
       # The launcher is the interpreter's shim around libperl: it has no stack
       # buffer and no libc call to fortify, so those two properties cannot

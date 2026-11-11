@@ -2,7 +2,7 @@
 #
 # Zstandard compression tools and library. Used by tar and other tooling in
 # the minimal Eternal userland.
-schema: 1
+schema: 2
 
 package:
   name: zstd
@@ -63,7 +63,6 @@ outputs:
         - zstd-libs = ${package.version}-${package.release}
     tests:
       - name: roundtrip
-        stage: installed
         packages:
           - coreutils
           - diffutils
@@ -83,13 +82,11 @@ outputs:
         - /usr/share/licenses/zstd-libs/LICENSE
     tests:
       - name: minimal-runtime-dependencies
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
               libraries: ["libzstd.so.[0-9]*"]
       - name: runtime
-        stage: installed
         packages:
           - python3
         files: tests
@@ -115,7 +112,6 @@ outputs:
         - libzstd-devel = ${package.version}-${package.release}
     tests:
       - name: compression-api
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -141,7 +137,6 @@ outputs:
         - libzstd-static = ${package.version}-${package.release}
     tests:
       - name: static-compression-api
-        stage: installed
         packages:
           - gcc
           - glibc-devel

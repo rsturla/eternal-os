@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
-schema: 1
+schema: 2
 package:
   name: autoconf
   version: '2.73'
@@ -68,7 +68,6 @@ outputs:
     - grep
   tests:
     - name: configure-project
-      stage: installed
       packages:
         - coreutils
         - gcc

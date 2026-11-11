@@ -3,7 +3,7 @@
 # dnf5 package manager and the libdnf5 libraries. The build keeps the core
 # package manager, the CLI library and libdnf5, and disables the daemon,
 # modulemd, comps, systemd, Python/Perl/Ruby bindings, plugins, tests and docs.
-schema: 1
+schema: 2
 
 package:
   name: dnf5
@@ -121,7 +121,6 @@ outputs:
         - rpm
     tests:
       - name: offline-installed-query
-        stage: installed
         packages:
           - bash
           - grep
@@ -142,7 +141,7 @@ outputs:
           - missing.stdout
           - missing.stderr
       - name: offline-local-package-transaction
-        stage: transaction
+        mode: transaction
         packages:
           - bash
           - coreutils
@@ -180,14 +179,12 @@ outputs:
         - zchunk-libs
     tests:
       - name: runtime-loader
-        stage: installed
         packages:
           - bash
           - python3
         script: |
           python3 -I -c 'import ctypes,glob,os; paths=glob.glob("/usr/lib*/libdnf5.so.*"); assert paths; ctypes.CDLL(paths[0],mode=os.RTLD_NOW)'
       - name: runtime-closure
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -208,7 +205,6 @@ outputs:
 
     tests:
       - name: cxx-api
-        stage: installed
         packages:
           - bash
           - gcc
@@ -234,14 +230,12 @@ outputs:
         - libsmartcols
     tests:
       - name: runtime-loader
-        stage: installed
         packages:
           - bash
           - python3
         script: |
           python3 -I -c 'import ctypes,glob,os; paths=glob.glob("/usr/lib*/libdnf5-cli.so.*"); assert paths; ctypes.CDLL(paths[0],mode=os.RTLD_NOW)'
       - name: runtime-closure
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -262,7 +256,6 @@ outputs:
         - libdnf5-devel = ${package.version}-${package.release}
     tests:
       - name: cxx-api
-        stage: installed
         packages:
           - bash
           - gcc

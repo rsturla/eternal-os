@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # libexslt has no fortifiable libc call. Check its other hardening properties.
 # Check all properties on xsltproc and libxslt.
-schema: 1
+schema: 2
 package:
   name: libxslt
   version: 1.1.45
@@ -68,12 +68,10 @@ outputs:
     - libxslt-libs = ${package.version}-${package.release}
   tests:
   - name: transform
-    stage: installed
     files: tests
     script: |
       test "$(xsltproc --nonet "$TEST_FILES/exslt.xsl" "$TEST_FILES/input.xml")" = 42
   - name: xslt-cli
-    stage: installed
     files: tests
     script: |
       test "$(xsltproc --nonet "$TEST_FILES/transform.xsl" "$TEST_FILES/input.xml")" = 42
@@ -94,7 +92,6 @@ outputs:
     - libxml2
   tests:
   - name: runtime-linkage
-    stage: installed
     pipeline:
       - uses: test/runtime-linkage
         with:
@@ -113,7 +110,6 @@ outputs:
     - libxslt-libs = ${package.version}-${package.release}
   tests:
   - name: api-behavior
-    stage: installed
     packages:
     - gcc
     - glibc-devel
@@ -135,7 +131,6 @@ outputs:
     - /usr/share/gtk-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check
     with:

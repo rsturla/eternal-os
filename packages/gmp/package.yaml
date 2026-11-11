@@ -2,7 +2,7 @@
 #
 # A library for arbitrary precision arithmetic. A build dependency for the GNU toolchain and the
 # rest of the minimal Eternal userland.
-schema: 1
+schema: 2
 
 package:
   name: gmp
@@ -56,6 +56,16 @@ build:
         outputs: [gmp, gmp-devel, gmp-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages:
+        - diffutils
+      artifacts:
+        - test-suite.log
+        - tests/test-suite.log
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: gmp
     summary: A library for arbitrary precision arithmetic
@@ -65,7 +75,6 @@ outputs:
         - /usr/share/licenses/gmp/COPYINGv3
     tests:
       - name: runtime-linkage
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -86,7 +95,6 @@ outputs:
 
     tests:
       - name: api-behavior
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -108,14 +116,3 @@ outputs:
       license:
         - /usr/share/licenses/gmp-doc/COPYING.LESSERv3
         - /usr/share/licenses/gmp-doc/COPYINGv3
-
-tests:
-  - name: upstream
-    stage: build
-    packages:
-      - diffutils
-    artifacts:
-      - test-suite.log
-      - tests/test-suite.log
-    pipeline:
-      - uses: make/check

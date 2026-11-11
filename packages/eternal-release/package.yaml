@@ -6,7 +6,7 @@
 #
 # The release files live in files/ next to this recipe. `context` copies that
 # directory into the source workspace, so the build reads them directly.
-schema: 1
+schema: 2
 
 package:
   name: eternal-release
@@ -69,18 +69,17 @@ outputs:
 
 tests:
   - name: release-files
-    stage: build
+    packages: [grep]
     script: |
-      grep -q '^ID=eternal$' os-release
-      grep -q '^VERSION_ID="rolling"$' os-release
-      grep -q '^PRETTY_NAME="Eternal Linux Rolling"$' os-release
-      test -f system-release
-      test -f redhat-release
-      grep -q 'baseurl=https://packages.eternal.sturla.tech/' eternal.repo
-      grep -q '^\[eternal-archive\]$' eternal.repo
-      grep -q 'baseurl=https://packages.eternal.sturla.tech/archive/' eternal.repo
+      grep -q '^ID=eternal$' "$TEST_PACKAGE_ROOT/etc/os-release"
+      grep -q '^VERSION_ID="rolling"$' "$TEST_PACKAGE_ROOT/etc/os-release"
+      grep -q '^PRETTY_NAME="Eternal Linux Rolling"$' "$TEST_PACKAGE_ROOT/etc/os-release"
+      test -f "$TEST_PACKAGE_ROOT/etc/system-release"
+      test -f "$TEST_PACKAGE_ROOT/etc/redhat-release"
+      grep -q 'baseurl=https://packages.eternal.sturla.tech/' "$TEST_PACKAGE_ROOT/etc/yum.repos.d/eternal.repo"
+      grep -q '^\[eternal-archive\]$' "$TEST_PACKAGE_ROOT/etc/yum.repos.d/eternal.repo"
+      grep -q 'baseurl=https://packages.eternal.sturla.tech/archive/' "$TEST_PACKAGE_ROOT/etc/yum.repos.d/eternal.repo"
   - name: identity-and-repositories
-    stage: installed
     packages:
       - bash
       - coreutils

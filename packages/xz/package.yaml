@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # XZ and LZMA compression tools and library. A dependency for the minimal Eternal build root.
-schema: 1
+schema: 2
 
 package:
   name: xz
@@ -49,6 +49,13 @@ build:
         outputs: [xz, xz-libs, xz-devel, xz-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+      artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: xz
     summary: XZ and LZMA compression tools
@@ -69,7 +76,6 @@ outputs:
         - xz-libs = ${package.version}-${package.release}
     tests:
       - name: roundtrip
-        stage: installed
         packages:
           - coreutils
           - diffutils
@@ -93,13 +99,11 @@ outputs:
         - /usr/share/licenses/xz-libs/COPYING.LGPLv2.1
     tests:
       - name: minimal-runtime-dependencies
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
               libraries: ["liblzma.so.[0-9]*"]
       - name: runtime
-        stage: installed
         packages:
           - python3
         files: tests
@@ -125,7 +129,6 @@ outputs:
         - xz-libs = ${package.version}-${package.release}
     tests:
       - name: compression-api
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -150,11 +153,3 @@ outputs:
         - /usr/share/licenses/xz-doc/COPYING.0BSD
         - /usr/share/licenses/xz-doc/COPYING.GPLv2
         - /usr/share/licenses/xz-doc/COPYING.LGPLv2.1
-
-tests:
-  - name: upstream
-    stage: build
-    packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
-    artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
-    pipeline:
-      - uses: make/check

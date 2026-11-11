@@ -2,7 +2,7 @@
 #
 # Multiple-precision C library. A build dependency for the GNU toolchain and the
 # rest of the minimal Eternal userland.
-schema: 1
+schema: 2
 
 package:
   name: mpc
@@ -51,6 +51,16 @@ build:
         outputs: [mpc, mpc-devel, mpc-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages:
+        - diffutils
+      artifacts:
+        - test-suite.log
+        - tests/test-suite.log
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: mpc
     summary: Multiple-precision C library
@@ -65,7 +75,6 @@ outputs:
         - libmpc = ${package.version}-${package.release}
     tests:
       - name: runtime-linkage
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -88,7 +97,6 @@ outputs:
 
     tests:
       - name: api-behavior
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -108,14 +116,3 @@ outputs:
         - /usr/share/licenses/mpc-doc/COPYING.LESSER
       license:
         - /usr/share/licenses/mpc-doc/COPYING.LESSER
-
-tests:
-  - name: upstream
-    stage: build
-    packages:
-      - diffutils
-    artifacts:
-      - test-suite.log
-      - tests/test-suite.log
-    pipeline:
-      - uses: make/check

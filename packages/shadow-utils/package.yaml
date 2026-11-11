@@ -2,7 +2,7 @@
 #
 # PAM login and account management utilities. This is the provider of
 # useradd/groupadd/passwd and the /etc/login.defs defaults.
-schema: 1
+schema: 2
 
 package:
   name: shadow-utils
@@ -118,7 +118,7 @@ outputs:
         - pam
     tests:
       - name: account-lifecycle
-        stage: transaction
+        mode: transaction
         packages:
           - bash
           - coreutils
@@ -157,7 +157,6 @@ outputs:
           - status.txt
           - aging.txt
       - name: runtime-closure
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -175,7 +174,7 @@ outputs:
         - shadow-utils = ${package.version}-${package.release}
     tests:
       - name: subordinate-id-api
-        stage: transaction
+        mode: transaction
         packages:
           - bash
           - gcc

@@ -5,7 +5,7 @@
 # build-tool set while the seed is still in use. Keep this recipe buildable
 # from the current self-hosted root; promote changes here once they work
 # without bootstrap-only overrides.
-schema: 1
+schema: 2
 
 package:
   name: coreutils
@@ -68,7 +68,6 @@ outputs:
         - coreutils-single
     tests:
       - name: filesystem-and-text
-        stage: installed
         packages: []
         files: tests
         script: |
@@ -87,6 +86,5 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check

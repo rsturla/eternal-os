@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # libtoolize needs the aclocal macros at runtime; keep them with the tools.
-schema: 1
+schema: 2
 package:
   name: libtool
   version: 2.6.2
@@ -73,7 +73,6 @@ outputs:
     - make
   tests:
     - name: shared-library
-      stage: installed
       packages:
         - coreutils
         - gcc
@@ -92,13 +91,11 @@ outputs:
     - /usr/share/licenses/libtool-libs/**
   tests:
     - name: minimal-runtime-dependencies
-      stage: installed
       pipeline:
         - uses: test/runtime-linkage
           with:
             libraries: ["libltdl.so.[0-9]*"]
     - name: runtime
-      stage: installed
       packages:
         - python3
       files: tests
@@ -119,7 +116,6 @@ outputs:
     - libtool-libs = ${package.version}-${package.release}
   tests:
     - name: ltdl-api
-      stage: installed
       packages:
         - gcc
         - glibc-devel
@@ -140,6 +136,5 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check

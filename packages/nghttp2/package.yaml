@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/nghttp2.yaml
 # Build the shared library needed by curl. Defer the server and proxy applications.
-schema: 1
+schema: 2
 package:
   name: nghttp2
   version: 1.71.0
@@ -59,7 +59,6 @@ outputs:
     - libnghttp2 = ${package.version}-${package.release}
   tests:
   - name: runtime-linkage
-    stage: installed
     pipeline:
       - uses: test/runtime-linkage
         with:
@@ -78,7 +77,6 @@ outputs:
     - libnghttp2-devel = ${package.version}-${package.release}
   tests:
   - name: api-behavior
-    stage: installed
     packages:
     - gcc
     - glibc-devel
@@ -98,6 +96,5 @@ outputs:
     - /usr/share/licenses/nghttp2-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check

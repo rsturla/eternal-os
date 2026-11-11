@@ -2,7 +2,7 @@
 #
 # GNU stream editor. Part of the minimal Eternal userland and the
 # bootstrap tool set. The source is the upstream release tarball.
-schema: 1
+schema: 2
 
 package:
   name: sed
@@ -46,6 +46,13 @@ build:
         outputs: [sed, sed-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+      artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: sed
     summary: GNU stream editor
@@ -54,14 +61,12 @@ outputs:
         - /usr/share/licenses/sed/COPYING
     tests:
       - name: editing
-        stage: installed
         packages:
           - coreutils
         files: tests
         script: |
           bash "$TEST_FILES/editing.sh"
       - name: invalid-expression
-        stage: installed
         argv:
           - sed
           - '['
@@ -80,11 +85,3 @@ outputs:
         - /usr/share/licenses/sed-doc/COPYING
       license:
         - /usr/share/licenses/sed-doc/COPYING
-
-tests:
-  - name: upstream
-    stage: build
-    packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
-    artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
-    pipeline:
-      - uses: make/check

@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # A library implementing the zlib compression algorithms. A dependency for the minimal Eternal build root.
-schema: 1
+schema: 2
 
 package:
   name: zlib
@@ -45,6 +45,16 @@ build:
         outputs: [zlib, zlib-devel, zlib-static, zlib-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages:
+        - diffutils
+      artifacts:
+        - test-suite.log
+        - tests/test-suite.log
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: zlib
     summary: A library implementing the zlib compression algorithms
@@ -56,7 +66,6 @@ outputs:
         - zlib-ng-compat = ${package.version}-${package.release}
     tests:
       - name: runtime-linkage
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -79,7 +88,6 @@ outputs:
 
     tests:
       - name: api-behavior
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -104,7 +112,6 @@ outputs:
         - zlib-ng-compat-static = ${package.version}-${package.release}
     tests:
       - name: static-api-behavior
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -134,14 +141,3 @@ outputs:
         - /usr/share/licenses/zlib-doc/LICENSE
       license:
         - /usr/share/licenses/zlib-doc/LICENSE
-
-tests:
-  - name: upstream
-    stage: build
-    packages:
-      - diffutils
-    artifacts:
-      - test-suite.log
-      - tests/test-suite.log
-    pipeline:
-      - uses: make/check

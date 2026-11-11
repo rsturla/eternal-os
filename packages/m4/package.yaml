@@ -2,7 +2,7 @@
 #
 # GNU macro processor. Part of the minimal Eternal userland and the
 # bootstrap tool set. The source is the upstream release tarball.
-schema: 1
+schema: 2
 
 package:
   name: m4
@@ -46,6 +46,13 @@ build:
         outputs: [m4, m4-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+      artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: m4
     summary: GNU macro processor
@@ -54,7 +61,6 @@ outputs:
         - /usr/share/licenses/m4/COPYING
     tests:
       - name: macros
-        stage: installed
         packages:
           - coreutils
         files: tests
@@ -71,11 +77,3 @@ outputs:
         - /usr/share/licenses/m4-doc/COPYING
       license:
         - /usr/share/licenses/m4-doc/COPYING
-
-tests:
-  - name: upstream
-    stage: build
-    packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
-    artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
-    pipeline:
-      - uses: make/check

@@ -2,7 +2,7 @@
 #
 # RPM package manager. Built with the sqlite rpmdb, Sequoia OpenPGP backend and
 # the compression libraries needed to read rpm-md repositories.
-schema: 1
+schema: 2
 
 package:
   name: rpm
@@ -111,7 +111,6 @@ outputs:
         - popt
     tests:
       - name: macros-and-query
-        stage: installed
         packages:
           - bash
         script: |
@@ -122,7 +121,6 @@ outputs:
           test "$(rpm --eval '%{_prefix}')" = /usr
           if rpm -q eternal-rpmx-deliberately-absent; then exit 1; fi
       - name: openpgp-signatures
-        stage: installed
         packages: [coreutils, grep]
         files: tests
         script: |
@@ -132,7 +130,7 @@ outputs:
           - trusted.verify
           - tampered.verify
       - name: build-install-upgrade-verify-erase
-        stage: transaction
+        mode: transaction
         packages:
           - bash
           - coreutils
@@ -207,7 +205,6 @@ outputs:
         - zstd-libs
     tests:
       - name: runtime-loader
-        stage: installed
         packages:
           - bash
           - python3
@@ -220,13 +217,11 @@ outputs:
               ctypes.CDLL(paths[0], mode=os.RTLD_NOW)
           PYTHON
       - name: runtime-closure
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
               libraries: ["librpm.so.*", "librpmio.so.*", "librpmsign.so.*"]
       - name: runtime-configuration
-        stage: installed
         packages:
           - python3
         files: tests
@@ -245,7 +240,6 @@ outputs:
         - rpm-libs = ${package.version}-${package.release}
     tests:
       - name: runtime-loader
-        stage: installed
         packages:
           - bash
           - python3
@@ -258,7 +252,6 @@ outputs:
               ctypes.CDLL(paths[0], mode=os.RTLD_NOW)
           PYTHON
       - name: runtime-closure
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -287,7 +280,6 @@ outputs:
         - zstd-devel
     tests:
       - name: macro-and-transaction-api
-        stage: installed
         packages:
           - bash
           - gcc

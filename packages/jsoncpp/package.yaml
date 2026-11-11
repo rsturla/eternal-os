@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/jsoncpp.yaml
 # Disable unused object and static libraries. Run the upstream C++ tests.
-schema: 1
+schema: 2
 package:
   name: jsoncpp
   version: 1.9.8
@@ -51,6 +51,13 @@ build:
       - jsoncpp
       - jsoncpp-devel
   - uses: strip
+  tests:
+  - name: upstream
+    artifacts:
+    - build/Testing
+    pipeline:
+    - uses: cmake/check
+
 outputs:
 - name: jsoncpp
   files:
@@ -58,7 +65,6 @@ outputs:
     - /usr/share/licenses/jsoncpp/**
   tests:
   - name: runtime-linkage
-    stage: installed
     pipeline:
       - uses: test/runtime-linkage
         with:
@@ -75,7 +81,6 @@ outputs:
     - jsoncpp = ${package.version}-${package.release}
   tests:
   - name: api-behavior
-    stage: installed
     packages:
     - gcc-c++
     - glibc-devel
@@ -87,12 +92,5 @@ outputs:
       ./behavior
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check
-- name: upstream
-  stage: build
-  artifacts:
-  - build/Testing
-  pipeline:
-  - uses: cmake/check

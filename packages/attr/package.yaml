@@ -2,7 +2,7 @@
 #
 # Extended attribute utilities and the libattr runtime. Coreutils and tar use
 # libattr when copying extended attributes.
-schema: 1
+schema: 2
 
 package:
   name: attr
@@ -60,7 +60,6 @@ outputs:
         - libattr = ${package.version}-${package.release}
     tests:
       - name: extended-attributes
-        stage: installed
         packages:
           - coreutils
         files: tests
@@ -77,13 +76,11 @@ outputs:
         - /usr/share/licenses/libattr/**
     tests:
       - name: minimal-runtime-dependencies
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
               libraries: ["libattr.so.[0-9]*"]
       - name: runtime
-        stage: installed
         packages:
           - python3
         files: tests
@@ -103,7 +100,6 @@ outputs:
         - libattr = ${package.version}-${package.release}
     tests:
       - name: attr-api
-        stage: installed
         packages:
           - gcc
           - glibc-devel

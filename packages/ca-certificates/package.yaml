@@ -3,7 +3,7 @@
 # Mozilla CA certificate set, taken directly from the NSS certdata.txt. The
 # -bundle subpackage is the concatenated PEM bundle used by OpenSSL, curl and
 # language runtimes, so consumers do not need p11-kit or a trust-store daemon.
-schema: 1
+schema: 2
 
 package:
   name: ca-certificates
@@ -66,7 +66,6 @@ outputs:
         - /etc/ca-certificates.conf
     tests:
       - name: parse-every-trusted-root
-        stage: installed
         packages:
           - bash
           - python3
@@ -86,7 +85,6 @@ outputs:
         - /usr/share/licenses/ca-certificates-bundle/**
     tests:
       - name: bundle-aliases-and-trust-store
-        stage: installed
         packages:
           - bash
           - python3

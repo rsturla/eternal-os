@@ -11,7 +11,7 @@
 # The release tarball ships the translated message catalogs, so the build does
 # not need msgfmt. Its own info pages are built with the `texi2any` this build
 # produces.
-schema: 1
+schema: 2
 
 package:
   name: texinfo
@@ -87,7 +87,6 @@ outputs:
         - perl
     tests:
       - name: document-formats
-        stage: installed
         packages:
           - coreutils
         files: tests
@@ -107,7 +106,6 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check
         with:

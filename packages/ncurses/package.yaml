@@ -2,7 +2,7 @@
 #
 # Terminal display library and terminfo tools. Bash links against libtinfo and
 # the base image needs a terminfo database for tput/infocmp.
-schema: 1
+schema: 2
 
 package:
   name: ncurses
@@ -111,7 +111,6 @@ outputs:
         - ncurses-libs = ${package.version}-${package.release}
     tests:
       - name: terminfo-roundtrip
-        stage: installed
         packages:
           - coreutils
           - diffutils
@@ -183,7 +182,6 @@ outputs:
         - /usr/share/licenses/ncurses-base/**
     tests:
       - name: terminfo-entry
-        stage: installed
         packages:
           - ncurses
         script: |
@@ -244,7 +242,6 @@ outputs:
         - ncurses-base = ${package.version}-${package.release}
     tests:
       - name: terminfo-entry
-        stage: installed
         packages:
           - ncurses
         script: |
@@ -270,7 +267,6 @@ outputs:
         - ncurses-base = ${package.version}-${package.release}
     tests:
       - name: runtime-linkage
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -290,7 +286,6 @@ outputs:
 
     tests:
       - name: api-behavior
-        stage: installed
         packages:
           - gcc
           - glibc-devel

@@ -3,7 +3,7 @@
 # SELinux userspace library. rpm, libdnf5 and the base userland link against
 # libselinux; the utilities are split so the library can be installed without
 # the policy management tools.
-schema: 1
+schema: 2
 
 package:
   name: libselinux
@@ -65,7 +65,6 @@ outputs:
         - libsepol
     tests:
       - name: runtime-linkage
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -113,7 +112,6 @@ outputs:
         - libselinux = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         script: |
           trap 'printf "line %s: %s\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
           mode=$(getenforce)
@@ -149,7 +147,6 @@ outputs:
 
     tests:
       - name: api-behavior
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -173,7 +170,6 @@ outputs:
 
     tests:
       - name: static-api-behavior
-        stage: installed
         packages:
           - gcc
           - glibc-devel

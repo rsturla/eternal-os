@@ -11,7 +11,7 @@
 # This bootstrap variant exists because the ladder hides the seed binutils
 # provider while a stage builds this package. The production recipe is in
 # packages/binutils/package.yaml.
-schema: 1
+schema: 2
 
 package:
   name: binutils
@@ -93,7 +93,6 @@ outputs:
         - /usr/share/licenses/binutils/COPYING3.LIB
     tests:
       - name: assembler-archive-link-and-inspection
-        stage: installed
         packages:
           - bash
           - gcc
@@ -142,7 +141,6 @@ outputs:
         - binutils = ${package.version}-${package.release}
     tests:
       - name: bfd-headers
-        stage: installed
         packages:
           - bash
           - gcc

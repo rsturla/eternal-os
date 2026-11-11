@@ -5,7 +5,7 @@
 # build-tool set while the seed is still in use. Keep this recipe buildable
 # from the current self-hosted root; promote changes here once they work
 # without bootstrap-only overrides.
-schema: 1
+schema: 2
 
 package:
   name: make
@@ -63,7 +63,6 @@ outputs:
         - /usr/share/licenses/make/COPYING
     tests:
       - name: build-graph
-        stage: installed
         packages:
           - coreutils
         files: tests
@@ -80,7 +79,6 @@ outputs:
         - /usr/share/licenses/make-devel/COPYING
     tests:
       - name: make-api
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -102,6 +100,5 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check

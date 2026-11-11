@@ -9,7 +9,7 @@
 # split: an image that only needs a shell does not pull man pages or headers.
 #
 # The bootstrap variant lives in bootstrap/recipes/bash/package.yaml.
-schema: 1
+schema: 2
 
 package:
   name: bash
@@ -98,7 +98,6 @@ outputs:
         - /bin/bash
     tests:
       - name: language
-        stage: installed
         packages:
           - coreutils
         files: tests
@@ -120,7 +119,6 @@ outputs:
         - /bin/sh
     tests:
       - name: posix-shell
-        stage: installed
         packages: []
         files: tests
         script: |
@@ -151,7 +149,6 @@ outputs:
         - bash = ${package.version}-${package.release}
     tests:
       - name: builtin
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -172,7 +169,6 @@ outputs:
         - bash = ${package.version}-${package.release}
     tests:
       - name: loadable
-        stage: installed
         packages: []
         files: tests
         script: |
@@ -180,7 +176,6 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check
         with:

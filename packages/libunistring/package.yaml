@@ -4,7 +4,7 @@
 # handling, so it is imported with gettext rather than with the wider library
 # set. It has no dependencies of its own, which makes it the cheapest package
 # of the wave.
-schema: 1
+schema: 2
 
 package:
   name: libunistring
@@ -56,6 +56,22 @@ build:
         outputs: [libunistring, libunistring-devel, libunistring-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages:
+        - diffutils
+        - glibc-common
+        - glibc-locale-source
+      files: tests
+      artifacts:
+        - config.log
+        - config.h
+        - test-suite.log
+        - tests/test-suite.log
+        - upstream-results
+      script: |
+        bash "$TEST_FILES/upstream.sh"
+
 outputs:
   - name: libunistring
     summary: Library for manipulating Unicode strings
@@ -65,7 +81,6 @@ outputs:
         - /usr/share/licenses/libunistring/COPYING.LIB
     tests:
       - name: runtime-linkage
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -85,7 +100,6 @@ outputs:
         - libunistring = ${package.version}-${package.release}
     tests:
       - name: api-behavior
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -108,21 +122,5 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check
-  - name: upstream
-    stage: build
-    packages:
-      - diffutils
-      - glibc-common
-      - glibc-locale-source
-    files: tests
-    artifacts:
-      - config.log
-      - config.h
-      - test-suite.log
-      - tests/test-suite.log
-      - upstream-results
-    script: |
-      bash "$TEST_FILES/upstream.sh"

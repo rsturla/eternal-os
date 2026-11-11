@@ -5,7 +5,7 @@
 # Subdirectories that belong to a specific component stay with that component.
 #
 # The bootstrap variant lives in bootstrap/recipes/filesystem/package.yaml.
-schema: 1
+schema: 2
 
 package:
   name: filesystem
@@ -104,12 +104,10 @@ outputs:
 
 tests:
   - name: layout
-    stage: build
     files: tests
     script: |
-      bash "$TEST_FILES/layout.sh" "$STAGE"
+      bash "$TEST_FILES/layout.sh" "$TEST_PACKAGE_ROOT"
   - name: installed-merged-usr-and-permissions
-    stage: installed
     packages:
       - bash
       - coreutils

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# /tmp is a sandbox mount when installed; the staged check covers payload mode.
+# /tmp is a sandbox mount when installed; the RPM payload check covers its mode.
 set -euo pipefail
 root=${1%/}
 fail() {

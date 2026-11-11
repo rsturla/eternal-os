@@ -4,7 +4,7 @@
 # the libblkid, libfdisk, libmount, libsmartcols and libuuid runtime libraries.
 # Login and su-like tools are left to shadow so the two packages do not fight
 # over /usr/bin.
-schema: 1
+schema: 2
 
 package:
   name: util-linux
@@ -94,7 +94,6 @@ outputs:
         - pam
     tests:
       - name: offline-utilities
-        stage: installed
         packages:
           - coreutils
         files: tests
@@ -111,13 +110,11 @@ outputs:
         - /usr/share/licenses/libblkid/**
     tests:
       - name: minimal-runtime-dependencies
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
               libraries: ["libblkid.so.[0-9]*"]
       - name: blkid-runtime
-        stage: installed
         packages:
           - python3
         files: tests
@@ -134,13 +131,11 @@ outputs:
         - /usr/share/licenses/libfdisk/**
     tests:
       - name: minimal-runtime-dependencies
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
               libraries: ["libfdisk.so.[0-9]*"]
       - name: fdisk-runtime
-        stage: installed
         packages:
           - python3
         files: tests
@@ -157,13 +152,11 @@ outputs:
         - /usr/share/licenses/libmount/**
     tests:
       - name: minimal-runtime-dependencies
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
               libraries: ["libmount.so.[0-9]*"]
       - name: mount-runtime
-        stage: installed
         packages:
           - python3
         files: tests
@@ -180,13 +173,11 @@ outputs:
         - /usr/share/licenses/libsmartcols/**
     tests:
       - name: minimal-runtime-dependencies
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
               libraries: ["libsmartcols.so.[0-9]*"]
       - name: smartcols-runtime
-        stage: installed
         packages:
           - python3
         files: tests
@@ -203,13 +194,11 @@ outputs:
         - /usr/share/licenses/libuuid/**
     tests:
       - name: minimal-runtime-dependencies
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
               libraries: ["libuuid.so.[0-9]*"]
       - name: uuid-runtime
-        stage: installed
         packages:
           - python3
         files: tests
@@ -239,7 +228,6 @@ outputs:
         - libuuid-devel = ${package.version}-${package.release}
     tests:
       - name: libraries-api
-        stage: installed
         packages:
           - gcc
           - glibc-devel

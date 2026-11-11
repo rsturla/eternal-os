@@ -2,7 +2,7 @@
 #
 # GNU tar archiver. Part of the minimal Eternal userland and the
 # bootstrap tool set. The source is the upstream release tarball.
-schema: 1
+schema: 2
 
 package:
   name: tar
@@ -57,7 +57,6 @@ outputs:
         - /usr/share/licenses/tar/COPYING
     tests:
       - name: archives
-        stage: installed
         packages:
           - coreutils
           - diffutils

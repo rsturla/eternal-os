@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
-schema: 1
+schema: 2
 package:
   name: cmake
   version: 4.4.5
@@ -98,7 +98,6 @@ outputs:
         - libgcc
     tests:
       - name: configure-build-test-install
-        stage: installed
         packages:
           - bash
           - gcc
@@ -118,7 +117,6 @@ outputs:
         artifacts:
           - build/Testing/Temporary
       - name: invalid-project
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -147,6 +145,5 @@ outputs:
         - /usr/share/licenses/cmake-doc/**
 tests:
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check

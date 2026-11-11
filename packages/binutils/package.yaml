@@ -9,7 +9,7 @@
 # does not pull development files just to get `ld` or `as`.
 #
 # The bootstrap variant lives in bootstrap/recipes/binutils/package.yaml.
-schema: 1
+schema: 2
 
 package:
   name: binutils
@@ -81,6 +81,33 @@ build:
         outputs: [binutils, binutils-devel, binutils-static, binutils-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      environment:
+        USER: rpmx-test
+        LOGNAME: rpmx-test
+      packages:
+        - dejagnu
+        - expect
+      pipeline:
+        - runs: |
+            status=0
+            make -j2 -k check || status=$?
+            mkdir -p upstream-reports
+            find . -path ./upstream-reports -prune -o -type f \( -name '*.sum' -o -name '*.log' \) -exec cp --parents '{}' upstream-reports/ \;
+            test "$status" = 0
+            for suite in binutils gas ld; do
+              find "$suite" -type f -name '*.sum' -exec cat '{}' + > "upstream-reports/$suite.summary"
+              grep -E '# of expected passes[[:space:]]+[1-9][0-9]*' "upstream-reports/$suite.summary"
+              if grep -E '^(FAIL|XPASS|ERROR|UNRESOLVED):' "upstream-reports/$suite.summary"; then
+                echo "unexpected DejaGNU result in $suite" >&2
+                exit 1
+              fi
+            done
+      artifacts:
+        - upstream-reports
+      timeout: 2h
+
 outputs:
   - name: binutils
     summary: A GNU collection of binary utilities
@@ -91,7 +118,6 @@ outputs:
         - /usr/share/licenses/binutils/COPYING3.LIB
     tests:
       - name: assembler-archive-link-and-inspection
-        stage: installed
         packages:
           - bash
           - gcc
@@ -143,7 +169,6 @@ outputs:
         - binutils = ${package.version}-${package.release}
     tests:
       - name: bfd-headers
-        stage: installed
         packages:
           - bash
           - gcc
@@ -167,7 +192,6 @@ outputs:
         - zlib-devel
     tests:
       - name: static-bfd-api
-        stage: installed
         packages:
           - bash
           - gcc
@@ -201,34 +225,6 @@ outputs:
         - /usr/share/licenses/binutils-doc/COPYING3.LIB
 
 tests:
-  - name: upstream
-    stage: build
-    # DejaGNU uses this label in reports; the sandbox UID need not be in passwd.
-    environment:
-      USER: rpmx-test
-      LOGNAME: rpmx-test
-    packages:
-      - dejagnu
-      - expect
-    pipeline:
-      - runs: |
-          status=0
-          make -j2 -k check || status=$?
-          mkdir -p upstream-reports
-          find . -path ./upstream-reports -prune -o -type f \( -name '*.sum' -o -name '*.log' \) -exec cp --parents '{}' upstream-reports/ \;
-          test "$status" = 0
-          for suite in binutils gas ld; do
-            find "$suite" -type f -name '*.sum' -exec cat '{}' + > "upstream-reports/$suite.summary"
-            grep -E '# of expected passes[[:space:]]+[1-9][0-9]*' "upstream-reports/$suite.summary"
-            if grep -E '^(FAIL|XPASS|ERROR|UNRESOLVED):' "upstream-reports/$suite.summary"; then
-              echo "unexpected DejaGNU result in $suite" >&2
-              exit 1
-            fi
-          done
-        timeout: 2h
-    artifacts:
-      - upstream-reports
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check

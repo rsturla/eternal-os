@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Use the supported 3.5 LTS series to retain the libssl.so.3 ABI.
 # Install the software and configuration without the optional documentation.
-schema: 1
+schema: 2
 package:
   name: openssl3
   version: 3.5.9
@@ -60,6 +60,21 @@ build:
       - openssl3-libs
       - openssl3-devel
   - uses: strip
+  tests:
+  - name: upstream
+    packages:
+    - make
+    - perl
+    - diffutils
+    - nss_wrapper-libs
+    files: tests
+    artifacts:
+    - test-runs
+    - test/test-runs
+    - upstream-hosts
+    script: |
+      bash "$TEST_FILES/upstream.sh"
+
 outputs:
 - name: openssl3
   files:
@@ -72,14 +87,12 @@ outputs:
     - openssl = ${package.version}-${package.release}
   tests:
   - name: digest
-    stage: installed
     packages:
     - grep
     script: |
       printf abc | openssl dgst -sha256 > /tmp/digest
       grep -q ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad /tmp/digest
   - name: signatures-and-certificates
-    stage: installed
     script: |
       printf 'signed payload\n' > payload
       openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out key.pem
@@ -118,13 +131,11 @@ outputs:
     - openssl-libs = ${package.version}-${package.release}
   tests:
   - name: runtime-linkage
-    stage: installed
     pipeline:
       - uses: test/runtime-linkage
         with:
           libraries: ["libssl.so.*", "libcrypto.so.*"]
   - name: python-tls-consumer
-    stage: installed
     packages:
     - python-3.14
     files: tests
@@ -144,7 +155,6 @@ outputs:
     - openssl-devel = ${package.version}-${package.release}
   tests:
   - name: api-behavior
-    stage: installed
     packages:
     - gcc
     - glibc-devel
@@ -156,20 +166,5 @@ outputs:
       ./behavior
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check
-- name: upstream
-  stage: build
-  packages:
-  - make
-  - perl
-  - diffutils
-  - nss_wrapper-libs
-  files: tests
-  artifacts:
-  - test-runs
-  - test/test-runs
-  - upstream-hosts
-  script: |
-    bash "$TEST_FILES/upstream.sh"

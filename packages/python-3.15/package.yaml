@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
-schema: 1
+schema: 2
 
 package:
   name: python-3.15
@@ -85,14 +85,12 @@ outputs:
         - python3.15 = ${package.version}-${package.release}
     tests:
       - name: stdlib-and-native-modules
-        stage: installed
         packages:
           - bash
         files: tests
         script: |
           python3.15 -I "$TEST_FILES/runtime.py" 3.15
       - name: syntax-error
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -107,7 +105,6 @@ outputs:
         artifacts:
           - syntax.stderr
       - name: coinstall-default
-        stage: installed
         packages: [bash, coreutils, python-3.14-default]
         script: |
           test "$(readlink /usr/bin/python3)" = python3.14
@@ -123,14 +120,12 @@ outputs:
         - /usr/share/licenses/python-3.15-libs/LICENSE
     tests:
       - name: load-runtime
-        stage: installed
         packages:
           - bash
           - python-3.15
         script: |
           python3.15 -I -c 'import ctypes; lib=ctypes.CDLL("libpython3.15.so.1.0"); lib.Py_GetVersion.restype=ctypes.c_char_p; assert lib.Py_GetVersion().startswith(b"3.15.")'
       - name: runtime-closure
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
@@ -157,7 +152,6 @@ outputs:
         - python-3.14-default
     tests:
       - name: default-interpreter
-        stage: installed
         packages:
           - bash
           - coreutils
@@ -183,7 +177,6 @@ outputs:
         - python-3.15-libs = ${package.version}-${package.release}
     tests:
       - name: embed-and-extension
-        stage: installed
         packages:
           - bash
           - gcc
@@ -208,7 +201,6 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       # The launcher only forwards to Py_BytesMain: it has no stack buffer and
       # no libc call to fortify, so those two properties cannot appear in it.

@@ -12,7 +12,7 @@
 #
 # This mirrors Wolfi's openssf-compiler-options: the compiler package depends on
 # the policy package, and every build that installs the compiler inherits it.
-schema: 1
+schema: 2
 
 package:
   name: openssf-compiler-options
@@ -77,34 +77,33 @@ outputs:
 
 tests:
   - name: layout
-    stage: build
+    packages: [grep]
     script: |
-      test -L "$STAGE/usr/libexec/eternal/gcc/bin/gcc"
-      test "$(readlink "$STAGE/usr/libexec/eternal/gcc/bin/gcc")" = gcc-wrapper
+      test -L "$TEST_PACKAGE_ROOT/usr/libexec/eternal/gcc/bin/gcc"
+      test "$(readlink "$TEST_PACKAGE_ROOT/usr/libexec/eternal/gcc/bin/gcc")" = gcc-wrapper
       for version in 13 14 15 16; do
-        test -f "$STAGE/usr/lib/eternal/gcc/openssf-$version.spec"
-        test -f "$STAGE/usr/lib/eternal/gcc/openssf-soft-format-$version.spec"
+        test -f "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-$version.spec"
+        test -f "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-soft-format-$version.spec"
         grep -q -- '-Werror=format-security' \
-          "$STAGE/usr/lib/eternal/gcc/openssf-$version.spec"
+          "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-$version.spec"
         ! grep -q -- '-Werror=format-security' \
-          "$STAGE/usr/lib/eternal/gcc/openssf-soft-format-$version.spec"
+          "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-soft-format-$version.spec"
       done
-      test -f "$STAGE/usr/lib/eternal/gcc/openssf-arch-x86_64.spec"
-      test -f "$STAGE/usr/lib/eternal/gcc/openssf-arch-aarch64.spec"
+      test -f "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-arch-x86_64.spec"
+      test -f "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-arch-aarch64.spec"
       grep -q -- '-fPIE' \
-        "$STAGE/usr/lib/eternal/gcc/openssf-16.spec"
+        "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-16.spec"
       grep -q -- '-fzero-init-padding-bits=all' \
-        "$STAGE/usr/lib/eternal/gcc/openssf-16.spec"
+        "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-16.spec"
       ! grep -q -- '-fzero-init-padding-bits=all' \
-        "$STAGE/usr/lib/eternal/gcc/openssf-13.spec"
+        "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-13.spec"
       grep -q -- '-march=x86-64-v2' \
-        "$STAGE/usr/lib/eternal/gcc/openssf-arch-x86_64.spec"
+        "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-arch-x86_64.spec"
       grep -q -- '-mbranch-protection=standard' \
-        "$STAGE/usr/lib/eternal/gcc/openssf-arch-aarch64.spec"
+        "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-arch-aarch64.spec"
       grep -q -- '-fuse-ld=bfd' \
-        "$STAGE/usr/lib/eternal/gcc/openssf-arch-aarch64.spec"
+        "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-arch-aarch64.spec"
   - name: default-wrapper
-    stage: installed
     packages: [gcc]
     environment:
       PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -114,7 +113,6 @@ tests:
           cc: cc
 
   - name: linker-selection
-    stage: installed
     packages: [gcc, grep]
     files: tests
     environment:
@@ -123,7 +121,6 @@ tests:
       bash "$TEST_FILES/linker-selection.sh"
 
   - name: spec-13
-    stage: installed
     packages:
       - gcc-13
     environment:
@@ -135,7 +132,6 @@ tests:
           cc: gcc-13
 
   - name: spec-14
-    stage: installed
     packages:
       - gcc-14
     environment:
@@ -147,7 +143,6 @@ tests:
           cc: gcc-14
 
   - name: spec-15
-    stage: installed
     packages:
       - gcc-15
     environment:
@@ -159,7 +154,6 @@ tests:
           cc: gcc-15
 
   - name: spec-16
-    stage: installed
     packages:
       - gcc-16
     environment:

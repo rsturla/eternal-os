@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/libidn2.yaml
 # Disable NLS, as in Wolfi. Use the release tarball to avoid gnulib bootstrap tools.
-schema: 1
+schema: 2
 package:
   name: libidn2
   version: 2.3.8
@@ -55,6 +55,16 @@ build:
       - libidn2-devel
       - libidn2-doc
   - uses: strip
+  tests:
+  - name: upstream
+    packages:
+    - diffutils
+    artifacts:
+    - test-suite.log
+    - tests/test-suite.log
+    pipeline:
+    - uses: make/check
+
 outputs:
 - name: libidn2
   files:
@@ -65,7 +75,6 @@ outputs:
     - libidn2-libs = ${package.version}-${package.release}
   tests:
   - name: idna
-    stage: installed
     script: |
       export LC_ALL=C.UTF-8
       test "$(idn2 münchen.de)" = xn--mnchen-3ya.de
@@ -81,7 +90,6 @@ outputs:
     - libunistring
   tests:
   - name: runtime-linkage
-    stage: installed
     pipeline:
       - uses: test/runtime-linkage
         with:
@@ -98,7 +106,6 @@ outputs:
     - libidn2-libs = ${package.version}-${package.release}
   tests:
   - name: api-behavior
-    stage: installed
     packages:
     - gcc
     - glibc-devel
@@ -119,15 +126,5 @@ outputs:
     - /usr/share/licenses/libidn2-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check
-- name: upstream
-  stage: build
-  packages:
-  - diffutils
-  artifacts:
-  - test-suite.log
-  - tests/test-suite.log
-  pipeline:
-  - uses: make/check

@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/libuv.yaml
 # Use upstream CMake support for the release archive. Keep static archives separate.
-schema: 1
+schema: 2
 package:
   name: libuv
   version: 1.53.0
@@ -58,7 +58,6 @@ outputs:
     - /usr/share/licenses/libuv/**
   tests:
   - name: runtime-linkage
-    stage: installed
     pipeline:
       - uses: test/runtime-linkage
         with:
@@ -75,7 +74,6 @@ outputs:
     - libuv = ${package.version}-${package.release}
   tests:
   - name: api-behavior
-    stage: installed
     packages:
     - gcc
     - glibc-devel
@@ -97,7 +95,6 @@ outputs:
     - libuv-devel = ${package.version}-${package.release}
   tests:
   - name: static-api-behavior
-    stage: installed
     packages:
     - gcc
     - glibc-devel
@@ -120,6 +117,5 @@ outputs:
       fi
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check

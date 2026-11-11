@@ -12,7 +12,7 @@
 # so `make` would regenerate the man page with help2man. The shipped page is
 # the 2.6.4 page; it is touched to keep it, which avoids carrying help2man and
 # a full Perl tool chain just for one roff file.
-schema: 1
+schema: 2
 
 package:
   name: flex
@@ -84,7 +84,6 @@ outputs:
         - m4
     tests:
       - name: scanner
-        stage: installed
         packages:
           - coreutils
           - gcc
@@ -103,13 +102,11 @@ outputs:
         - /usr/share/licenses/flex-libs/COPYING
     tests:
       - name: minimal-runtime-dependencies
-        stage: installed
         pipeline:
           - uses: test/runtime-linkage
             with:
               libraries: ["libfl.so.[0-9]*"]
       - name: runtime
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -132,7 +129,6 @@ outputs:
         - flex-libs = ${package.version}-${package.release}
     tests:
       - name: flex-api
-        stage: installed
         packages:
           - gcc
           - glibc-devel
@@ -154,7 +150,6 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       # libfl is a few hundred bytes of wrapper code with no stack buffers and
       # no libc string calls, so the stack-protector and fortify probes have
