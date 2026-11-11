@@ -17,7 +17,7 @@ schema: 1
 package:
   name: openssf-compiler-options
   version: "20261109"
-  release: 2
+  release: 3
   summary: OpenSSF compiler hardening options
   description: |
     GCC wrapper scripts and versioned spec files that apply the OpenSSF
@@ -74,6 +74,8 @@ outputs:
     files:
       license:
         - /usr/share/licenses/openssf-compiler-options/LICENSE
+    dependencies:
+      run: [coreutils, sed]
 
 tests:
   - name: layout
