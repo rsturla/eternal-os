@@ -61,20 +61,13 @@ outputs:
       run:
         - libacl = ${package.version}-${package.release}
     tests:
-      - name: installed
+      - name: permissions
         stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            touch /tmp/acl-test
-            getfacl /tmp/acl-test > /tmp/acl.out
-            case "$(cat /tmp/acl.out)" in
-              *"user::"*) ;;
-              *) exit 1 ;;
-            esac
-            setfacl --version
+        packages:
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/permissions.sh"
 
   - name: libacl
     summary: Access control list runtime library
@@ -85,17 +78,19 @@ outputs:
       license:
         - /usr/share/licenses/libacl/**
     tests:
-      - name: installed
+      - name: minimal-runtime-dependencies
         stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libacl.so.* /usr/lib/libacl.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libacl.so.[0-9]*"]
+      - name: runtime
+        stage: installed
+        packages:
+          - python3
+        files: tests
+        script: |
+          python3 "$TEST_FILES/runtime.py"
 
   - name: libacl-devel
     summary: Development files for libacl
@@ -108,6 +103,16 @@ outputs:
     dependencies:
       run:
         - libacl = ${package.version}-${package.release}
+    tests:
+      - name: acl-api
+        stage: installed
+        packages:
+          - gcc
+          - glibc-devel
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/acl-api.sh"
 
   - name: acl-doc
     summary: Documentation for acl
@@ -118,24 +123,3 @@ outputs:
         - /usr/share/licenses/acl-doc/**
       license:
         - /usr/share/licenses/acl-doc/**
-
-tests:
-  - name: link
-    stage: installed
-    packages: [gcc, glibc-devel, bash-binsh, coreutils]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/acl-link.c <<'EOF'
-        #include <sys/acl.h>
-        #include <stddef.h>
-        int main(void) {
-          acl_t acl = acl_from_text("u::rwx,g::r-x,o::r-x");
-          if (acl == NULL) return 1;
-          acl_free(acl);
-          return 0;
-        }
-        EOF
-        gcc /tmp/acl-link.c -lacl -o /tmp/acl-link
-        /tmp/acl-link
