@@ -84,27 +84,13 @@ outputs:
         - gettext-libs = ${package.version}-${package.release}
         - xz
     tests:
-      - name: installed
+      - name: catalogs
         stage: installed
-        packages: [bash-binsh, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            msgfmt --version | head -1 | grep -q '0\.26\|1\.0'
-            cat > hello.po <<'EOF'
-            msgid ""
-            msgstr ""
-            "Content-Type: text/plain; charset=UTF-8\n"
-
-            msgid "hello"
-            msgstr "hallo"
-            EOF
-            msgfmt --check -o hello.mo hello.po
-            msgunfmt hello.mo | grep -qx 'msgstr "hallo"'
-            xgettext --version | head -1
-            echo 'hello world' | envsubst | grep -qx 'hello world'
-            N=eternal sh -c 'echo "hello $N"' | envsubst | grep -qx 'hello eternal'
+        packages:
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/catalogs.sh"
 
   - name: gettext-libs
     summary: Runtime libraries for gettext
@@ -122,7 +108,13 @@ outputs:
     dependencies:
       run:
         - ncurses-libs
-
+    tests:
+      - name: minimal-runtime-dependencies
+        stage: installed
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libasprintf.so.[0-9]*", "libgettextpo.so.[0-9]*"]
   - name: gettext-devel
     summary: Development files for gettext
     files:
@@ -145,29 +137,15 @@ outputs:
       run:
         - gettext-libs = ${package.version}-${package.release}
     tests:
-      - name: link
+      - name: gettext-api
         stage: installed
-        packages: [gcc, glibc-devel, pkgconf, grep, bash-binsh, coreutils, perl]
-        argv:
-          - sh
-          - -c
-          - |
-            test -f /usr/include/gettext-po.h
-            test -f /usr/share/aclocal/gettext.m4
-            test -f /usr/share/aclocal/nls.m4
-            cat > /tmp/po.c <<'EOF'
-            #include <gettext-po.h>
-            #include <libintl.h>
-            /* Take the address of a gettext-po entry point so the link proves
-               the library is present, without opening a catalogue first. */
-            int main(void) {
-              po_message_iterator_t (*iterator)(po_file_t, const char *) =
-                po_message_iterator;
-              return iterator == 0 || gettext("eternal") == 0;
-            }
-            EOF
-            gcc /tmp/po.c -lgettextpo -o /tmp/po
-            /tmp/po
+        packages:
+          - gcc
+          - glibc-devel
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/gettext-api.sh"
 
   - name: gettext-doc
     summary: Documentation for gettext
