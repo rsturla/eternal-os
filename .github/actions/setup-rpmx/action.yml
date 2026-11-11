@@ -15,8 +15,21 @@ runs:
     - name: Install host tools
       shell: bash
       run: |
-        sudo apt-get update
-        sudo apt-get install -y --no-install-recommends \
+        apt_options=()
+        # Hosted runners use Ubuntu's archive and security endpoints.
+        # Use an independent signed mirror if either endpoint is unavailable.
+        if { ! curl --silent --fail --location --head --connect-timeout 5 --max-time 10 https://archive.ubuntu.com/ubuntu/ >/dev/null || \
+             ! curl --silent --fail --location --head --connect-timeout 5 --max-time 10 https://security.ubuntu.com/ubuntu/ >/dev/null; }; then
+          . /etc/os-release
+          mirror_list="$RUNNER_TEMP/ubuntu-mirror.list"
+          for suite in "$VERSION_CODENAME" "$VERSION_CODENAME-updates" "$VERSION_CODENAME-backports" "$VERSION_CODENAME-security"; do
+            printf 'deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] https://mirrors.edge.kernel.org/ubuntu %s main restricted universe multiverse\n' "$suite"
+          done > "$mirror_list"
+          apt_options=(-o "Dir::Etc::sourcelist=$mirror_list" -o Dir::Etc::sourceparts=-)
+          echo 'Ubuntu archive unavailable; using the kernel.org Ubuntu mirror'
+        fi
+        sudo apt-get "${apt_options[@]}" -o APT::Update::Error-Mode=any update
+        sudo apt-get "${apt_options[@]}" install -y --no-install-recommends \
           bubblewrap podman fuse-overlayfs uidmap python3-yaml createrepo-c gnupg rpm
         # Ubuntu 26.04 restricts unprivileged user namespaces via AppArmor,
         # which rootless podman needs for root resolution.
