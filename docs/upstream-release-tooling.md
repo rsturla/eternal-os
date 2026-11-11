@@ -18,6 +18,10 @@ a pull request. A separate `scripts/upstream-all` meta-script enumerates package
 and invokes workers every two minutes. The worker never scans other packages.
 Do not put GitHub credentials, polling or Eternal policy into rpmx.
 
+Keep package-specific update configuration beside the build definition in
+`package.yaml`, under `metadata.eternal.update`. Add an opaque `metadata` map to
+rpmx's recipe schema. Eternal owns validation and interpretation of its namespace.
+
 The target is a reviewable PR within 15 minutes of an upstream release. Full
 builds can continue after publication. A PR with incomplete or failed preparation
 must remain a draft and state the failure. Count these separately from successful
@@ -70,8 +74,8 @@ including pip's vendor replacements. Tracking must cover both forms.
 | Module | Owns | Excludes |
 | --- | --- | --- |
 | Release discovery | Provider queries, normalized versions, publication evidence, stream classification, conditional requests | RPM recipes and PRs |
-| rpmx recipe update | Schema-aware edits, source acquisition and digests, release policy mechanics, source preparation, machine-readable results | Eternal stream choices and GitHub state |
-| Eternal update coordinator | Package bindings, update policy, related bootstrap recipes, retries, branches, PRs and latency records | Duplicate implementations of rpmx fetching or assembly |
+| rpmx recipe update | Schema-aware edits, opaque metadata preservation, source acquisition and digests, release policy mechanics, source preparation, machine-readable results | Interpretation of Eternal metadata, stream choices and GitHub state |
+| Eternal update coordinator | Recipe-local update configuration, related bootstrap recipes, retries, branches, PRs and latency records | Duplicate implementations of rpmx fetching or assembly |
 
 The seams are a release observation and a recipe update plan. Local files and a
 remote catalog are adapters at the discovery seam. A CLI caller needs no knowledge
@@ -90,7 +94,10 @@ design.
 Reuse that project through a versioned executable and JSON contract, not a
 cross-repository import of its Go `internal` packages. Add a one-shot, persisted
 check interface there if needed. Its existing `dry-run --project` discovers
-without persistence and is useful for local inspection. Production must reconcile
+without persistence and is useful for local inspection. The coordinator derives
+monitor project definitions from recipe metadata for the requested package.
+These definitions are generated inputs, not a second hand-maintained package
+catalog. Production must reconcile
 catalog state as well as consume events: the first monitor poll establishes a
 baseline and does not emit the existing release history.
 
@@ -120,8 +127,9 @@ It uses the same implementation interactively, from a timer and from CI:
 ./scripts/upstream-all run --jobs 8
 ```
 
-The meta-script's `audit` validates every production recipe has an enabled binding or an explicit
-opt-out reason. It also reports unsupported resolvers and stale checks.
+The meta-script's `audit` validates that every production recipe has enabled
+update metadata or an explicit opt-out reason. It also reports unsupported
+resolvers and stale checks.
 `check` is read-only with respect to Git. It needs network access, but no GitHub
 write token. `plan` can replay recorded observations offline. `apply` writes into
 a separate checkout and never changes the caller's working files. `verify` uses
@@ -154,7 +162,8 @@ root and runner, just as a normal local build does. Allow an explicit state/cach
 directory under XDG defaults. File-backed state needs no database or broker.
 Offline replay requires cached source bytes and prepared roots as well as JSON.
 
-The plan records a schema version, base Git SHA, binding hash, recipe hashes,
+The plan records a schema version, base Git SHA, effective update configuration
+hash, recipe hashes,
 upstream project/stream, raw tag, normalized version, timestamps, artifact URLs,
 immutable commit IDs, expected checksums, intended field edits and check results.
 Reject changed inputs before apply or publish. Do not evaluate release text as
@@ -162,46 +171,89 @@ shell code. Pass command arguments as arrays.
 
 ## Configuration
 
-Keep generic repository defaults in `rpmx-defaults.yaml`. Its existing `metadata`
-map can point to an Eternal-owned `upstream/` directory. Keep package bindings in
-`upstream/packages/<name>.yaml` and shared discovery project definitions in
-`upstream/projects/`. These are coordinator data, not new rpmx recipe schema keys.
+Store each package's upstream identity, version constraints, artifact selection
+and preparation rules in its recipe under `metadata.eternal.update`. Keep these
+rules beside the sources and build steps they describe. There is no separate
+hand-maintained `upstream/packages/` or `upstream/projects/` configuration tree.
 Do not use `package.upstream` as a download endpoint.
 
-An illustrative binding, with syntax to finalize during implementation:
+The proposed recipe extension is a generic, optional `metadata` map. rpmx accepts
+and preserves this map without interpreting downstream namespaces or expanding
+their template strings. Normal recipe validation remains strict outside it.
+Eternal's tooling validates `metadata.eternal.update`, including its schema
+version, required fields, unknown fields and provider-specific settings. Other
+tools can use their own namespaces without changes to rpmx.
+
+The pinned rpmx recipe schema currently rejects this field. Add support through
+a separate reviewed rpmx change before enabling recipe annotations. That change
+must cover recipe fragments, includes, serialization and recipe bundle handling.
+Metadata must survive bump operations, locks and SRPM round-trips. It must not
+introduce build steps or recipe variables. A typed rpmx `update:` section can be
+considered later if multiple downstream tools agree on shared semantics.
+
+An illustrative block inside `packages/zstd/package.yaml`, with downstream syntax
+to finalize during implementation:
 
 ```yaml
-schema: 1
-package: gcc-16
-project: gnu-gcc
-policy:
-  stream: "16"
-  prereleases: false
-  versioning: rpm
-recipe: packages/gcc-16/package.yaml
-preparation:
-  resolver: gnu-release-archive
-  source: primary
-  version_fields: []
+metadata:
+  eternal:
+    update:
+      schema: 1
+      enabled: true
+      upstream:
+        provider: github-releases
+        repository: facebook/zstd
+      version:
+        strip-prefix: v
+        prereleases: false
+      preparation:
+        resolver: github-release-asset
+        sources:
+          - name: zstd-${package.version}.tar.gz
+            asset: zstd-${version}.tar.gz
 ```
 
-Bindings identify sources explicitly by existing names or checked selectors;
-do not assume the first source is the only one. Add stable source identifiers to
+In this namespace, Eternal resolves `${package.version}` from the current recipe
+and `${version}` from the selected release. rpmx preserves these strings verbatim.
+Versioned packages also declare a stream constraint, such as `stream: "16"`
+for `gcc-16`. A local package instead declares `schema: 1`, `enabled: false`
+and a nonempty `reason` in the same namespace. Missing metadata is an audit
+failure, not an implicit opt-out.
+
+Keep repository-wide defaults in `rpmx-defaults.yaml`. Eternal can read shared
+version policy from `metadata.eternal.update` there. Its coordinator merges those
+defaults with the recipe's update metadata. Recipe values take precedence;
+mappings merge recursively and lists replace inherited lists. Each production
+recipe must still declare its enabled status and upstream identity or opt-out.
+Record the effective configuration and the contributing file hashes in the plan.
+This inheritance is Eternal tooling behavior, not implicit rpmx interpretation.
+
+Store polling, concurrency, PR settings and explicit bootstrap pairing under
+`metadata.eternal.upstream` in `rpmx-defaults.yaml`. Use environment variables or
+local credential references for secrets. Runtime observations, generated monitor
+definitions and work state belong in the configured state directory.
+
+Update metadata identifies sources by existing names or checked selectors.
+Do not assume the first source is the only one. Add stable source identifiers to
 rpmx only through an intentional schema change if mutable names become a problem.
 Resolvers produce exact field edits. Prefer upstream release metadata over
 guessing transformed URLs. Use declarative transforms for routine tag spelling.
 Use reviewed resolver code for SQLite encoding and numbered patch sets.
 
 Every stream has an explicit range. GCC 13 through 16 and Python 3.11 through
-3.15 remain separate. The glibc, Perl, Lua and OpenSSL bindings also need their
+3.15 remain separate. The glibc, Perl, Lua and OpenSSL recipes also need their
 own stream rules. A new stream produces an actionable discovery record; it does
 not rename packages, add selectors or rewrite dependencies automatically.
-Reject prereleases unless a binding explicitly opts in.
+Reject prereleases unless a recipe explicitly opts in.
 
-Bootstrap pairing is explicit per binding. Bash, binutils, coreutils and make
-can update both recipe variants in one package commit after validation of each.
+Bootstrap pairing is explicit in the repository configuration. Bash, binutils,
+coreutils and make can update both recipe variants in one package commit after
+validation of each.
 Keep bootstrap roots, epochs and build differences. The two local bootstrap
 recipes remain opted out. Never move stage logic out of `bootstrap/bootstrap.yaml`.
+The worker reads update policy from the production recipe and applies the
+repository's explicit pairing. Bootstrap recipes do not need duplicate upstream
+discovery metadata.
 
 ## Update semantics and source preparation
 
@@ -228,8 +280,9 @@ Reject an unrecognized release format rather than guessing its next value.
 | Other patched recipes | Retain local patches and test them; require review for conflicts or removal |
 
 Do not claim coverage from recognizing an upstream host alone. During rollout,
-`audit` must enumerate all 116 recipes and link each enabled binding to a passing
-resolver fixture. Source families above are design coverage, not working bindings.
+`audit` must enumerate all 116 recipes and link each enabled update configuration
+to a passing resolver fixture. Source families above are design coverage, not
+implemented resolvers.
 
 The rpmx update implementation must first resolve edits into a candidate recipe,
 then fetch from that candidate, then write the computed digests. Preserve comments
@@ -336,18 +389,25 @@ code supplied by an upstream release or a generated branch.
 1. Repair existing rpmx bump behavior in a focused upstream PR. Test new-byte
    digest refresh, release reset, failed fetch rollback and dry-run behavior.
    Adopt a reviewed rpmx revision later in an explicit dependency update.
-2. Add the coordinator's offline plan/apply interface, state transitions and
-   exhaustive binding audit. Keep GitHub writes behind `publish`.
-3. Integrate monitor observations and add missing discovery providers. Start
+2. Add opaque recipe `metadata` support in a separate rpmx PR. Validate its
+   preservation through includes, serialization, bump operations, locks and SRPMs.
+   Adopt the schema support through an explicit rpmx dependency update.
+3. Add the coordinator's offline plan/apply interface, state transitions and
+   recipe metadata validation. Add an exhaustive configuration audit and defaults
+   inheritance. Keep GitHub writes behind `publish`.
+4. Integrate monitor observations and add missing discovery providers. Start
    with ordinary GNU/GitHub archives and PyPI modules. Replay saved upstream
    responses through the same resolver interfaces used by polling.
-4. Add Bash, glibc, SQLite, NSS, tzdata and pip fixtures before enabling their
-   bindings. Add explicit stream policies and bootstrap pair checks.
-5. Run without publication, then enable PRs for a small package set. Measure
+5. Add Bash, glibc, SQLite, NSS, tzdata and pip fixtures before enabling their
+   update metadata. Add explicit stream policies and bootstrap pair checks.
+6. Run without publication, then enable PRs for a small package set. Measure
    latency, rate limits and burst handling before enabling the full inventory.
 
 Acceptance tests must demonstrate a release becoming a changed recipe with
-fresh digests and the correct release value. Cover transformed tags, opaque PyPI
+fresh digests and the correct release value. Check namespace preservation,
+downstream schema errors, explicit opt-outs, defaults precedence and stale
+configuration hashes. Verify that a worker reads only the requested package's
+update configuration and repository defaults. Cover transformed tags, opaque PyPI
 URLs, independent pip dependencies, a missing Bash patch, a glibc commit refresh,
 an upstream repack, a mirror mismatch, patch conflicts and source assembly errors.
 Also cover stale plans, no-op retries, duplicate events, a crash after push,
