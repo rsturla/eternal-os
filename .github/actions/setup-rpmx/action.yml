@@ -17,7 +17,7 @@ runs:
       run: |
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends \
-          bubblewrap podman fuse-overlayfs uidmap python3-yaml
+          bubblewrap podman fuse-overlayfs uidmap python3-yaml createrepo-c gnupg rpm
         # Ubuntu 26.04 restricts unprivileged user namespaces via AppArmor,
         # which rootless podman needs for root resolution.
         sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true

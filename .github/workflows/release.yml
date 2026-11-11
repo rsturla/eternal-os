@@ -30,6 +30,10 @@ jobs:
   repository:
     name: Repository
     needs: packages
+    # All refs publish to the same rolling and archive prefixes.
+    concurrency:
+      group: package-repository
+      cancel-in-progress: false
     runs-on: ubuntu-26.04
     permissions:
       contents: read
