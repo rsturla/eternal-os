@@ -79,11 +79,7 @@ outputs:
   tests:
   - name: round-trip
     stage: installed
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       mkdir /tmp/archive-test
       printf "payload\n" > /tmp/archive-test/payload
       bsdtar -cf /tmp/test.tar -C /tmp/archive-test payload
@@ -106,16 +102,12 @@ outputs:
     - zlib
     - zstd-libs
   tests:
-  - name: load
+  - name: runtime-linkage
     stage: installed
-    packages:
-      - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("libarchive.so.13")'
+    pipeline:
+      - uses: test/runtime-linkage
+        with:
+          libraries: ["libarchive.so.*"]
 - name: libarchive-devel
   files:
     license:
@@ -127,23 +119,17 @@ outputs:
     run:
     - libarchive-libs = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
+  - name: api-behavior
     stage: installed
     packages:
-      - gcc
-      - glibc-devel
-      - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.c <<'EOF'
-      #include <archive.h>
-      int main(void) { struct archive *a = archive_read_new(); return !a || archive_read_free(a); }
-      EOF
-      gcc /tmp/test.c $(pkg-config --cflags --libs libarchive) -o /tmp/test
-      /tmp/test
+    - gcc
+    - glibc-devel
+    - pkgconf
+    files: tests
+    script: |
+      pkg-config --exists libarchive
+      gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libarchive) "$TEST_FILES/behavior.c" $(pkg-config --libs libarchive) -o behavior
+      ./behavior
 - name: libarchive-doc
   files:
     license:
@@ -158,3 +144,30 @@ tests:
   stage: build
   pipeline:
   - uses: test/hardening-check
+- name: upstream
+  stage: build
+  packages:
+  - diffutils
+  - gzip
+  - bzip2
+  - xz
+  - zstd
+  # Exercise external-filter fallbacks without changing production features.
+  - lz4
+  - lzop
+  # Match the Fedora libc used by this recipe's bootstrap build profile.
+  - glibc-common
+  - glibc-locale-source
+  - glibc-gconv-extra
+  - nss_wrapper-libs
+  files: tests
+  artifacts:
+  - test-suite.log
+  - libarchive_test.log
+  - bsdtar_test.log
+  - bsdcpio_test.log
+  - bsdcat_test.log
+  - bsdunzip_test.log
+  - upstream-results
+  script: |
+    bash "$TEST_FILES/upstream.sh"
