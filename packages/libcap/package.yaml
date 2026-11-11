@@ -62,18 +62,12 @@ outputs:
       license:
         - /usr/share/licenses/libcap/**
     tests:
-      - name: installed
+      - name: runtime-linkage
         stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libcap.so.* /usr/lib/libcap.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libcap.so.*", "libpsx.so.*"]
   - name: libcap-utils
     summary: Utilities for manipulating POSIX capabilities
     files:
@@ -91,15 +85,19 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            capsh --print >/dev/null
-            getpcaps $$ >/dev/null
-            getcap /usr/bin/capsh >/dev/null
-
+        script: |
+          trap 'printf "line %s: %s\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
+          decoded=$(capsh --decode=3)
+          [[ $decoded == *'cap_chown,cap_dac_override'* ]]
+          process=$(getpcaps $$)
+          [[ $process == "$$:"* ]]
+          printf 'private fixture\n' > ordinary-file
+          test -z "$(getcap ordinary-file)"
+          status=0
+          capsh --supports=cap_eternal_invalid > diagnostic 2>&1 || status=$?
+          test "$status" = 1
+          diagnostic=$(<diagnostic)
+          [[ $diagnostic == *cap_eternal_invalid* ]]
   - name: libcap-devel
     summary: Development files for libcap
     files:
@@ -112,6 +110,18 @@ outputs:
       run:
         - libcap = ${package.version}-${package.release}
 
+    tests:
+      - name: api-behavior
+        stage: installed
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists libcap
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libcap) "$TEST_FILES/behavior.c" $(pkg-config --libs libcap) -o behavior
+          ./behavior
   - name: libcap-static
     summary: Static libraries for libcap
     files:
@@ -124,6 +134,29 @@ outputs:
       run:
         - libcap-devel = ${package.version}-${package.release}
 
+    tests:
+      - name: static-api-behavior
+        stage: installed
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+          - binutils
+          - grep
+        files: tests
+        script: |
+          pkg-config --exists libcap
+          private_libs=()
+          for flag in $(pkg-config --static --libs libcap); do
+            if test "$flag" != -lcap; then private_libs+=("$flag"); fi
+          done
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libcap) "$TEST_FILES/behavior.c" "$(pkg-config --variable=libdir libcap)/libcap.a" "$${private_libs[@]}" -o behavior
+          ./behavior
+          readelf -d behavior > dynamic.txt
+          if grep -E 'NEEDED.*\[libcap\.so' dynamic.txt; then
+            echo "static test linked the shared library" >&2
+            exit 1
+          fi
   - name: libcap-doc
     summary: Documentation for libcap
     files:
