@@ -68,18 +68,14 @@ outputs:
       run:
         - xz-libs = ${package.version}-${package.release}
     tests:
-      - name: installed
+      - name: roundtrip
         stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            printf 'hello\n' > /tmp/file
-            xz /tmp/file
-            test -f /tmp/file.xz
-            unxz /tmp/file.xz
-            test "$(cat /tmp/file)" = hello
+        packages:
+          - coreutils
+          - diffutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/roundtrip.sh"
 
   - name: xz-libs
     summary: XZ runtime library
@@ -96,17 +92,19 @@ outputs:
         - /usr/share/licenses/xz-libs/COPYING.GPLv2
         - /usr/share/licenses/xz-libs/COPYING.LGPLv2.1
     tests:
-      - name: installed
+      - name: minimal-runtime-dependencies
         stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/liblzma.so.* /usr/lib/liblzma.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["liblzma.so.[0-9]*"]
+      - name: runtime
+        stage: installed
+        packages:
+          - python3
+        files: tests
+        script: |
+          python3 "$TEST_FILES/runtime.py"
 
   - name: xz-devel
     summary: XZ development files
@@ -125,6 +123,16 @@ outputs:
     dependencies:
       run:
         - xz-libs = ${package.version}-${package.release}
+    tests:
+      - name: compression-api
+        stage: installed
+        packages:
+          - gcc
+          - glibc-devel
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/compression-api.sh"
 
   - name: xz-doc
     summary: XZ documentation
@@ -144,18 +152,9 @@ outputs:
         - /usr/share/licenses/xz-doc/COPYING.LGPLv2.1
 
 tests:
-  - name: link
-    stage: installed
-    packages: [gcc, glibc-devel, bash-binsh, coreutils]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #include <lzma.h>
-        int main(void) {
-          return lzma_version_number() != LZMA_VERSION;
-        }
-        EOF
-        gcc /tmp/test.c -llzma -o /tmp/test
-        /tmp/test
+  - name: upstream
+    stage: build
+    packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+    artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+    pipeline:
+      - uses: make/check
