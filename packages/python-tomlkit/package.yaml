@@ -76,10 +76,8 @@ outputs:
     license:
     - /usr/share/licenses/python-${matrix.python.version}-tomlkit/**
   tests:
-  - name: functional
+  - name: behavior
     stage: installed
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - import tomlkit; d = tomlkit.parse("# retained\nanswer = 42\n"); assert d["answer"] == 42; assert "# retained"
-      in tomlkit.dumps(d)
+    files: tests
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/test_behavior.py" "${matrix.python.version}" "tomlkit" "${package.version}"
