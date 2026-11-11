@@ -50,17 +50,14 @@ outputs:
     license:
     - /usr/share/licenses/scdoc/**
   tests:
-  - name: render
-    stage: installed
-    packages:
-      - grep
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      printf 'SMOKE(1)\n\n# NAME\nsmoke - test\n' | scdoc > /tmp/smoke.1
-      grep -q '^.TH' /tmp/smoke.1
+    - name: rendering
+      stage: installed
+      packages:
+        - coreutils
+      files: tests
+      script: |
+        bash "$TEST_FILES/rendering.sh"
+
 - name: scdoc-doc
   files:
     license:
@@ -68,8 +65,9 @@ outputs:
     include:
     - '@man'
     - /usr/share/licenses/scdoc-doc/**
+
 tests:
-- name: hardening
-  stage: build
-  pipeline:
-  - uses: test/hardening-check
+  - name: hardening
+    stage: build
+    pipeline:
+      - uses: test/hardening-check
