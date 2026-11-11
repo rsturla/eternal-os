@@ -1,0 +1,12 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "eternal-fixture"
+version = "1.2.3"
+description = "Offline build fixture"
+requires-python = ">=3.11"
+
+[project.scripts]
+eternal-fixture = "eternal_fixture:main"
