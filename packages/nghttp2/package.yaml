@@ -58,16 +58,12 @@ outputs:
     provides:
     - libnghttp2 = ${package.version}-${package.release}
   tests:
-  - name: load
+  - name: runtime-linkage
     stage: installed
-    packages:
-    - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("libnghttp2.so.14")'
+    pipeline:
+      - uses: test/runtime-linkage
+        with:
+          libraries: ["libnghttp2.so.*"]
 - name: nghttp2-devel
   files:
     include:
@@ -81,23 +77,17 @@ outputs:
     provides:
     - libnghttp2-devel = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
+  - name: api-behavior
     stage: installed
     packages:
     - gcc
     - glibc-devel
     - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.c <<'EOF'
-      #include <nghttp2/nghttp2.h>
-      int main(void) { nghttp2_session_callbacks *c; if (nghttp2_session_callbacks_new(&c)) return 1; nghttp2_session_callbacks_del(c); return 0; }
-      EOF
-      gcc /tmp/test.c $(pkg-config --cflags --libs libnghttp2) -o /tmp/test
-      /tmp/test
+    files: tests
+    script: |
+      pkg-config --exists libnghttp2
+      gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libnghttp2) "$TEST_FILES/behavior.c" $(pkg-config --libs libnghttp2) -o behavior
+      ./behavior
 - name: nghttp2-doc
   files:
     include:
