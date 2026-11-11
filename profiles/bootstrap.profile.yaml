@@ -66,6 +66,8 @@ repositories:
       - gettext*
       - glib2*
       - json-c*
+      # Fedora CMake needs jsoncpp ABI 26; Eternal currently ships ABI 27.
+      - jsoncpp*
       - libarchive*
       - librepo*
       - libsemanage*
