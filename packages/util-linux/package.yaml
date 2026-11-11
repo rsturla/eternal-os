@@ -93,20 +93,13 @@ outputs:
         - libuuid = ${package.version}-${package.release}
         - pam
     tests:
-      - name: installed
+      - name: offline-utilities
         stage: installed
-        packages: [bash-binsh, coreutils, grep]
-        argv:
-          - sh
-          - -eu
-          - -c
-          - |
-            mount --version
-            lsblk --version
-            blkid --version
-            findmnt --version
-            flock --version
-            uuidgen | grep -E '^[0-9a-f-]{36}$'
+        packages:
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/offline-utilities.sh"
 
   - name: libblkid
     summary: Block device identification library
@@ -117,17 +110,19 @@ outputs:
       license:
         - /usr/share/licenses/libblkid/**
     tests:
-      - name: installed
+      - name: minimal-runtime-dependencies
         stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libblkid.so.* /usr/lib/libblkid.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libblkid.so.[0-9]*"]
+      - name: blkid-runtime
+        stage: installed
+        packages:
+          - python3
+        files: tests
+        script: |
+          python3 "$TEST_FILES/blkid-runtime.py"
 
   - name: libfdisk
     summary: Partitioning library
@@ -138,17 +133,19 @@ outputs:
       license:
         - /usr/share/licenses/libfdisk/**
     tests:
-      - name: installed
+      - name: minimal-runtime-dependencies
         stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libfdisk.so.* /usr/lib/libfdisk.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libfdisk.so.[0-9]*"]
+      - name: fdisk-runtime
+        stage: installed
+        packages:
+          - python3
+        files: tests
+        script: |
+          python3 "$TEST_FILES/fdisk-runtime.py"
 
   - name: libmount
     summary: Block device mounting library
@@ -159,17 +156,19 @@ outputs:
       license:
         - /usr/share/licenses/libmount/**
     tests:
-      - name: installed
+      - name: minimal-runtime-dependencies
         stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libmount.so.* /usr/lib/libmount.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libmount.so.[0-9]*"]
+      - name: mount-runtime
+        stage: installed
+        packages:
+          - python3
+        files: tests
+        script: |
+          python3 "$TEST_FILES/mount-runtime.py"
 
   - name: libsmartcols
     summary: Table formatting library
@@ -180,17 +179,19 @@ outputs:
       license:
         - /usr/share/licenses/libsmartcols/**
     tests:
-      - name: installed
+      - name: minimal-runtime-dependencies
         stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libsmartcols.so.* /usr/lib/libsmartcols.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libsmartcols.so.[0-9]*"]
+      - name: smartcols-runtime
+        stage: installed
+        packages:
+          - python3
+        files: tests
+        script: |
+          python3 "$TEST_FILES/smartcols-runtime.py"
 
   - name: libuuid
     summary: Universally unique identifier library
@@ -201,17 +202,19 @@ outputs:
       license:
         - /usr/share/licenses/libuuid/**
     tests:
-      - name: installed
+      - name: minimal-runtime-dependencies
         stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libuuid.so.* /usr/lib/libuuid.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libuuid.so.[0-9]*"]
+      - name: uuid-runtime
+        stage: installed
+        packages:
+          - python3
+        files: tests
+        script: |
+          python3 "$TEST_FILES/uuid-runtime.py"
 
   - name: util-linux-devel
     summary: Development files for util-linux libraries
@@ -234,6 +237,17 @@ outputs:
         - libmount-devel = ${package.version}-${package.release}
         - libsmartcols-devel = ${package.version}-${package.release}
         - libuuid-devel = ${package.version}-${package.release}
+    tests:
+      - name: libraries-api
+        stage: installed
+        packages:
+          - gcc
+          - glibc-devel
+          - coreutils
+          - pkgconf
+        files: tests
+        script: |
+          bash "$TEST_FILES/libraries-api.sh"
 
   - name: util-linux-doc
     summary: Documentation for util-linux
