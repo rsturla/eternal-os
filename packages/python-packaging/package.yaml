@@ -79,10 +79,8 @@ outputs:
     license:
     - /usr/share/licenses/python-${matrix.python.version}-packaging/**
   tests:
-  - name: functional
+  - name: offline-behavior
     stage: installed
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - from packaging.version import Version; from packaging.requirements import Requirement; assert Version("2.0")
-      > Version("1.9"); assert "1.5" in Requirement("demo>=1,<2").specifier
+    files: tests
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/check.py" "${matrix.python.version}" "packaging" "${package.version}"
