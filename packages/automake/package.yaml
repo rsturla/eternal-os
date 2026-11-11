@@ -64,26 +64,20 @@ outputs:
     - autoconf
     - perl
   tests:
-  - name: generate
-    stage: installed
-    packages:
-      - make
-      - tar
-      - gzip
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      mkdir /tmp/automake-test
-      cd /tmp/automake-test
-      printf 'AC_INIT([smoke], [1])\nAM_INIT_AUTOMAKE([foreign])\nAC_CONFIG_FILES([Makefile])\nAC_OUTPUT\n' > configure.ac
-      printf 'EXTRA_DIST = configure.ac\n' > Makefile.am
-      aclocal
-      autoconf
-      automake --add-missing --copy
-      ./configure
-      make dist
+    - name: build-project
+      stage: installed
+      packages:
+        - coreutils
+        - gcc
+        - glibc-devel
+        - make
+        - tar
+        - gzip
+        - bash-binsh
+      files: tests
+      script: |
+        bash "$TEST_FILES/build-project.sh"
+
 - name: automake-doc
   files:
     license:
