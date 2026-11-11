@@ -12,79 +12,98 @@ package:
     vendor: mesonbuild
     product: meson
 sources:
-- name: meson-1.12.1.tar.gz
-  kind: archive
-  digest: sha512:64c75f9e4165e35059d560c8bb1e13f61893e391396974bf7b8b229491cd712f81e69d8ccabc55e2b49b1268d957ac8d365c258fce3e2c65c7634d140612da02
-  locators:
-  - kind: https
-    url: https://github.com/mesonbuild/meson/releases/download/1.12.1/meson-1.12.1.tar.gz
-  - kind: https
-    url: https://files.pythonhosted.org/packages/source/m/meson/meson-1.12.1.tar.gz
-  extract:
-    format: tar.gz
-    strip-components: 1
+  - name: meson-1.12.1.tar.gz
+    kind: archive
+    digest: sha512:64c75f9e4165e35059d560c8bb1e13f61893e391396974bf7b8b229491cd712f81e69d8ccabc55e2b49b1268d957ac8d365c258fce3e2c65c7634d140612da02
+    locators:
+      - kind: https
+        url: https://github.com/mesonbuild/meson/releases/download/1.12.1/meson-1.12.1.tar.gz
+      - kind: https
+        url: https://files.pythonhosted.org/packages/source/m/meson/meson-1.12.1.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
   packages:
-  - bash
-  - coreutils
-  - python3
-  - python3-build
-  - python3-setuptools
-  - python3-wheel
-  - python3-pip
-  pipeline:
-  - uses: python/build-wheel
-    with:
-      build-package: python3-build
-      python: /usr/bin/python3
-  - uses: python/install-wheel
-    with:
-      pip-package: python3-pip
-      python: /usr/bin/python3
-  - uses: license/copy
-    with:
-      files:
-      - COPYING
-      outputs:
-      - meson
-      - meson-doc
-outputs:
-- name: meson
-  arch: noarch
-  files:
-    license:
-    - /usr/share/licenses/meson/**
-  dependencies:
-    run:
-    - python3
-    - ninja-build
-  tests:
-  - name: build-project
-    stage: installed
-    packages:
-      - gcc
-      - glibc-devel
-    argv:
     - bash
-    - -eu
-    - -c
-    - |
-      mkdir /tmp/meson-test
-      cd /tmp/meson-test
-      printf "project('smoke', 'c')\nexecutable('smoke', 'main.c')\n" > meson.build
-      printf 'int main(void) { return 0; }\n' > main.c
-      meson setup build --wrap-mode=nodownload
-      meson compile -C build
-      ./build/smoke
-- name: meson-doc
-  arch: noarch
-  files:
-    license:
-    - /usr/share/licenses/meson-doc/**
-    include:
-    - '@man'
-    - '@doc'
-    - /usr/share/polkit-1/**
-    - /usr/share/licenses/meson-doc/**
+    - coreutils
+    - python3
+    - python3-build
+    - python3-setuptools
+    - python3-wheel
+    - python3-pip
+  pipeline:
+    - uses: python/build-wheel
+      with:
+        build-package: python3-build
+        python: /usr/bin/python3
+    - uses: python/install-wheel
+      with:
+        pip-package: python3-pip
+        python: /usr/bin/python3
+    - uses: license/copy
+      with:
+        files:
+          - COPYING
+        outputs:
+          - meson
+          - meson-doc
+outputs:
+  - name: meson
+    arch: noarch
+    files:
+      license:
+        - /usr/share/licenses/meson/**
+    dependencies:
+      run:
+        - python3
+        - ninja-build
+    tests:
+      - name: configure-build-test-install
+        stage: installed
+        packages:
+          - bash
+          - gcc
+          - coreutils
+        files: tests
+        script: |
+          meson setup build "$TEST_FILES" --prefix=/usr --libdir=lib --wrap-mode=nodownload
+          meson compile -C build
+          meson test -C build --print-errorlogs
+          DESTDIR="$PWD/dest" meson install -C build
+          LD_LIBRARY_PATH="$PWD/dest/usr/lib" ./dest/usr/bin/probe
+          meson compile -C build --clean
+          test ! -f build/probe
+          meson compile -C build
+          meson test -C build --print-errorlogs
+        artifacts:
+          - build/meson-logs
+      - name: invalid-project
+        stage: installed
+        packages:
+          - bash
+          - gcc
+          - coreutils
+        script: |
+          mkdir invalid
+          printf "project('invalid', 'c')\nerror('intentional failure')\n" > invalid/meson.build
+          if meson setup invalid-build invalid --wrap-mode=nodownload >invalid.stdout 2>invalid.stderr; then exit 1; fi
+          case "$(<invalid.stdout)" in
+            *'ERROR: Problem encountered: intentional failure'*) ;;
+            *) echo 'Meson did not report the intentional project failure' >&2; exit 1 ;;
+          esac
+        artifacts:
+          - invalid.stdout
+          - invalid.stderr
+  - name: meson-doc
+    arch: noarch
+    files:
+      license:
+        - /usr/share/licenses/meson-doc/**
+      include:
+        - '@man'
+        - '@doc'
+        - /usr/share/polkit-1/**
+        - /usr/share/licenses/meson-doc/**
