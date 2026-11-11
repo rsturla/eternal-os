@@ -76,11 +76,8 @@ outputs:
     license:
     - /usr/share/licenses/python-${matrix.python.version}-calver/**
   tests:
-  - name: functional
+  - name: offline-behavior
     stage: installed
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - from calver.integration import version; from types import SimpleNamespace; import os, tempfile; os.chdir(tempfile.mkdtemp());
-      os.environ["SOURCE_DATE_EPOCH"] = "0"; d = SimpleNamespace(metadata=SimpleNamespace(version=None)); version(d,
-      "use_calver", True); assert d.metadata.version == "1970.01.01"
+    files: tests
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/check.py" "${matrix.python.version}" "calver" "${package.version}"
