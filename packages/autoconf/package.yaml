@@ -69,6 +69,7 @@ outputs:
   tests:
   - name: generate
     stage: installed
+    packages: [gawk]
     argv:
     - bash
     - -eu

@@ -67,6 +67,8 @@ outputs:
   - name: generate
     stage: installed
     packages:
+      - findutils
+      - gawk
       - make
       - tar
       - gzip
