@@ -4,7 +4,7 @@ schema: 1
 package:
   name: python-3.15
   version: "3.15.2"
-  release: 1
+  release: 2
   summary: The Python programming language (version 3.15)
   description: |
     Python is an interpreted, interactive, object-oriented programming
@@ -36,7 +36,7 @@ build:
     - bzip2-devel
     - expat-devel
     - libffi-devel
-    - libzstd-devel
+    - zstd-devel
     - ncurses-devel
     - openssl-devel
     - readline-devel
@@ -86,7 +86,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        packages: [bzip2-libs, expat, libffi, libzstd, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
+        packages: [bzip2-libs, expat, libffi, zstd-libs, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
         argv:
           - sh
           - -c
@@ -152,7 +152,7 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        packages: [bzip2-libs, expat, libffi, libzstd, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
+        packages: [bzip2-libs, expat, libffi, zstd-libs, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
         argv:
           - sh
           - -c
