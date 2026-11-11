@@ -2,8 +2,9 @@
 #
 # Stage 0 builds the first in-tree userspace packages inside the Fedora 44
 # seed. Stage 1 rebuilds them with the stage 0 repository in the root, so the
-# build itself uses Eternal make and coreutils. glibc, gcc and binutils are
-# still supplied by the seed and are the next packages to import.
+# build itself uses Eternal make and coreutils. The Go stages first build
+# Fedora-seeded compilers, then rebuild both production streams with Eternal
+# Go 1.26. The C compiler and C library still come from Fedora.
 document: rpmx-bootstrap
 version: 1
 name: eternal
@@ -46,3 +47,25 @@ stages:
       # Fedora ships both `coreutils` and the single-binary `coreutils-single`;
       # either can satisfy a `coreutils` dependency. Hide both.
       coreutils: [coreutils, coreutils-single]
+
+  - name: go-seed
+    profile: ../profiles/bootstrap.profile.yaml
+    inputs: [stage1]
+    packages: [golang-1.26, golang-1.27]
+    output: .work/out/go-seed
+    seed: true
+
+  - name: go-selfhost
+    profile: ../profiles/bootstrap.profile.yaml
+    inputs: [go-seed]
+    recipes:
+      - ../packages/golang-1.26/package.yaml
+      - ../packages/golang-1.27/package.yaml
+    packages: [golang-1.26, golang-1.27]
+    output: .work/out/go-selfhost
+    fixed-point: [golang-1.26, golang-1.27]
+    # Hide published copies so the first pass consumes the local seed output.
+    # The fixed-point passes then consume this stage's own output.
+    replaces:
+      golang-1.26: golang-1.26
+      golang-1.27: golang-1.27

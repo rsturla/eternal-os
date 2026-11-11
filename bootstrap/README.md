@@ -49,3 +49,27 @@ make bootstrap-clean
 
 The equivalent direct commands are `rpmx bootstrap plan bootstrap/bootstrap.yaml`
 and `rpmx bootstrap build bootstrap/bootstrap.yaml --arch <arch>`.
+
+## Go compiler transition
+
+The Go stages follow the existing userspace stages:
+
+- `go-seed` builds both streams from `recipes/golang-1.26/` and
+  `recipes/golang-1.27/` with Fedora's `golang-bin` compiler.
+- `go-selfhost` selects the production recipes under `../packages/` explicitly.
+  Both use the versioned Eternal `go-1.26` command from the seed output.
+  Provider exclusions hide published copies of these streams so the local
+  stage output supplies the compiler. Fixed-point passes then rebuild both
+  streams with this stage's own output.
+
+The production recipes need no default selector. Normal builds consume the
+published Eternal `golang-1.26` package. The ladder remains the explicit path
+to recreate that compiler from Fedora when the Eternal package is unavailable.
+Keep the bootstrap variants' sources, patches, flags and tests in sync with
+the production streams. Their release numbers can differ.
+
+The bootstrap variants retain the installed `coinstall-fedora` test. Production
+recipes test co-installation with the other Eternal stream instead. Native
+rpmx roots include test dependencies, so this split keeps Fedora Go out of the
+production root. The C compiler and glibc remain under the existing bootstrap
+profile policy.
