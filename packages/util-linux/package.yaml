@@ -95,9 +95,10 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        packages: [bash-binsh, coreutils]
+        packages: [bash-binsh, coreutils, grep]
         argv:
           - sh
+          - -eu
           - -c
           - |
             mount --version
