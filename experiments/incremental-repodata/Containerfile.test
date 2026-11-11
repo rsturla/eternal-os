@@ -1,0 +1,2 @@
+FROM registry.fedoraproject.org/fedora:44
+RUN dnf5 install -y rpm-build && dnf5 clean all
