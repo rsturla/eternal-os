@@ -12,122 +12,141 @@ package:
     vendor: kitware
     product: cmake
 sources:
-- name: cmake-4.4.5.tar.gz
-  kind: archive
-  digest: sha512:f4b467b78ac097737a7e46aec352e5aa40a6ebee2d422bec6ee02e86d7f2fc2a600aa8d662f2ad641e0fab8dcd015452d23fc40dcab90eba5a1de9cb106be47b
-  locators:
-  - kind: https
-    url: https://github.com/Kitware/CMake/releases/download/v4.4.5/cmake-4.4.5.tar.gz
-  - kind: https
-    url: https://cmake.org/files/v4.4/cmake-4.4.5.tar.gz
-  extract:
-    format: tar.gz
-    strip-components: 1
+  - name: cmake-4.4.5.tar.gz
+    kind: archive
+    digest: sha512:f4b467b78ac097737a7e46aec352e5aa40a6ebee2d422bec6ee02e86d7f2fc2a600aa8d662f2ad641e0fab8dcd015452d23fc40dcab90eba5a1de9cb106be47b
+    locators:
+      - kind: https
+        url: https://github.com/Kitware/CMake/releases/download/v4.4.5/cmake-4.4.5.tar.gz
+      - kind: https
+        url: https://cmake.org/files/v4.4/cmake-4.4.5.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
   packages:
-  - gcc
-  - gcc-c++
-  - make
-  - bash
-  - coreutils
-  - cmake
-  - pkgconf
-  sysroot:
-  - libcurl-devel
-  - libarchive-devel
-  - expat-devel
-  - zlib-devel
-  - bzip2-devel
-  - xz-devel
-  - zstd-devel
-  - libuv-devel
-  - jsoncpp-devel
-  - rhash-devel
-  pipeline:
-  - uses: cmake/configure
-    with:
-      args:
-      - -DBUILD_TESTING=OFF
-      - -DCMAKE_BUILD_TYPE=Release
-      - -DCMAKE_USE_SYSTEM_CURL=ON
-      - -DCMAKE_USE_SYSTEM_LIBARCHIVE=ON
-      - -DCMAKE_USE_SYSTEM_EXPAT=ON
-      - -DCMAKE_USE_SYSTEM_ZLIB=ON
-      - -DCMAKE_USE_SYSTEM_BZIP2=ON
-      - -DCMAKE_USE_SYSTEM_LIBLZMA=ON
-      - -DCMAKE_USE_SYSTEM_ZSTD=ON
-      - -DCMAKE_USE_SYSTEM_LIBUV=ON
-      - -DCMAKE_USE_SYSTEM_JSONCPP=ON
-      - -DCMAKE_USE_SYSTEM_LIBRHASH=ON
-      - -DCMake_ENABLE_DEBUGGER=OFF
-      - -DCMAKE_DOC_DIR=share/doc/cmake
-      - -DCMAKE_USE_SYSTEM_LIBRARIES=ON
-      - -DCMAKE_USE_SYSTEM_CPPDAP=OFF
-      - -DCMAKE_USE_SYSTEM_KWIML=OFF
-      - -DCMAKE_USE_SYSTEM_FORM=OFF
-      - -DBUILD_CursesDialog=OFF
-      - -DBUILD_QtDialog=OFF
-      - -DCMake_TEST_NO_NETWORK=ON
-  - uses: cmake/build
-  - uses: cmake/install
-  - uses: license/copy
-    with:
-      files:
-      - LICENSE.rst
-      outputs:
-      - cmake
-      - cmake-doc
-  - uses: strip
-outputs:
-- name: cmake
-  files:
-    license:
-    - /usr/share/licenses/cmake/**
-  dependencies:
-    run:
-    - bash-binsh
-    - libarchive
-    - libcurl
-    - expat
-    - libuv
-    - jsoncpp
-    - rhash
-    - libstdc++
-    - libgcc
-  tests:
-  - name: build-project
-    stage: installed
-    packages:
-      - gcc
-      - glibc-devel
-      - make
-    argv:
+    - gcc
+    - gcc-c++
+    - make
     - bash
-    - -eu
-    - -c
-    - |
-      mkdir /tmp/cmake-test
-      cd /tmp/cmake-test
-      printf 'cmake_minimum_required(VERSION 3.20)\nproject(smoke C)\nadd_executable(smoke main.c)\n' > CMakeLists.txt
-      printf 'int main(void) { return 0; }\n' > main.c
-      cmake -S . -B build
-      cmake --build build
-      ./build/smoke
-- name: cmake-doc
-  files:
-    license:
-    - /usr/share/licenses/cmake-doc/**
-    include:
-    - '@doc'
-    - /usr/share/cmake-*/Help/**
-    - '@man'
-    - /usr/share/emacs/**
-    - /usr/share/vim/**
-    - /usr/share/licenses/cmake-doc/**
-tests:
-- name: hardening
-  stage: build
+    - coreutils
+    - cmake
+    - pkgconf
+  sysroot:
+    - libcurl-devel
+    - libarchive-devel
+    - expat-devel
+    - zlib-devel
+    - bzip2-devel
+    - xz-devel
+    - zstd-devel
+    - libuv-devel
+    - jsoncpp-devel
+    - rhash-devel
   pipeline:
-  - uses: test/hardening-check
+    - uses: cmake/configure
+      with:
+        args:
+          - -DBUILD_TESTING=OFF
+          - -DCMAKE_BUILD_TYPE=Release
+          - -DCMAKE_USE_SYSTEM_CURL=ON
+          - -DCMAKE_USE_SYSTEM_LIBARCHIVE=ON
+          - -DCMAKE_USE_SYSTEM_EXPAT=ON
+          - -DCMAKE_USE_SYSTEM_ZLIB=ON
+          - -DCMAKE_USE_SYSTEM_BZIP2=ON
+          - -DCMAKE_USE_SYSTEM_LIBLZMA=ON
+          - -DCMAKE_USE_SYSTEM_ZSTD=ON
+          - -DCMAKE_USE_SYSTEM_LIBUV=ON
+          - -DCMAKE_USE_SYSTEM_JSONCPP=ON
+          - -DCMAKE_USE_SYSTEM_LIBRHASH=ON
+          - -DCMake_ENABLE_DEBUGGER=OFF
+          - -DCMAKE_DOC_DIR=share/doc/cmake
+          - -DCMAKE_USE_SYSTEM_LIBRARIES=ON
+          - -DCMAKE_USE_SYSTEM_CPPDAP=OFF
+          - -DCMAKE_USE_SYSTEM_KWIML=OFF
+          - -DCMAKE_USE_SYSTEM_FORM=OFF
+          - -DBUILD_CursesDialog=OFF
+          - -DBUILD_QtDialog=OFF
+          - -DCMake_TEST_NO_NETWORK=ON
+    - uses: cmake/build
+    - uses: cmake/install
+    - uses: license/copy
+      with:
+        files:
+          - LICENSE.rst
+        outputs:
+          - cmake
+          - cmake-doc
+    - uses: strip
+outputs:
+  - name: cmake
+    files:
+      license:
+        - /usr/share/licenses/cmake/**
+    dependencies:
+      run:
+        - bash-binsh
+        - libarchive
+        - libcurl
+        - expat
+        - libuv
+        - jsoncpp
+        - rhash
+        - libstdc++
+        - libgcc
+    tests:
+      - name: configure-build-test-install
+        stage: installed
+        packages:
+          - bash
+          - gcc
+          - make
+          - coreutils
+        files: tests
+        script: |
+          cmake -S "$TEST_FILES" -B build -G 'Unix Makefiles' -DCMAKE_INSTALL_PREFIX=/usr
+          cmake --build build --parallel 2
+          ctest --test-dir build --output-on-failure --no-tests=error
+          DESTDIR="$PWD/dest" cmake --install build
+          LD_LIBRARY_PATH="$PWD/dest/usr/lib" ./dest/usr/bin/probe
+          cmake --build build --target clean
+          test ! -f build/probe
+          cmake --build build --parallel 2
+          ctest --test-dir build --output-on-failure --no-tests=error
+        artifacts:
+          - build/Testing/Temporary
+      - name: invalid-project
+        stage: installed
+        packages:
+          - bash
+          - coreutils
+          - make
+        script: |
+          mkdir invalid
+          # Do not probe compilers before exercising the invalid command.
+          printf 'cmake_minimum_required(VERSION 3.20)\nproject(invalid NONE)\nunknown_command()\n' > invalid/CMakeLists.txt
+          if cmake -S invalid -B invalid-build >invalid.stdout 2>invalid.stderr; then exit 1; fi
+          case "$(<invalid.stderr)" in
+            *'Unknown CMake command "unknown_command"'*) ;;
+            *) cat invalid.stderr >&2; echo 'CMake did not diagnose unknown_command' >&2; exit 1 ;;
+          esac
+        artifacts:
+          - invalid.stderr
+  - name: cmake-doc
+    files:
+      license:
+        - /usr/share/licenses/cmake-doc/**
+      include:
+        - '@doc'
+        - /usr/share/cmake-*/Help/**
+        - '@man'
+        - /usr/share/emacs/**
+        - /usr/share/vim/**
+        - /usr/share/licenses/cmake-doc/**
+tests:
+  - name: hardening
+    stage: build
+    pipeline:
+      - uses: test/hardening-check
