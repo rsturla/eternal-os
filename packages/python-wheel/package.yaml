@@ -79,11 +79,8 @@ outputs:
     run:
     - python-${matrix.python.version}-packaging
   tests:
-  - name: functional
+  - name: behavior
     stage: installed
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - from wheel.wheelfile import WheelFile; import tempfile, pathlib; p = pathlib.Path(tempfile.mkdtemp())
-      / "demo-1.0-py3-none-any.whl"; w = WheelFile(p, "w"); w.writestr("demo.py", "value = 42\n"); w.close();
-      assert p.is_file()
+    files: tests
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/test_behavior.py" "${matrix.python.version}" "wheel" "${package.version}"
