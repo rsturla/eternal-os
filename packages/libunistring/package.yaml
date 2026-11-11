@@ -9,7 +9,7 @@ schema: 1
 package:
   name: libunistring
   version: "1.5"
-  release: 1
+  release: 2
   summary: Library for manipulating Unicode strings
   description: |
     GNU libunistring provides functions for manipulating Unicode strings and
@@ -37,7 +37,8 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  packages: [gcc, make, bash, coreutils, sed, grep, diffutils]
+  # Gnulib's configure probe requires EUC-JP to recognize working iconv.
+  packages: [gcc, make, bash, coreutils, sed, grep, diffutils, glibc-gconv-extra]
   pipeline:
     - uses: autotools/configure
       with:
@@ -63,18 +64,12 @@ outputs:
         - /usr/share/licenses/libunistring/COPYING
         - /usr/share/licenses/libunistring/COPYING.LIB
     tests:
-      - name: installed
+      - name: runtime-linkage
         stage: installed
-        packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libunistring.so.* /usr/lib/libunistring.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libunistring.so.*"]
   - name: libunistring-devel
     summary: Development files for libunistring
     files:
@@ -89,26 +84,15 @@ outputs:
       run:
         - libunistring = ${package.version}-${package.release}
     tests:
-      - name: link
+      - name: api-behavior
         stage: installed
-        packages: [gcc, glibc-devel, bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            cat > /tmp/u8.c <<'EOF'
-            #include <unistr.h>
-            #include <unictype.h>
-            #include <stdio.h>
-            int main(void) {
-              const uint8_t text[] = "eternal";
-              printf("%zu\n", u8_strlen(text));
-              return 0;
-            }
-            EOF
-            gcc /tmp/u8.c -lunistring -o /tmp/u8
-            test "$(/tmp/u8)" = 7
-
+        packages:
+          - gcc
+          - glibc-devel
+        files: tests
+        script: |
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration  "$TEST_FILES/behavior.c" -lunistring -o behavior
+          ./behavior
   - name: libunistring-doc
     summary: Documentation for libunistring
     files:
@@ -127,3 +111,18 @@ tests:
     stage: build
     pipeline:
       - uses: test/hardening-check
+  - name: upstream
+    stage: build
+    packages:
+      - diffutils
+      - glibc-common
+      - glibc-locale-source
+    files: tests
+    artifacts:
+      - config.log
+      - config.h
+      - test-suite.log
+      - tests/test-suite.log
+      - upstream-results
+    script: |
+      bash "$TEST_FILES/upstream.sh"
