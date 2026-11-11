@@ -11,7 +11,7 @@
 # time; it must never become the definition of the distribution.
 document: rpmx-profile
 version: 1
-name: bootstrap-fedora-44
+name: bootstrap
 releasever: "44"
 dist-tag: .eternal
 archs: [x86_64, aarch64]
@@ -20,13 +20,12 @@ builder:
 repositories:
   - id: eternal
     baseurl: https://packages.eternal.sturla.tech/rolling/$basearch
-    # Only the userland packages that have completed the self-hosting switch
-    # are consumed from here. Keep the seed compiler and C library out until
-    # their exact-release dependencies are stable.
+    # Only packages that have completed the self-hosting switch are consumed
+    # here. Select one compiler and C library stream for this build root.
     #
     # The recipes added in the first rolling release are published, but their
     # package layouts still overlap the Fedora set: archful/noarch pairs
-    # (meson, toml11), the perl and python streams, the curl/openssl/rpm stack
+    # (meson, toml11), the python streams, the curl/openssl/rpm stack
     # and the libxml2/libarchive pair. Keep them on the Fedora side until each
     # integration is validated; shrink this list as the packages are adopted.
     #
@@ -40,17 +39,21 @@ repositories:
       - eternal-release
       - eternal-base
       - eternal-baselayout
-      - glibc-*
-      - gcc-*
-      - ld-linux-*
-      - libc-bin-*
-      - libstdc++-*
-      - libatomic-*
-      - nss-db-*
+      - glibc-2.43*
+      - ld-linux-2.43*
+      - libc-bin-2.43*
+      - nss-db-2.43*
+      - gcc-13*
+      - gcc-14*
+      - gcc-15*
+      - libstdc++-13*
+      - libstdc++-14*
+      - libstdc++-15*
+      - libatomic-13*
+      - libatomic-14*
+      - libatomic-15*
       - expat*
       # New recipes held out of the shared root until their integration lands.
-      - autoconf*
-      - automake*
       - bison*
       - bzip2*
       - ca-certificates*
@@ -72,7 +75,6 @@ repositories:
       - librepo*
       - libsemanage*
       - libsolv*
-      - libtool*
       - libunistring*
       - libxml2*
       - libxslt*
@@ -83,7 +85,6 @@ repositories:
       # Keep its matching library until the Eternal provider can replace it.
       - nghttp2*
       - openssl3*
-      - perl*
       - popt*
       - python-3.13*
       - python-3.14*
@@ -92,7 +93,6 @@ repositories:
       - scdoc*
       - shadow-utils*
       - sqlite*
-      - texinfo*
       - toml11*
       - tzdata*
       - util-linux*
@@ -108,6 +108,24 @@ repositories:
     # copies is what makes the build root consume the published Eternal
     # repository instead of only using it for metadata.
     exclude:
+      - autoconf*
+      - automake*
+      - libtool*
+      # Texinfo currently links Fedora libperl 5.42; keep its library and
+      # optional modules available until Texinfo is rebuilt with Eternal Perl.
+      - perl
+      - perl-devel
+      - perl-interpreter
+      - texinfo*
+      - glibc*
+      - gcc
+      - gcc-*
+      - cpp
+      - cpp-*
+      - libgcc*
+      - libgomp*
+      - libstdc++*
+      - libatomic*
       - acl*
       - attr*
       - audit*
@@ -158,6 +176,24 @@ repositories:
   - id: updates
     metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch
     exclude:
+      - autoconf*
+      - automake*
+      - libtool*
+      # Texinfo currently links Fedora libperl 5.42; keep its library and
+      # optional modules available until Texinfo is rebuilt with Eternal Perl.
+      - perl
+      - perl-devel
+      - perl-interpreter
+      - texinfo*
+      - glibc*
+      - gcc
+      - gcc-*
+      - cpp
+      - cpp-*
+      - libgcc*
+      - libgomp*
+      - libstdc++*
+      - libatomic*
       - acl*
       - attr*
       - audit*
@@ -215,7 +251,9 @@ packages:
     - binutils
     - coreutils
     - findutils
-    - gcc
+    - gcc-16-default
+    - glibc-2.44
+    - glibc-2.44-devel
     - make
     - patch
     - tar
