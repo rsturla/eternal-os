@@ -3,7 +3,7 @@ schema: 1
 package:
   name: cmake
   version: 4.4.5
-  release: 1
+  release: 2
   summary: Cross-platform build system generator
   description: Cross-platform build system generator.
   license: BSD-3-Clause AND MIT-open-group AND Zlib
@@ -41,7 +41,7 @@ build:
   - zlib-devel
   - bzip2-devel
   - xz-devel
-  - libzstd-devel
+  - zstd-devel
   - libuv-devel
   - jsoncpp-devel
   - rhash-devel
