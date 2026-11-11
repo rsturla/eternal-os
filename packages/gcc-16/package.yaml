@@ -14,7 +14,7 @@ schema: 1
 package:
   name: gcc-16
   version: "16.2.0"
-  release: 2
+  release: 3
   summary: The GNU Compiler Collection, version 16
   description: |
     GCC 16 provides the C and C++ compilers, the GNU runtime libraries and the
@@ -99,6 +99,8 @@ build:
           - --enable-default-pie
           - --enable-default-ssp
           - --enable-initfini-array
+          # Also harden GCC runtime and startup objects on AArch64.
+          - --enable-standard-branch-protection
           - --enable-gnu-indirect-function
           - --enable-gnu-unique-object
           - --with-system-zlib
@@ -191,6 +193,15 @@ outputs:
         - cpp = ${package.version}-${package.release}
         - cc = ${package.version}-${package.release}
     tests:
+      - name: compiler-hardening
+        stage: installed
+        packages: [bash, binutils, coreutils, findutils, grep, openssf-compiler-options, sed]
+        environment:
+          PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+        pipeline:
+          - uses: test/compiler-hardening-check
+            with:
+              cc: cc
       - name: cxx-link
         stage: installed
         packages: [bash-binsh, coreutils]
