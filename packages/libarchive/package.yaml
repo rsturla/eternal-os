@@ -3,7 +3,7 @@ schema: 1
 package:
   name: libarchive
   version: 3.8.11
-  release: 1
+  release: 2
   summary: Archive reading and writing library and tools
   description: Archive reading and writing library and tools.
   license: BSD-2-Clause AND BSD-3-Clause AND CC0-1.0 AND LicenseRef-Public-Domain
@@ -36,7 +36,7 @@ build:
   - zlib-devel
   - bzip2-devel
   - xz-devel
-  - libzstd-devel
+  - zstd-devel
   - openssl-devel
   - libacl-devel
   pipeline:
@@ -104,7 +104,7 @@ outputs:
     - xz-libs
     - openssl-libs
     - zlib
-    - libzstd
+    - zstd-libs
   tests:
   - name: load
     stage: installed
