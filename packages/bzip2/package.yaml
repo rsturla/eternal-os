@@ -73,20 +73,14 @@ outputs:
       run:
         - bzip2-libs = ${package.version}-${package.release}
     tests:
-      - name: installed
+      - name: roundtrip
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            printf 'eternal bzip2 test\n' > /tmp/bzip2-test
-            bzip2 -k /tmp/bzip2-test
-            test -f /tmp/bzip2-test.bz2
-            rm /tmp/bzip2-test
-            bunzip2 /tmp/bzip2-test.bz2
-            test "$(cat /tmp/bzip2-test)" = "eternal bzip2 test"
-            bzip2 -c /tmp/bzip2-test | bzcat | grep -F 'eternal bzip2 test'
+        packages:
+          - coreutils
+          - diffutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/roundtrip.sh"
 
   - name: bzip2-libs
     summary: Libraries for applications using bzip2
@@ -97,18 +91,12 @@ outputs:
       license:
         - /usr/share/licenses/bzip2-libs/**
     tests:
-      - name: installed
+      - name: minimal-runtime-dependencies
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libbz2.so.* /usr/lib/libbz2.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libbz2.so.[0-9]*"]
   - name: bzip2-devel
     summary: Development files for bzip2
     files:
@@ -121,16 +109,15 @@ outputs:
       run:
         - bzip2-libs = ${package.version}-${package.release}
     tests:
-      - name: link
+      - name: compression-api
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '#include <bzlib.h>\nint main(void){return BZ_OK;}\n' > /tmp/bz.c
-            gcc /tmp/bz.c -lbz2 -o /tmp/bz
-            /tmp/bz
+        packages:
+          - gcc
+          - glibc-devel
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/compression-api.sh"
 
   - name: bzip2-static
     summary: Static bzip2 library
@@ -143,6 +130,16 @@ outputs:
     dependencies:
       run:
         - bzip2-devel = ${package.version}-${package.release}
+    tests:
+      - name: static-compression-api
+        stage: installed
+        packages:
+          - gcc
+          - glibc-devel
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/static-compression-api.sh"
 
   - name: bzip2-doc
     summary: Documentation for bzip2
@@ -153,3 +150,10 @@ outputs:
         - /usr/share/licenses/bzip2-doc/**
       license:
         - /usr/share/licenses/bzip2-doc/**
+
+tests:
+  - name: upstream-samples
+    stage: build
+    packages: [diffutils]
+    script: |
+      make test
