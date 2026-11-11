@@ -151,7 +151,7 @@ outputs:
           mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
           rpmbuild -bb "$TEST_FILES/probe.spec" --define "_topdir $PWD/rpmbuild" \
            --define 'probe_version 1' --define '__os_install_post %{nil}'
-          dnf5 --disablerepo='*' --setopt=plugins=False --setopt=gpgcheck=False install -y rpmbuild/RPMS/noarch/eternal-rpmx-probe-1-1.noarch.rpm
+          dnf5 --disablerepo='*' --setopt=plugins=False --setopt=gpgcheck=False --setopt=localpkg_gpgcheck=False install -y rpmbuild/RPMS/noarch/eternal-rpmx-probe-1-1.noarch.rpm
           rpm -q eternal-rpmx-probe
           test "$(cat /usr/share/eternal-rpmx-probe/payload)" = payload-1
           dnf5 --disablerepo='*' --setopt=plugins=False --setopt=clean_requirements_on_remove=False remove -y eternal-rpmx-probe
