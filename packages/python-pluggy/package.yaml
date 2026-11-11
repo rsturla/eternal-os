@@ -77,10 +77,8 @@ outputs:
     license:
     - /usr/share/licenses/python-${matrix.python.version}-pluggy/**
   tests:
-  - name: functional
+  - name: behavior
     stage: installed
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - import pluggy; pm = pluggy.PluginManager("demo"); assert pm.register(object(), "plugin") == "plugin";
-      assert pm.has_plugin("plugin")
+    files: tests
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/test_behavior.py" "${matrix.python.version}" "pluggy" "${package.version}"
