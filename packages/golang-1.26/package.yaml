@@ -3,7 +3,7 @@ schema: 1
 package:
   name: golang-1.26
   version: "1.26.11"
-  release: 1
+  release: 2
   summary: The Go programming language, version 1.26
   license: BSD-3-Clause
   upstream: https://go.dev/
@@ -37,7 +37,7 @@ patches:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  packages: [golang-bin, gcc, bash, coreutils, findutils, sed, grep, diffutils, binutils]
+  packages: [golang-1.26, gcc, bash, coreutils, findutils, sed, grep, diffutils, binutils]
   sysroot: [glibc-devel]
   environment:
     CGO_ENABLED: "1"
@@ -53,8 +53,8 @@ build:
   pipeline:
     - runs: |
         set -eu
-        # Resolve Fedora's seed before make.bash changes GOROOT.
-        export GOROOT_BOOTSTRAP="$(go env GOROOT)"
+        # Resolve the versioned Eternal compiler before make.bash changes GOROOT.
+        export GOROOT_BOOTSTRAP="$(go-1.26 env GOROOT)"
         export GOMAXPROCS="$JOBS"
         cd src
         bash ./make.bash
@@ -218,10 +218,10 @@ outputs:
               grep -F 'Host FIPS mode is enabled' out
             done
 
-      - name: coinstall-fedora
+      - name: coinstall-stream
         stage: installed
-        packages: [golang-bin, grep]
-        argv: [bash, -eu, -o, pipefail, -c, "go-1.26 version | grep -F 'go1.26.11 '; test -x /usr/bin/go; test /usr/bin/go-1.26 -ef /usr/lib64/golang-1.26/bin/go"]
+        packages: [golang-1.27, grep]
+        argv: [bash, -eu, -o, pipefail, -c, "go-1.26 version | grep -F 'go1.26.11 '; test \"$(go-1.27 env GOROOT)\" = /usr/lib64/golang-1.27; test /usr/bin/go-1.26 -ef /usr/lib64/golang-1.26/bin/go"]
 
   - name: golang-1.26-default
     summary: Unversioned commands for Go 1.26
