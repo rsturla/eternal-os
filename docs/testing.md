@@ -166,6 +166,7 @@ Choose exactly one execution form:
 tests:
   - name: reject-missing-match
     stage: installed
+    packages: [grep]
     argv: [grep, missing, /dev/null]
     expect:
       exit-code: 1
