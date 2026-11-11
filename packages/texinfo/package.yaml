@@ -16,7 +16,7 @@ schema: 1
 package:
   name: texinfo
   version: "7.3"
-  release: 1
+  release: 2
   summary: GNU documentation system
   description: |
     Texinfo is the documentation system used by the GNU project. It provides
@@ -55,6 +55,8 @@ build:
     - uses: autotools/configure
       with:
         args:
+          # Keep texi2any independent of the build-time Perl ABI.
+          - --disable-perl-xs
           - --disable-nls
           - --disable-static
     - uses: make/build
@@ -91,6 +93,7 @@ outputs:
         packages: [bash-binsh, coreutils, perl, gcc]
         argv:
           - sh
+          - -eu
           - -c
           - |
             makeinfo --version | head -1 | grep -q '7.3'
