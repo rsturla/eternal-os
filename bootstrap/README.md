@@ -49,3 +49,10 @@ make bootstrap-clean
 
 The equivalent direct commands are `rpmx bootstrap plan bootstrap/bootstrap.yaml`
 and `rpmx bootstrap build bootstrap/bootstrap.yaml --arch <arch>`.
+
+Bootstrap variants keep their own tests and fixtures under `recipes/<name>/tests/`.
+Keep behavioral checks in both variants when a package participates in the ladder.
+Test tools belong in each test's `packages` list. Do not add them to the seed
+or stage policy merely to run a test. See [package testing](../docs/testing.md).
+The production `scripts/test-all.sh` runner selects `packages/`; validate bootstrap
+variants through their build or a direct `rpmx test` command.

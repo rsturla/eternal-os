@@ -125,6 +125,14 @@ materialization, artifact transfer between jobs and object-storage credentials.
 - a matrix builds only the affected packages in parallel, which runs the
   recipe's tests by default, and uploads per-package artifacts.
 
+Recipes declare upstream build suites, installed consumer tests and private
+RPM transaction tests. Test fixtures belong to the recipe and contribute to
+its content hash. The Python bootstrap helper also hashes the local dependencies
+and test tools that it builds for an unpublished matrix consumer.
+See [package testing](testing.md) for isolation rules, reports and coverage.
+`make test` runs installed and transaction tests against existing RPMs in `out/`.
+Build-stage suites require a build or `rpmx test` without `--install-dir`.
+
 `release.yml` runs on `main`, on `v*` tags and on demand:
 
 1. lint, then build rpmx once per architecture, then run the full package
@@ -206,9 +214,8 @@ Until then, the shell entry points are intentionally boring and reviewable.
 ## Roadmap
 
 1. Add `eternal-keys` once a signing key exists (see `docs/signing.md`).
-2. Replace the bootstrap shell, coreutils and filesystem packages with in-tree
-   recipes; shrink `profiles/bootstrap.profile.yaml` as each lands.
-3. Add `aarch64` to the profiles and the CI matrix.
-4. Add an `eternal-minimal` image and an `eternal-devel` image built from the
+2. Replace remaining Fedora build dependencies with in-tree recipes; shrink
+   the bootstrap profiles as each lands.
+3. Add an `eternal-minimal` image and an `eternal-devel` image built from the
    same repository.
-5. Add an ISO or bootable container image once the package set can boot.
+4. Add an ISO or bootable container image once the package set can boot.
