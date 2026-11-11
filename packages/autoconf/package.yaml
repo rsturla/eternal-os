@@ -67,18 +67,18 @@ outputs:
     - sed
     - grep
   tests:
-  - name: generate
-    stage: installed
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      mkdir /tmp/autoconf-test
-      cd /tmp/autoconf-test
-      printf 'AC_INIT([smoke], [1])\nAC_CONFIG_SRCDIR([configure.ac])\nAC_OUTPUT\n' > configure.ac
-      autoconf
-      ./configure
+    - name: configure-project
+      stage: installed
+      packages:
+        - coreutils
+        - gcc
+        - glibc-devel
+        - make
+        - bash-binsh
+      files: tests
+      script: |
+        bash "$TEST_FILES/configure-project.sh"
+
 - name: autoconf-doc
   files:
     license:
