@@ -6,7 +6,7 @@ schema: 1
 package:
   name: libsolv
   version: "0.7.41"
-  release: 1
+  release: 2
   summary: Package dependency solver
   description: |
     libsolv is a library for solving package dependencies and managing
@@ -33,7 +33,7 @@ build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
   packages: [cmake, make, gcc, bash, coreutils, pkgconf]
-  sysroot: [bzip2-devel, expat-devel, xz-devel, zchunk-devel, zlib-devel, libzstd-devel, rpm-devel]
+  sysroot: [bzip2-devel, expat-devel, xz-devel, zchunk-devel, zlib-devel, zstd-devel, rpm-devel]
   pipeline:
     - uses: cmake/configure
       with:
@@ -80,7 +80,7 @@ outputs:
         - xz-libs
         - zchunk-libs
         - zlib
-        - libzstd
+        - zstd-libs
         - rpm-libs
     tests:
       - name: installed
