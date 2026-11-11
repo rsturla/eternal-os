@@ -73,9 +73,10 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, m4]
+        packages: [bash-binsh, coreutils, gcc, grep, m4]
         argv:
           - sh
+          - -eu
           - -c
           - |
             bison --version | head -1 | grep -q '3\.8\.2'
