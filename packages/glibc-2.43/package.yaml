@@ -12,7 +12,7 @@ schema: 1
 package:
   name: glibc-2.43
   version: "2.43"
-  release: 2
+  release: 3
   summary: The GNU C Library
   description: |
     The GNU C Library provides the C runtime, dynamic loader interfaces,
@@ -100,6 +100,9 @@ build:
       with:
         dir: build
     - runs: |
+        # Generate locale files with the glibc built in this recipe.
+        make -C build -j"$JOBS" localedata/install-locale-files DESTDIR="$STAGE"
+    - runs: |
         # ld.so.cache is host state, not package payload.
         rm -f "$STAGE/etc/ld.so.cache"
 
@@ -130,7 +133,7 @@ build:
     - uses: license/copy
       with:
         files: [COPYINGv2, COPYING.LIB]
-        outputs: [glibc-2.43, ld-linux-2.43, libc-bin-2.43, glibc-2.43-iconv, glibc-2.43-locales, nss-db-2.43, glibc-2.43-devel, glibc-2.43-static, glibc-2.43-doc]
+        outputs: [glibc-2.43, ld-linux-2.43, libc-bin-2.43, glibc-2.43-iconv, glibc-2.43-locales, glibc-2.43-locale-posix, glibc-2.43-locale-ca, glibc-2.43-locale-de, glibc-2.43-locale-en, glibc-2.43-locale-es, glibc-2.43-locale-fr, glibc-2.43-locale-extra, nss-db-2.43, glibc-2.43-devel, glibc-2.43-static, glibc-2.43-doc]
     - runs: |
         # The loader configuration is owned by ld-linux-2.43, not by the
         # library package.
@@ -155,6 +158,7 @@ outputs:
     dependencies:
       run:
         - ld-linux-2.43 = ${package.version}-${package.release}
+        - glibc-2.43-locale-posix = ${package.version}-${package.release}
       conflicts:
         - glibc-2.44
       provides:
@@ -216,6 +220,116 @@ outputs:
         - glibc-2.43 = ${package.version}-${package.release}
       provides:
         - glibc-iconv = ${package.version}-${package.release}
+
+  - name: glibc-2.43-locale-posix
+    summary: POSIX UTF-8 locale data for glibc
+    files:
+      include:
+        - /usr/lib*/locale/C.utf8/**
+        - /usr/share/licenses/glibc-2.43-locale-posix/**
+      license:
+        - /usr/share/licenses/glibc-2.43-locale-posix/COPYINGv2
+        - /usr/share/licenses/glibc-2.43-locale-posix/COPYING.LIB
+    dependencies:
+      provides:
+        - glibc-locale-posix = ${package.version}-${package.release}
+
+  - name: glibc-2.43-locale-ca
+    summary: CA locale data for glibc
+    files:
+      include:
+        - /usr/lib*/locale/ca*/**
+        - /usr/share/licenses/glibc-2.43-locale-ca/**
+      license:
+        - /usr/share/licenses/glibc-2.43-locale-ca/COPYINGv2
+        - /usr/share/licenses/glibc-2.43-locale-ca/COPYING.LIB
+    dependencies:
+      run:
+        - glibc-2.43 = ${package.version}-${package.release}
+      provides:
+        - glibc-locale-ca = ${package.version}-${package.release}
+
+  - name: glibc-2.43-locale-de
+    summary: DE locale data for glibc
+    files:
+      include:
+        - /usr/lib*/locale/de*/**
+        - /usr/share/licenses/glibc-2.43-locale-de/**
+      license:
+        - /usr/share/licenses/glibc-2.43-locale-de/COPYINGv2
+        - /usr/share/licenses/glibc-2.43-locale-de/COPYING.LIB
+    dependencies:
+      run:
+        - glibc-2.43 = ${package.version}-${package.release}
+      provides:
+        - glibc-locale-de = ${package.version}-${package.release}
+
+  - name: glibc-2.43-locale-en
+    summary: EN locale data for glibc
+    files:
+      include:
+        - /usr/lib*/locale/en*/**
+        - /usr/share/licenses/glibc-2.43-locale-en/**
+      license:
+        - /usr/share/licenses/glibc-2.43-locale-en/COPYINGv2
+        - /usr/share/licenses/glibc-2.43-locale-en/COPYING.LIB
+    dependencies:
+      run:
+        - glibc-2.43 = ${package.version}-${package.release}
+      provides:
+        - glibc-locale-en = ${package.version}-${package.release}
+
+  - name: glibc-2.43-locale-es
+    summary: ES locale data for glibc
+    files:
+      include:
+        - /usr/lib*/locale/es*/**
+        - /usr/share/licenses/glibc-2.43-locale-es/**
+      license:
+        - /usr/share/licenses/glibc-2.43-locale-es/COPYINGv2
+        - /usr/share/licenses/glibc-2.43-locale-es/COPYING.LIB
+    dependencies:
+      run:
+        - glibc-2.43 = ${package.version}-${package.release}
+      provides:
+        - glibc-locale-es = ${package.version}-${package.release}
+
+  - name: glibc-2.43-locale-fr
+    summary: FR locale data for glibc
+    files:
+      include:
+        - /usr/lib*/locale/fr*/**
+        - /usr/share/licenses/glibc-2.43-locale-fr/**
+      license:
+        - /usr/share/licenses/glibc-2.43-locale-fr/COPYINGv2
+        - /usr/share/licenses/glibc-2.43-locale-fr/COPYING.LIB
+    dependencies:
+      run:
+        - glibc-2.43 = ${package.version}-${package.release}
+      provides:
+        - glibc-locale-fr = ${package.version}-${package.release}
+
+  - name: glibc-2.43-locale-extra
+    summary: Other locale data for glibc
+    files:
+      include:
+        - /usr/lib*/locale/**
+        - /usr/share/licenses/glibc-2.43-locale-extra/**
+      exclude:
+        - /usr/lib*/locale/C.utf8*/**
+        - /usr/lib*/locale/ca*/**
+        - /usr/lib*/locale/de*/**
+        - /usr/lib*/locale/en*/**
+        - /usr/lib*/locale/es*/**
+        - /usr/lib*/locale/fr*/**
+      license:
+        - /usr/share/licenses/glibc-2.43-locale-extra/COPYINGv2
+        - /usr/share/licenses/glibc-2.43-locale-extra/COPYING.LIB
+    dependencies:
+      run:
+        - glibc-2.43 = ${package.version}-${package.release}
+      provides:
+        - glibc-locale-extra = ${package.version}-${package.release}
 
   - name: glibc-2.43-locales
     summary: GNU C Library locale data and translations
@@ -316,8 +430,12 @@ outputs:
               test ! -L "$libdir/$so" || { echo "$libdir/$so is still a symlink"; exit 1; }
             done
             cat > /tmp/glibc-devel-test.c <<'EOF'
+            #include <locale.h>
             #include <pthread.h>
-            int main(void) { return pthread_equal(pthread_self(), pthread_self()) ? 0 : 1; }
+            int main(void) {
+              if (setlocale(LC_ALL, "C.UTF-8") == 0) return 1;
+              return pthread_equal(pthread_self(), pthread_self()) ? 0 : 1;
+            }
             EOF
             gcc -pthread -Wl,--hash-style=gnu -o /tmp/glibc-devel-test /tmp/glibc-devel-test.c
             readelf -d /tmp/glibc-devel-test | grep -q GNU_HASH
