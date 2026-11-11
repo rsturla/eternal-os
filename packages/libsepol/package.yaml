@@ -78,16 +78,12 @@ outputs:
     license:
     - /usr/share/licenses/libsepol/**
   tests:
-  - name: load
+  - name: runtime-linkage
     stage: installed
-    packages:
-      - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("libsepol.so.2")'
+    pipeline:
+      - uses: test/runtime-linkage
+        with:
+          libraries: ["libsepol.so.*"]
 - name: libsepol-devel
   files:
     license:
@@ -99,22 +95,19 @@ outputs:
     run:
     - libsepol = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
+  - name: api-behavior
     stage: installed
     packages:
-      - gcc
-      - glibc-devel
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.c <<'EOF'
-      #include <sepol/handle.h>
-      int main(void) { sepol_handle_t *h = sepol_handle_create(); if (!h) return 1; sepol_handle_destroy(h); return 0; }
-      EOF
-      gcc /tmp/test.c -lsepol -o /tmp/test
-      /tmp/test
+    - gcc
+    - glibc-devel
+    - pkgconf
+    files: tests
+    script: |
+      pkg-config --exists libsepol
+      gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libsepol) "$TEST_FILES/behavior.c" $(pkg-config --libs libsepol) -o behavior
+      ./behavior
+      gcc -std=c17 -Wall -Wextra -Werror "$TEST_FILES/policy.c" $(pkg-config --cflags --libs libsepol) -o policy
+      ./policy "$TEST_FILES/minimal.cil"
 - name: libsepol-static
   files:
     license:
@@ -125,6 +118,31 @@ outputs:
   dependencies:
     run:
     - libsepol-devel = ${package.version}-${package.release}
+  tests:
+  - name: static-api-behavior
+    stage: installed
+    packages:
+    - gcc
+    - glibc-devel
+    - pkgconf
+    - binutils
+    - grep
+    files: tests
+    script: |
+      pkg-config --exists libsepol
+      private_libs=()
+      for flag in $(pkg-config --static --libs libsepol); do
+        if test "$flag" != -lsepol; then private_libs+=("$flag"); fi
+      done
+      gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libsepol) "$TEST_FILES/behavior.c" "$(pkg-config --variable=libdir libsepol)/libsepol.a" "$${private_libs[@]}" -o behavior
+      ./behavior
+      readelf -d behavior > dynamic.txt
+      if grep -E 'NEEDED.*\[libsepol\.so' dynamic.txt; then
+        echo "static test linked the shared library" >&2
+        exit 1
+      fi
+      gcc -std=c17 -Wall -Wextra -Werror "$TEST_FILES/policy.c" "$(pkg-config --variable=libdir libsepol)/libsepol.a" "$${private_libs[@]}" -o policy
+      ./policy "$TEST_FILES/minimal.cil"
 - name: libsepol-doc
   files:
     license:
