@@ -81,12 +81,12 @@ outputs:
     run:
     - python(abi) = ${matrix.python.version}
   tests:
-  - name: functional
+  - name: behavior
     stage: installed
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - 'from setuptools import Distribution; d = Distribution({"name": "demo", "version": "1.0"}); assert d.get_name()
-      == "demo"; assert d.get_version() == "1.0"'
+    files: tests
+    packages:
+    - python-${matrix.python.version}-installer
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/test_behavior.py" "${matrix.python.version}" "setuptools" "${package.version}"
   generators:
     python: false
