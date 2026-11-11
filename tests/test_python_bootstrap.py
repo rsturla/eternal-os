@@ -69,6 +69,14 @@ class PythonBootstrap(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "dependency cycle"):
             bootstrap.dependency_order(plans, "python-a")
 
+    def test_local_bootstrap_cache_tracks_preceding_dependencies(self):
+        order = ["python", "backend", "module"]
+        first = bootstrap.bootstrap_hashes(order, {"python": "a", "backend": "b", "module": "c"})
+        changed = bootstrap.bootstrap_hashes(order, {"python": "a", "backend": "new", "module": "c"})
+        self.assertEqual(first["python"], changed["python"])
+        self.assertNotEqual(first["backend"], changed["backend"])
+        self.assertNotEqual(first["module"], changed["module"])
+
 
 if __name__ == "__main__":
     unittest.main()
