@@ -92,16 +92,12 @@ outputs:
     - audit-libs
     - bzip2-libs
   tests:
-  - name: load
+  - name: runtime-linkage
     stage: installed
-    packages:
-      - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("libsemanage.so.2")'
+    pipeline:
+      - uses: test/runtime-linkage
+        with:
+          libraries: ["libsemanage.so.*"]
 - name: libsemanage-devel
   files:
     license:
@@ -113,22 +109,17 @@ outputs:
     run:
     - libsemanage = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
+  - name: api-behavior
     stage: installed
     packages:
-      - gcc
-      - glibc-devel
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.c <<'EOF'
-      #include <semanage/handle.h>
-      int main(void) { semanage_handle_t *h = semanage_handle_create(); if (!h) return 1; semanage_handle_destroy(h); return 0; }
-      EOF
-      gcc /tmp/test.c -lsemanage -o /tmp/test
-      /tmp/test
+    - gcc
+    - glibc-devel
+    - pkgconf
+    files: tests
+    script: |
+      pkg-config --exists libsemanage
+      gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libsemanage) "$TEST_FILES/behavior.c" $(pkg-config --libs libsemanage) -o behavior
+      ./behavior
 - name: libsemanage-static
   files:
     license:
@@ -142,31 +133,28 @@ outputs:
     - audit-libs-devel
     - bzip2-devel
   tests:
-  - name: link-archive
+  - name: static-api-behavior
     stage: installed
     packages:
-      - gcc
-      - glibc-devel
-      - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/static-test.c <<'EOF'
-      #include <semanage/handle.h>
-      int main(void) {
-          semanage_handle_t *h = semanage_handle_create();
-          if (!h) return 1;
-          semanage_handle_destroy(h);
-          return 0;
-      }
-      EOF
-      archive=/usr/lib/libsemanage.a
-      if test -f /usr/lib64/libsemanage.a; then archive=/usr/lib64/libsemanage.a; fi
-      gcc /tmp/static-test.c -Wl,--whole-archive "$archive" -Wl,--no-whole-archive \
-          $(pkg-config --libs --static libsemanage) -o /tmp/static-test
-      /tmp/static-test
+    - gcc
+    - glibc-devel
+    - pkgconf
+    - binutils
+    - grep
+    files: tests
+    script: |
+      pkg-config --exists libsemanage
+      private_libs=()
+      for flag in $(pkg-config --static --libs libsemanage); do
+        if test "$flag" != -lsemanage; then private_libs+=("$flag"); fi
+      done
+      gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libsemanage) "$TEST_FILES/behavior.c" "$(pkg-config --variable=libdir libsemanage)/libsemanage.a" "$${private_libs[@]}" -o behavior
+      ./behavior
+      readelf -d behavior > dynamic.txt
+      if grep -E 'NEEDED.*\[libsemanage\.so' dynamic.txt; then
+        echo "static test linked the shared library" >&2
+        exit 1
+      fi
 - name: libsemanage-doc
   files:
     license:
@@ -182,5 +170,4 @@ tests:
 patches:
 - file: patches/0001-reject-relative-home-directories.patch
   strip: 2
-  reason: Backport upstream ed3001e29f66ce63ccdbd21420c1447522fe2f83 from Fedora; reject invalid home
-    directories before policy generation
+  reason: Backport upstream ed3001e29f66ce63ccdbd21420c1447522fe2f83 from Fedora; reject invalid home directories before policy generation
