@@ -61,18 +61,12 @@ outputs:
       run:
         - gmp
     tests:
-      - name: installed
+      - name: runtime-linkage
         stage: installed
-        packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libmpfr.so.* /usr/lib/libmpfr.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libmpfr.so.*"]
   - name: mpfr-devel
     summary: MPFR development files
     files:
@@ -86,6 +80,18 @@ outputs:
         - mpfr = ${package.version}-${package.release}
         - gmp-devel
 
+    tests:
+      - name: api-behavior
+        stage: installed
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists mpfr
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags mpfr) "$TEST_FILES/behavior.c" $(pkg-config --libs mpfr) -o behavior
+          ./behavior
   - name: mpfr-doc
     summary: MPFR documentation
     files:
@@ -98,24 +104,12 @@ outputs:
         - /usr/share/licenses/mpfr-doc/COPYING.LESSER
 
 tests:
-  - name: link
-    stage: installed
-    packages: [gcc, glibc-devel, bash-binsh]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #include <mpfr.h>
-        int main(void) {
-          mpfr_t value;
-          mpfr_init2(value, 64);
-          mpfr_set_ui(value, 2, MPFR_RNDN);
-          mpfr_mul_ui(value, value, 3, MPFR_RNDN);
-          int result = mpfr_cmp_ui(value, 6) != 0;
-          mpfr_clear(value);
-          return result;
-        }
-        EOF
-        gcc /tmp/test.c -lmpfr -lgmp -o /tmp/test
-        /tmp/test
+  - name: upstream
+    stage: build
+    packages:
+      - diffutils
+    artifacts:
+      - test-suite.log
+      - tests/test-suite.log
+    pipeline:
+      - uses: make/check
