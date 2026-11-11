@@ -12,7 +12,7 @@ schema: 1
 package:
   name: glibc-2.44
   version: "2.44"
-  release: 3
+  release: 4
   summary: The GNU C Library
   description: |
     The GNU C Library provides the C runtime, dynamic loader interfaces,
@@ -69,10 +69,15 @@ build:
   pipeline:
     - runs: |
         mkdir build
+        # The ELF interpreter path is fixed by the architecture ABI.
+        rtlddir=$LIBDIR
+        if [ "${arch}" = aarch64 ]; then
+          rtlddir=/usr/lib
+        fi
         cat > build/configparms <<EOF
         slibdir=$LIBDIR
         libdir=$LIBDIR
-        rtlddir=$LIBDIR
+        rtlddir=$rtlddir
         rootsbindir=/usr/bin
         user-defined-trusted-dirs=/usr/local/lib:/usr/local/lib64:/usr/lib:/usr/lib64:/lib:/lib64
         EOF
@@ -404,8 +409,7 @@ outputs:
           - -c
           - |
             set -eu
-            libdir=/usr/lib64
-            [ -d "$libdir" ] || libdir=/usr/lib
+            libdir="$LIBDIR"
             test -f "$libdir/libc.so-2.44"
             test -f "$libdir/libm.so-2.44"
             test ! -L "$libdir/libc.so-2.44"
@@ -509,12 +513,14 @@ tests:
       - sh
       - -c
       - |
+        set -eu
         case "${arch}" in
           x86_64) loader="$STAGE/usr/lib64/ld-linux-x86-64.so.2" ;;
           aarch64) loader="$STAGE/usr/lib/ld-linux-aarch64.so.1" ;;
           *) echo "unsupported arch"; exit 1 ;;
         esac
         test -x "$loader"
+        test ! -L "$loader"
         test -f "$STAGE/usr/lib64/libc.so.6" || test -f "$STAGE/usr/lib/libc.so.6"
         test -f "$STAGE/etc/ld.so.conf"
         test -f "$STAGE/etc/rpc"
