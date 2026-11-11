@@ -44,6 +44,7 @@ repositories:
       - eternal-baselayout
       - glibc-*
       - gcc-*
+      - libgcc-*
       - ld-linux-*
       - libc-bin-*
       - libstdc++-*

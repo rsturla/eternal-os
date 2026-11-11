@@ -149,6 +149,36 @@ The first script builds only the requested foundation names, in the order
 Later builds can use earlier successful candidates in their test roots. A failure stops the
 chain and retains its normal output evidence.
 
+When selecting compiler streams, add their names with `--package gcc-13` through
+`--package gcc-16`. The script first builds a private OpenSSF policy seed, then
+only the selected compilers. These raw builds run their source tests but remain
+quarantined. Once every producer succeeds, the complete candidate cohort passes
+standalone acceptance against the Eternal production profile, including all
+OpenSSF wrapper tests. Only then do selected package outputs become consumer
+dependencies. The seed is exported only when explicitly selected. Source identity,
+rpmx identity, complete planned outputs and source-test reports are checked again
+before acceptance; a changed or incomplete producer cannot enter the pool.
+
+CI runs the selected compiler producers in parallel and uses the same entry points
+locally available for separate producer workspaces:
+
+```console
+uv run --with pyyaml python scripts/compiler-cohort.py produce-seed \
+  --arch x86_64 --output quarantine/openssf-compiler-options
+uv run --with pyyaml python scripts/compiler-cohort.py produce \
+  --package gcc-13 --arch x86_64 --seed quarantine/openssf-compiler-options \
+  --output quarantine/gcc-13
+uv run --with pyyaml bash scripts/build-test-dependencies.sh \
+  --package gcc-13 --arch x86_64 --compiler-inputs quarantine \
+  --output out --rpms .work/new-compiler-candidates
+```
+
+Use the same `--build-release` value for all commands when supplied. Keep producer
+artifacts under their quarantine names; they are not release artifacts. Build logs
+and source-test evidence remain in each producer directory on failure. Acceptance
+evidence is under `out/test-reports/compiler-cohort/ARCH/`. A compiler-free selection
+keeps the ordinary foundation path and does not build any compiler streams.
+
 `--test-rpms DIR` accepts a directory of binary RPMs for one target architecture,
 including noarch outputs. It requires host `rpm`, rpmx, Python and PyYAML.
 The helper validates RPM headers, copies an immutable repository snapshot, and

@@ -314,7 +314,7 @@ ensure_toolchain_repo() {
   ((no_tests)) && args+=(--no-tests)
   run_build "$toolchain_out" "$reports" "${args[@]}"
 
-  find "$toolchain_out" -type f -name '*.rpm' ! -name '*.src.rpm' \
+  find "$toolchain_out/${arch:-$(uname -m)}" -maxdepth 1 -type f -name '*.rpm' ! -name '*.src.rpm' \
     -exec cp -t "$toolchain_rpms" {} +
   "$rpmx" repo --rpms "$toolchain_rpms" --output "$toolchain_repo"
   printf '%s\n' "$seed_identity" >"$stamp"

@@ -27,7 +27,7 @@ repositories:
     # unversioned lua-devel/lua-libs layout. Mixing both providers makes the
     # offline root transaction fail with file and version conflicts. libxml2
     # is the exception here and comes from Eternal for libxslt.
-    exclude: [filesystem, basesystem, eternal-release, eternal-base, eternal-baselayout, glibc-*, gcc-*, ld-linux-*, libc-bin-*, libstdc++-*, libatomic-*, nss-db-*, expat*, zstd*, util-linux*, libblkid*, libfdisk*, libmount*, libsmartcols*, libuuid*, lua*]
+    exclude: [filesystem, basesystem, eternal-release, eternal-base, eternal-baselayout, glibc-*, gcc-*, libgcc-*, ld-linux-*, libc-bin-*, libstdc++-*, libatomic-*, nss-db-*, expat*, zstd*, util-linux*, libblkid*, libfdisk*, libmount*, libsmartcols*, libuuid*, lua*]
   - id: fedora
     baseurl: https://dl.fedoraproject.org/pub/fedora/linux/releases/$releasever/Everything/$basearch/os/
     # These package names are already produced by Eternal. Hiding the Fedora

@@ -385,6 +385,12 @@ elif args[0] == 'build':
         sys.exit(7)
     (output / arch).mkdir(parents=True, exist_ok=True)
     (output / arch / 'fixture.rpm').write_text('fixture RPM')
+    diagnostic = output / arch / 'test-results/private'
+    diagnostic.mkdir(parents=True, exist_ok=True)
+    (diagnostic / 'corrupt.rpm').write_text('diagnostic, not a seed candidate')
+    foreign_arch = 'aarch64' if arch == 'x86_64' else 'x86_64'
+    (output / foreign_arch).mkdir(exist_ok=True)
+    (output / foreign_arch / 'foreign.rpm').write_text('wrong architecture')
     evidence_paths = []
     for case in ('first', 'second'):
         evidence = output / 'evidence' / case
@@ -454,6 +460,8 @@ elif args[0] == 'repo':
             expect_builds(0, profiles[0], "reuse an unchanged untested build", no_tests=True)
             tested = expect_builds(2, profiles[0], "enabling tests must invalidate both stamps")
             self.assertTrue(all("--junit" not in call for call in tested))
+            self.assertEqual({path.name for path in (root / ".work/toolchain-rpms").iterdir()},
+                             {"fixture.rpm"})
             summaries = list((root / "out/test-reports").rglob("upstream.sum"))
             self.assertEqual(len(summaries), 1)
             self.assertEqual(summaries[0].read_text(), "openssf-compiler-options results\n")
@@ -513,7 +521,9 @@ elif args[0] == 'repo':
                                      [] if copy_error else sorted(expected))
                     self.assertEqual(len(list((failed_output / "test-reports").rglob("junit.xml"))),
                                      2 if failed_name == "demo" else 1)
-                    self.assertFalse(list((failed_output / "test-reports").rglob("*.rpm")))
+                    # Explicit test artifacts may themselves be RPM fixtures; producer
+                    # binaries must never be copied into the evidence mirror.
+                    self.assertFalse(list((failed_output / "test-reports").rglob("fixture.rpm")))
                     self.assertFalse((failed_output / ".stamps/x86_64/demo").exists())
                     if failed_name == "demo":
                         self.assertEqual((failed_output / "demo/x86_64/test-results/assertion/artifacts/upstream.sum").read_text(),
