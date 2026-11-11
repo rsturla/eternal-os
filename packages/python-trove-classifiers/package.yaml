@@ -77,9 +77,8 @@ outputs:
     license:
     - /usr/share/licenses/python-${matrix.python.version}-trove-classifiers/**
   tests:
-  - name: functional
+  - name: behavior
     stage: installed
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - 'from trove_classifiers import classifiers; assert "Programming Language :: Python :: 3" in classifiers'
+    files: tests
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/test_behavior.py" "${matrix.python.version}" "trove-classifiers" "${package.version}"
