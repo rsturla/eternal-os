@@ -68,7 +68,8 @@ The runner writes `out/tests/results.tsv`, package JSON results, JUnit reports, 
 Each package report includes SHA256 manifests for the input RPMs, recipe files
 and rpmx binary. It records the repository's rpmx pin.
 rpmx reports the exact inputs and resolved environments in `run-report.json`.
-Use `--output DIR` to choose another report directory.
+Use `scripts/test-all.sh --output DIR` to choose another report directory.
+For a direct `rpmx test` invocation, use `--test-output DIR`.
 Missing RPMs, invalid recipes, absent runtime tests, skipped tests and failures produce a nonzero exit.
 
 Build and acceptance have separate reports. `rpmx build --output DIR` writes

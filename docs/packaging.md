@@ -420,6 +420,10 @@ Rules:
 - Do not add a runtime dependency on a development package unless the package
   genuinely cannot work without it; GCC needing glibc headers to compile is a
   deliberate exception.
+- Keep shared compiler runtimes in separate outputs. An application that needs
+  `libgcc_s.so.1` must not pull in the compiler, binutils or development headers.
+  Such dependencies can also create installation cycles that break scriptlets.
+  Test the runtime output in a root without compiler or development tools.
 
 ## 4. Build pipeline
 
