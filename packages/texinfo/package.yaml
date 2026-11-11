@@ -86,27 +86,13 @@ outputs:
       run:
         - perl
     tests:
-      - name: installed
+      - name: document-formats
         stage: installed
-        packages: [bash-binsh, coreutils, perl, gcc]
-        argv:
-          - sh
-          - -c
-          - |
-            makeinfo --version | head -1 | grep -q '7.3'
-            texi2any --version | head -1 | grep -q '7.3'
-            info --version | head -1 | grep -q '7.3'
-            cat > sample.texi <<'EOF'
-            \input texinfo
-            @setfilename sample.info
-            @node Top
-            @chapter Hello
-            Eternal Texinfo works.
-            @bye
-            EOF
-            makeinfo --no-split -o sample.info sample.texi
-            grep -q 'Eternal Texinfo works.' sample.info
-            install-info --version | head -1
+        packages:
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/document-formats.sh"
 
   - name: texinfo-doc
     summary: Documentation for Texinfo

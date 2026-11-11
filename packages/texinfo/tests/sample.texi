@@ -1,0 +1,11 @@
+\input texinfo
+@setfilename sample.info
+@settitle Eternal fixture
+@dircategory Development
+@direntry
+* Eternal fixture: (sample). A package test.
+@end direntry
+@node Top
+@top Eternal fixture
+Eternal documentation fixture.
+@bye
