@@ -53,14 +53,13 @@ outputs:
       license:
         - /usr/share/licenses/m4/COPYING
     tests:
-      - name: installed
+      - name: macros
         stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            test "$(printf 'eval(2+3)\n' | m4)" = 5
+        packages:
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/macros.sh"
 
   - name: m4-doc
     summary: GNU macro processor documentation
@@ -72,3 +71,11 @@ outputs:
         - /usr/share/licenses/m4-doc/COPYING
       license:
         - /usr/share/licenses/m4-doc/COPYING
+
+tests:
+  - name: upstream
+    stage: build
+    packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+    artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+    pipeline:
+      - uses: make/check
