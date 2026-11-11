@@ -14,7 +14,7 @@ schema: 1
 package:
   name: binutils
   version: "2.46.1"
-  release: 1
+  release: 2
   summary: A GNU collection of binary utilities
   description: |
     The GNU binutils are a collection of binary tools: the linker, assembler,
@@ -64,6 +64,7 @@ build:
           - --disable-gprofng
           - --disable-nls
           - --disable-shared
+          - --enable-install-libiberty
     - uses: make/build
       with:
         args: [tooldir=/usr]
@@ -89,17 +90,41 @@ outputs:
         - /usr/share/licenses/binutils/COPYING3
         - /usr/share/licenses/binutils/COPYING3.LIB
     tests:
-      - name: installed
+      - name: assembler-archive-link-and-inspection
         stage: installed
-        packages: [bash-binsh, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            ld --version | grep -q 'GNU ld'
-            as --version | grep -q 'GNU assembler'
-            objdump --version | grep -q 'GNU objdump'
-
+        packages:
+          - bash
+          - gcc
+          - coreutils
+          - grep
+        files: tests
+        script: |
+          gcc -S "$TEST_FILES/library.c" -o library.s
+          as library.s -o library.o
+          ar rcs libanswer.a library.o
+          ranlib libanswer.a
+          gcc "$TEST_FILES/main.c" -L. -lanswer -o probe
+          ./probe
+          nm libanswer.a > symbols.txt
+          grep ' T answer$' symbols.txt
+          readelf -h probe > elf.txt
+          grep 'ELF64' elf.txt
+          objdump -d probe > disassembly.txt
+          grep '<answer>:' disassembly.txt
+          objcopy --only-keep-debug probe debug
+          cp probe stripped
+          strip --strip-unneeded stripped
+          ./stripped
+          objcopy --add-gnu-debuglink=debug stripped
+          readelf --string-dump=.gnu_debuglink stripped > debuglink.txt
+          grep 'debug' debuglink.txt
+          if ld --definitely-invalid >invalid.stdout 2>invalid.stderr; then exit 1; fi
+          case "$(<invalid.stderr)" in
+            *'unrecognized option'*'--definitely-invalid'*) ;;
+            *) echo 'ld did not diagnose --definitely-invalid' >&2; exit 1 ;;
+          esac
+        artifacts:
+          - invalid.stderr
   - name: binutils-devel
     summary: Binutils development headers and libraries
     files:
@@ -117,15 +142,15 @@ outputs:
       run:
         - binutils = ${package.version}-${package.release}
     tests:
-      - name: installed
+      - name: bfd-headers
         stage: installed
-        packages: [bash-binsh, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            test -f /usr/include/bfd.h
-
+        packages:
+          - bash
+          - gcc
+        files: tests
+        script: |
+          gcc -Wall -Wextra -Werror -c "$TEST_FILES/bfd.c" -o bfd-probe.o
+          test -s bfd-probe.o
   - name: binutils-static
     summary: Binutils static libraries
     files:
@@ -138,16 +163,32 @@ outputs:
     dependencies:
       run:
         - binutils-devel = ${package.version}-${package.release}
+        # libbfd.a retains zlib references; consumers need the -lz link interface.
+        - zlib-devel
     tests:
-      - name: installed
+      - name: static-bfd-api
         stage: installed
-        packages: [bash-binsh, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            test -f /usr/lib64/libbfd.a
-
+        packages:
+          - bash
+          - gcc
+          - binutils
+          - grep
+        files: tests
+        script: |
+          archive="$LIBDIR/libbfd.a"
+          test -f "$archive" || { echo "missing static BFD archive: $archive" >&2; exit 1; }
+          gcc "$TEST_FILES/bfd.c" "$archive" -lsframe -liberty -lz -ldl -o bfd-static
+          ./bfd-static ./bfd-static
+          printf 'not an ELF object\n' > invalid-object
+          if ./bfd-static invalid-object; then
+            echo 'BFD unexpectedly accepted an invalid object' >&2
+            exit 1
+          fi
+          readelf -d bfd-static > dynamic.txt
+          if grep -F libbfd dynamic.txt; then
+            echo 'static BFD consumer unexpectedly depends on shared libbfd' >&2
+            exit 1
+          fi
   - name: binutils-doc
     summary: Binutils documentation
     files:
@@ -160,13 +201,33 @@ outputs:
         - /usr/share/licenses/binutils-doc/COPYING3.LIB
 
 tests:
-  - name: build
+  - name: upstream
     stage: build
-    argv:
-      - sh
-      - -c
-      - ./binutils/objdump --version | grep -q 'GNU objdump'
-
+    # DejaGNU uses this label in reports; the sandbox UID need not be in passwd.
+    environment:
+      USER: rpmx-test
+      LOGNAME: rpmx-test
+    packages:
+      - dejagnu
+      - expect
+    pipeline:
+      - runs: |
+          status=0
+          make -j2 -k check || status=$?
+          mkdir -p upstream-reports
+          find . -path ./upstream-reports -prune -o -type f \( -name '*.sum' -o -name '*.log' \) -exec cp --parents '{}' upstream-reports/ \;
+          test "$status" = 0
+          for suite in binutils gas ld; do
+            find "$suite" -type f -name '*.sum' -exec cat '{}' + > "upstream-reports/$suite.summary"
+            grep -E '# of expected passes[[:space:]]+[1-9][0-9]*' "upstream-reports/$suite.summary"
+            if grep -E '^(FAIL|XPASS|ERROR|UNRESOLVED):' "upstream-reports/$suite.summary"; then
+              echo "unexpected DejaGNU result in $suite" >&2
+              exit 1
+            fi
+          done
+        timeout: 2h
+    artifacts:
+      - upstream-reports
   - name: hardening
     stage: build
     pipeline:
