@@ -12,7 +12,7 @@ schema: 1
 package:
   name: glibc-2.44
   version: "2.44"
-  release: 1
+  release: 2
   summary: The GNU C Library
   description: |
     The GNU C Library provides the C runtime, dynamic loader interfaces,
@@ -177,6 +177,7 @@ outputs:
         - glibc-2.44 = ${package.version}-${package.release}
       provides:
         - ld-linux = ${package.version}-${package.release}
+        - rtld(GNU_HASH)
 
   - name: libc-bin-2.44
     summary: GNU C Library binaries
@@ -274,6 +275,7 @@ outputs:
     dependencies:
       run:
         - glibc >= ${package.version}
+        - kernel-headers
       provides:
         - glibc-devel = ${package.version}-${package.release}
     tests:
@@ -287,6 +289,7 @@ outputs:
           - sh
           - -c
           - |
+            set -eu
             libdir=/usr/lib64
             [ -d "$libdir" ] || libdir=/usr/lib
             test -f "$libdir/libc.so-2.44"
@@ -340,7 +343,9 @@ outputs:
             }
             EOF
             gcc -O2 -Wall -Wextra -Werror -fstack-protector-all -pthread \
+              -Wl,--hash-style=gnu \
               -o /tmp/glibc-devel-test /tmp/glibc-devel-test.c -lm
+            readelf -d /tmp/glibc-devel-test | grep -q GNU_HASH
             /tmp/glibc-devel-test
             if readelf -d /tmp/glibc-devel-test |
                 grep -q '\.so-'; then
