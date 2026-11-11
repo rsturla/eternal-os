@@ -58,40 +58,40 @@ outputs:
       license:
         - /usr/share/licenses/filesystem/LICENSE
       directories:
-        - { path: /boot, mode: "0755", user: root, group: root }
-        - { path: /dev, mode: "0755", user: root, group: root }
-        - { path: /etc, mode: "0755", user: root, group: root }
-        - { path: /home, mode: "0755", user: root, group: root }
-        - { path: /media, mode: "0755", user: root, group: root }
-        - { path: /mnt, mode: "0755", user: root, group: root }
-        - { path: /opt, mode: "0755", user: root, group: root }
-        - { path: /proc, mode: "0555", user: root, group: root }
-        - { path: /root, mode: "0700", user: root, group: root }
-        - { path: /run, mode: "0755", user: root, group: root }
-        - { path: /srv, mode: "0755", user: root, group: root }
-        - { path: /sys, mode: "0555", user: root, group: root }
-        - { path: /tmp, mode: "1777", user: root, group: root }
-        - { path: /usr, mode: "0755", user: root, group: root }
-        - { path: /usr/bin, mode: "0755", user: root, group: root }
-        - { path: /usr/include, mode: "0755", user: root, group: root }
-        - { path: /usr/lib, mode: "0755", user: root, group: root }
-        - { path: /usr/lib64, mode: "0755", user: root, group: root }
-        - { path: /usr/libexec, mode: "0755", user: root, group: root }
-        - { path: /usr/local, mode: "0755", user: root, group: root }
-        - { path: /usr/local/bin, mode: "0755", user: root, group: root }
-        - { path: /usr/local/include, mode: "0755", user: root, group: root }
-        - { path: /usr/local/lib, mode: "0755", user: root, group: root }
-        - { path: /usr/local/lib64, mode: "0755", user: root, group: root }
-        - { path: /usr/local/sbin, mode: "0755", user: root, group: root }
-        - { path: /usr/local/share, mode: "0755", user: root, group: root }
-        - { path: /usr/sbin, mode: "0755", user: root, group: root }
-        - { path: /usr/share, mode: "0755", user: root, group: root }
-        - { path: /var, mode: "0755", user: root, group: root }
-        - { path: /var/cache, mode: "0755", user: root, group: root }
-        - { path: /var/lib, mode: "0755", user: root, group: root }
-        - { path: /var/log, mode: "0755", user: root, group: root }
-        - { path: /var/spool, mode: "0755", user: root, group: root }
-        - { path: /var/tmp, mode: "1777", user: root, group: root }
+        - {path: /boot, mode: "0755", user: root, group: root}
+        - {path: /dev, mode: "0755", user: root, group: root}
+        - {path: /etc, mode: "0755", user: root, group: root}
+        - {path: /home, mode: "0755", user: root, group: root}
+        - {path: /media, mode: "0755", user: root, group: root}
+        - {path: /mnt, mode: "0755", user: root, group: root}
+        - {path: /opt, mode: "0755", user: root, group: root}
+        - {path: /proc, mode: "0555", user: root, group: root}
+        - {path: /root, mode: "0700", user: root, group: root}
+        - {path: /run, mode: "0755", user: root, group: root}
+        - {path: /srv, mode: "0755", user: root, group: root}
+        - {path: /sys, mode: "0555", user: root, group: root}
+        - {path: /tmp, mode: "1777", user: root, group: root}
+        - {path: /usr, mode: "0755", user: root, group: root}
+        - {path: /usr/bin, mode: "0755", user: root, group: root}
+        - {path: /usr/include, mode: "0755", user: root, group: root}
+        - {path: /usr/lib, mode: "0755", user: root, group: root}
+        - {path: /usr/lib64, mode: "0755", user: root, group: root}
+        - {path: /usr/libexec, mode: "0755", user: root, group: root}
+        - {path: /usr/local, mode: "0755", user: root, group: root}
+        - {path: /usr/local/bin, mode: "0755", user: root, group: root}
+        - {path: /usr/local/include, mode: "0755", user: root, group: root}
+        - {path: /usr/local/lib, mode: "0755", user: root, group: root}
+        - {path: /usr/local/lib64, mode: "0755", user: root, group: root}
+        - {path: /usr/local/sbin, mode: "0755", user: root, group: root}
+        - {path: /usr/local/share, mode: "0755", user: root, group: root}
+        - {path: /usr/sbin, mode: "0755", user: root, group: root}
+        - {path: /usr/share, mode: "0755", user: root, group: root}
+        - {path: /var, mode: "0755", user: root, group: root}
+        - {path: /var/cache, mode: "0755", user: root, group: root}
+        - {path: /var/lib, mode: "0755", user: root, group: root}
+        - {path: /var/log, mode: "0755", user: root, group: root}
+        - {path: /var/spool, mode: "0755", user: root, group: root}
+        - {path: /var/tmp, mode: "1777", user: root, group: root}
     dependencies:
       # The layout package cannot require itself; the repository default
       # would otherwise apply to it like every other output.
@@ -105,14 +105,14 @@ outputs:
 tests:
   - name: layout
     stage: build
-    argv:
-      - sh
-      - -c
-      - |
-        test -L "$STAGE/bin" && test "$(readlink "$STAGE/bin")" = usr/bin
-        test -L "$STAGE/sbin" && test "$(readlink "$STAGE/sbin")" = usr/sbin
-        test -L "$STAGE/lib" && test "$(readlink "$STAGE/lib")" = usr/lib
-        test -L "$STAGE/lib64" && test "$(readlink "$STAGE/lib64")" = usr/lib64
-        test -d "$STAGE/usr/bin" && test -d "$STAGE/usr/lib64"
-        test "$(stat -c %a "$STAGE/tmp")" = 1777
-        test "$(stat -c %a "$STAGE/root")" = 700
+    files: tests
+    script: |
+      bash "$TEST_FILES/layout.sh" "$STAGE"
+  - name: installed-merged-usr-and-permissions
+    stage: installed
+    packages:
+      - bash
+      - coreutils
+    files: tests
+    script: |
+      bash "$TEST_FILES/layout.sh" /
