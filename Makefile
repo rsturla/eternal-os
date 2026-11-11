@@ -8,7 +8,7 @@ ARCH ?= x86_64
 BASE ?= origin/HEAD
 BOOTSTRAP ?= bootstrap/bootstrap.yaml
 
-.PHONY: help bootstrap bootstrap-plan bootstrap-build bootstrap-clean doctor check lint arches affected hash build build-affected build-all lock lock-check repo all ci clean
+.PHONY: help bootstrap bootstrap-plan bootstrap-build bootstrap-clean doctor check lint arches affected hash build build-affected build-all test test-tools lock lock-check repo all ci clean
 
 help:
 	@echo "Eternal Linux"
@@ -18,7 +18,7 @@ help:
 	@echo "  make bootstrap-build Run the bootstrap ladder for $(ARCH)"
 	@echo "  make bootstrap-clean Remove bootstrap roots and locks (root-owned files included)"
 	@echo "  make doctor          Check the host toolchain"
-	@echo "  make check           pre-commit + commit checks + lint (same as CI)"
+	@echo "  make check           pre-commit + commit checks + helper tests + lint (same as CI)"
 	@echo "  make lint            Validate every recipe"
 	@echo "  make arches          List target architectures from the profile"
 	@echo "  make affected        List packages affected since $(BASE)"
@@ -26,6 +26,8 @@ help:
 	@echo "  make build           Build packages whose content hash changed"
 	@echo "  make build-affected  Build only packages affected since $(BASE)"
 	@echo "  make build-all       Force a rebuild of every package"
+	@echo "  make test            Run runtime tests against existing RPMs for $(ARCH)"
+	@echo "  make test-tools      Test repository helpers without building RPMs"
 	@echo "  make lock            Write local package.lock.json files"
 	@echo "  make lock-check      Fail when a local lock is stale (network)"
 	@echo "  make repo            Assemble $(SITE)/$(RELEASE)/<arch>/ from $(OUT)/"
@@ -73,6 +75,12 @@ build-affected:
 
 build-all:
 	RPMX=$(RPMX) ./scripts/build-all.sh --all --force --output $(OUT)
+
+test:
+	RPMX=$(RPMX) ./scripts/test-all.sh --rpms $(OUT) --arch $(ARCH)
+
+test-tools:
+	./scripts/test-tools.sh
 
 lock:
 	RPMX=$(RPMX) ./scripts/lock-all.sh

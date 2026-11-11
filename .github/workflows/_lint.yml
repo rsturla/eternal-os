@@ -20,12 +20,12 @@ jobs:
       - name: pre-commit
         run: |
           python3 -m venv "$RUNNER_TEMP/pre-commit"
-          "$RUNNER_TEMP/pre-commit/bin/pip" install pre-commit
+          "$RUNNER_TEMP/pre-commit/bin/pip" install pre-commit PyYAML
           "$RUNNER_TEMP/pre-commit/bin/pre-commit" run \
             --all-files --show-diff-on-failure
 
       - name: Lint recipes
-        run: ./scripts/lint-all.sh
+        run: PATH="$RUNNER_TEMP/pre-commit/bin:$PATH" ./scripts/lint-all.sh
 
       - name: Test repository publication
         run: python3 -m unittest discover -s tests -p test_publish.py -v

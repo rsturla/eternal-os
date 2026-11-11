@@ -8,6 +8,7 @@ set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 rpmx=${RPMX:-rpmx}
+original_args=("$@")
 
 package=
 selection=all
@@ -20,6 +21,8 @@ jobs=
 force=0
 locked=0
 no_tests=0
+test_profile="$root/profiles/eternal.profile.yaml"
+test_rpms=
 extra=()
 
 usage() {
@@ -31,13 +34,15 @@ usage: build-all.sh [options]
   --since REF        Base ref for --affected (default: origin/HEAD)
   --all              Consider every package (the default)
   --force            Rebuild even when the content hash matches
-  --output DIR       Artifacts root; each architecture writes DIR/<arch>
+  --output DIR       Artifacts root; recipes write DIR/<name>/<arch>
   --arch ARCH        Target architecture (default: rpmx default)
   --signing-key FILE Sign RPMs with this OpenPGP secret key
   --build-release N  Append +buildN to rebuilt packages (rolling releases)
   --jobs N           Parallel build jobs exported to steps as JOBS
   --locked           Refuse recipe, source or root drift
   --no-tests         Build without running the recipe's tests
+  --test-profile FILE Repository policy for runtime tests (default: Eternal)
+  --test-rpms DIR    Prefer these candidate binary RPMs in isolated test roots
   -h, --help         Show this help
 EOF
 }
@@ -95,6 +100,14 @@ while (($# > 0)); do
       extra+=(--no-tests)
       shift
       ;;
+    --test-profile)
+      test_profile=${2:?--test-profile needs a file}
+      shift 2
+      ;;
+    --test-rpms)
+      test_rpms=${2:?--test-rpms needs a directory}
+      shift 2
+      ;;
     -h | --help)
       usage
       exit 0
@@ -107,10 +120,125 @@ while (($# > 0)); do
   esac
 done
 
+if [[ -n $test_rpms ]] && ((no_tests)); then
+  echo "--test-rpms cannot be combined with --no-tests" >&2
+  exit 2
+fi
+
 if [[ -n $package && $selection == affected ]]; then
   echo "--package cannot be combined with --affected" >&2
   exit 2
 fi
+
+# rpmx cannot write JUnit for a multi-architecture invocation. Run the same
+# entry point once per declared architecture, retaining each report and failure.
+if [[ $arch == all ]]; then
+  declared_arches=$(python3 - "$root/profiles/bootstrap.profile.yaml" <<'PY'
+import sys
+import yaml
+with open(sys.argv[1]) as source:
+    arches = yaml.safe_load(source)["archs"]
+if not arches or any(not isinstance(arch, str) or arch == "all" for arch in arches):
+    raise SystemExit("bootstrap profile must declare concrete architectures")
+print("\n".join(arches))
+PY
+  )
+  mapfile -t target_arches <<<"$declared_arches"
+  status=0
+  for target_arch in "${target_arches[@]}"; do
+    arch_args=()
+    for ((index = 0; index < ${#original_args[@]}; index++)); do
+      if [[ ${original_args[index]} == --arch ]]; then
+        arch_args+=(--arch "$target_arch")
+        index=$((index + 1))
+      else
+        arch_args+=("${original_args[index]}")
+      fi
+    done
+    if "$root/scripts/build-all.sh" "${arch_args[@]}"; then
+      :
+    else
+      failed=$?
+      ((status != 0)) || status=$failed
+    fi
+  done
+  exit "$status"
+fi
+
+# Relative repository and key paths are anchored at the profile location.
+# Include that location as well as its contents in cached test outcomes.
+if [[ -n $test_rpms ]]; then
+  test_rpms=$(realpath -e -- "$test_rpms")
+  candidate_identity=$(
+    { printf '%s\0' "$(realpath -e -- "$test_profile")"; cat -- "$test_profile"
+      find "$test_rpms" -type f -name '*.rpm' -print0 | sort -z | xargs -0 -r sha256sum
+    } | sha256sum | cut -d' ' -f1
+  )
+  candidate_profile="$root/.work/test-profiles/${arch:-$(uname -m)}/$candidate_identity/profile.yaml"
+  RPMX="$rpmx" python3 "$root/scripts/prepare-test-profile.py" \
+    --profile "$test_profile" --rpms "$test_rpms" \
+    --arch "${arch:-$(uname -m)}" --output "$candidate_profile"
+  test_profile=$candidate_profile
+fi
+test_profile_identity=disabled
+if ((no_tests == 0)); then
+  test_profile=$(realpath -e -- "$test_profile")
+  test_profile_identity=$({ printf '%s\0' "$test_profile"; cat -- "$test_profile"; } | sha256sum | cut -d' ' -f1)
+fi
+test_variant="tests=$((1 - no_tests)) test-profile=$test_profile_identity"
+
+# rpmx already retains raw logs beside built RPMs. Publish private seed logs
+# under the same output tree as normal package reports, including on failure.
+test_junit_path() {
+  printf '%s/%s/junit.xml' "$1" "${arch:-$(uname -m)}"
+}
+
+collect_test_evidence() {
+  local build_output=$1 reports=$2 directory target junit collected=0
+  junit=$(test_junit_path "$build_output")
+  local -a directories=("$build_output/${arch:-$(uname -m)}/test-results")
+  if [[ -f $junit ]]; then
+    mkdir -p "$reports" || return
+    cp -- "$junit" "$reports/junit.xml" || return
+    collected=1
+  fi
+  for directory in "${directories[@]}"; do
+    [[ -d $directory ]] || continue
+    target="$reports/$(basename "$(dirname "$directory")")"
+    mkdir -p "$target" || return
+    cp -a -- "$directory" "$target/" || return
+    collected=1
+  done
+  if ((collected)); then
+    echo "==> test evidence $reports" >&2
+  fi
+}
+
+run_build() {
+  local build_output=$1 reports=$2 status=0
+  shift 2
+  if ((no_tests == 0)); then
+    # Clear test evidence only. Retain package outputs and other architectures.
+    # A build that fails before tests must not publish older successful tests.
+    rm -f -- "$(test_junit_path "$build_output")"
+    mkdir -p "$(dirname "$(test_junit_path "$build_output")")"
+    if [[ -n $reports ]]; then
+      rm -rf -- "$reports"
+      mkdir -p "$reports"
+    fi
+    rm -rf -- "$build_output/${arch:-$(uname -m)}/test-results"
+  fi
+  "$@" || status=$?
+  if ((no_tests == 0)); then
+    if [[ -z $reports ]]; then
+      echo "==> test evidence $build_output" >&2
+    elif ! collect_test_evidence "$build_output" "$reports"; then
+      echo "cannot collect test evidence in $reports" >&2
+      ((status != 0)) || status=1
+    fi
+  fi
+  return "$status"
+}
 
 # The bootstrap profiles install openssf-compiler-options from this local
 # repository. Build it first with bootstrap-toolchain.profile.yaml, which is the
@@ -120,11 +248,18 @@ toolchain_out="$root/.work/toolchain-out"
 toolchain_rpms="$root/.work/toolchain-rpms"
 
 ensure_toolchain_repo() {
-  local hash stamp
+  local hash stamp seed_identity reports report_identity
   hash=$("$root/scripts/package-hash.sh" openssf-compiler-options | awk '{print $2}')
   stamp="$toolchain_repo/.stamp"
+  seed_identity="$hash arch=${arch:-$(uname -m)} $test_variant"
+  report_identity=$(printf '%s' "$seed_identity" | sha256sum | cut -d' ' -f1)
+  reports="$output/test-reports/toolchain/$report_identity"
   if [[ -f $stamp && -f $toolchain_repo/repodata/repomd.xml ]] &&
-     [[ $(<"$stamp") == "$hash" ]]; then
+     [[ $(<"$stamp") == "$seed_identity" ]]; then
+    if ((no_tests == 0)) && ! collect_test_evidence "$toolchain_out" "$reports"; then
+      echo "cannot collect test evidence in $reports" >&2
+      return 1
+    fi
     return 0
   fi
 
@@ -135,12 +270,16 @@ ensure_toolchain_repo() {
   [[ -n $arch ]] && args+=(--arch "$arch")
   [[ -n $jobs ]] && args+=(--jobs "$jobs")
   ((no_tests)) && args+=(--no-tests)
-  "${args[@]}"
+  ((no_tests)) || args+=(--test-profile "$test_profile")
+  if ((no_tests == 0)); then
+    args+=(--junit "$(test_junit_path "$toolchain_out")")
+  fi
+  run_build "$toolchain_out" "$reports" "${args[@]}"
 
   find "$toolchain_out" -type f -name '*.rpm' ! -name '*.src.rpm' \
     -exec cp -t "$toolchain_rpms" {} +
   "$rpmx" repo --rpms "$toolchain_rpms" --output "$toolchain_repo"
-  printf '%s\n' "$hash" >"$stamp"
+  printf '%s\n' "$seed_identity" >"$stamp"
 }
 
 if [[ $package != openssf-compiler-options ]]; then
@@ -186,13 +325,24 @@ for line in "${hashes[@]}"; do
 done
 
 stamp_dir="$output/.stamps/${arch:-native}"
-variant="tests=$((1 - no_tests)) signed=$([[ -n $signing_key ]] && echo 1 || echo 0) locked=$locked"
+variant="$test_variant signed=$([[ -n $signing_key ]] && echo 1 || echo 0) locked=$locked"
 
 for recipe in "${recipes[@]}"; do
   name=$(basename "$(dirname "$recipe")")
   pkg_output="$output/$name"
   stamp="$stamp_dir/$name"
-  stamp_value="${hash_of[$name]:-missing} $variant"
+  # One output directory per package: the installed-stage test root must not
+  # see RPMs from unrelated packages.
+  cmd=("$rpmx" build "$recipe" --output "$pkg_output")
+  [[ -n $arch ]] && cmd+=(--arch "$arch")
+  [[ -n $signing_key ]] && cmd+=(--signing-key "$signing_key")
+  [[ -n $build_release ]] && cmd+=(--build-release "$build_release")
+  [[ -n $jobs ]] && cmd+=(--jobs "$jobs")
+  ((no_tests)) || cmd+=(--test-profile "$test_profile")
+  cmd+=("${extra[@]}")
+
+  stamp_hash=${hash_of[$name]:-missing}
+  stamp_value="$stamp_hash $variant"
 
   if ((!force)) && [[ -f $stamp ]] && [[ $(cat "$stamp") == "$stamp_value" ]]; then
     if [[ -n $arch ]]; then
@@ -201,22 +351,19 @@ for recipe in "${recipes[@]}"; do
       pattern="$pkg_output/*/*.rpm"
     fi
     if compgen -G "$pattern" >/dev/null; then
-      echo "==> skip $name (unchanged: ${hash_of[$name]:0:12})"
+      echo "==> skip $name (unchanged: ${stamp_hash:0:12})"
+      ((no_tests)) || echo "==> test evidence $pkg_output" >&2
       continue
     fi
   fi
 
-  # One output directory per package: the installed-stage test root must not
-  # see RPMs from unrelated packages.
-  cmd=("$rpmx" build "$recipe" --output "$pkg_output")
-  [[ -n $arch ]] && cmd+=(--arch "$arch")
-  [[ -n $signing_key ]] && cmd+=(--signing-key "$signing_key")
-  [[ -n $build_release ]] && cmd+=(--build-release "$build_release")
-  [[ -n $jobs ]] && cmd+=(--jobs "$jobs")
-  cmd+=("${extra[@]}")
-
-  echo "==> build ${recipe#"$root"/} (${hash_of[$name]:0:12}) -> $pkg_output"
-  "${cmd[@]}"
+  echo "==> build ${recipe#"$root"/} (${stamp_hash:0:12}) -> $pkg_output"
+  # A failed forced rebuild must not leave an earlier successful stamp.
+  rm -f -- "$stamp"
+  if ((no_tests == 0)); then
+    cmd+=(--junit "$(test_junit_path "$pkg_output")")
+  fi
+  run_build "$pkg_output" "" "${cmd[@]}"
 
   mkdir -p "$stamp_dir"
   printf '%s\n' "$stamp_value" >"$stamp"

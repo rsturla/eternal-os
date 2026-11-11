@@ -1,8 +1,12 @@
 # rpmx and local build output
 out/
 site/
+test-results/
 .rpmx/
 *.rpm
+# Keep signed-package and transaction test fixtures trackable.
+!packages/*/tests/**/*.rpm
+!bootstrap/recipes/*/tests/**/*.rpm
 
 # Local package locks. The bootstrap root still follows live Fedora, so its
 # closure moves independently of a recipe; commit locks only after the root is
