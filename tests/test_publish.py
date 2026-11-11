@@ -281,5 +281,60 @@ printf '%s\\n' '{version}' > %{{buildroot}}/opt/publish-test/{payload}
         self.assertEqual(old.read_text(), 'previous snapshot')
 
 
+@unittest.skipUnless(shutil.which('jq'), 'jq is required to read configured architectures')
+class PublishDiscoveryTest(unittest.TestCase):
+    """Exercise real publisher discovery without RPM building or remote writes."""
+
+    def test_only_canonical_production_paths_reach_repository_generation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            packages, output = work / 'out', work / 'site'
+            canonical = {
+                'x86_64/flat.rpm': b'flat binary',
+                'x86_64/src/flat.src.rpm': b'flat source',
+                'fixture-package/aarch64/nested.rpm': b'nested binary',
+                'fixture-package/aarch64/src/nested.src.rpm': b'nested source',
+            }
+            ignored = [
+                'evidence/fixture.rpm', 'fixture-package/evidence/fixture.rpm',
+                'evidence/x86_64/fixture.rpm', 'test-reports/aarch64/fixture.rpm',
+                'producers/x86_64/fixture.rpm', 'producer-gcc-13/x86_64/fixture.rpm',
+                'compiler-producers/x86_64/fixture.rpm', 'fixture-package/mips/fixture.rpm',
+                'x86_64/evidence/fixture.src.rpm', 'fixture-package/aarch64/evidence/fixture.src.rpm',
+                'x86_64/src/evidence/fixture.src.rpm', 'test-reports/x86_64/src/fixture.src.rpm',
+                'producer-gcc-13/x86_64/src/fixture.src.rpm', 'unplaced.src.rpm',
+            ]
+            for relative, data in {**canonical, **dict.fromkeys(ignored, b'test fixture')}.items():
+                path = packages / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+            # Capture exactly what the real publisher passes to rpmx repo.
+            # Metadata generation itself is covered by PublishTest above.
+            fake = work / 'rpmx'
+            fake.write_text('''#!/usr/bin/env python3
+import pathlib, shutil, sys
+args = sys.argv[1:]
+assert args[0] == 'repo', args
+source = pathlib.Path(args[args.index('--rpms') + 1])
+output = pathlib.Path(args[args.index('--output') + 1])
+output.mkdir(parents=True, exist_ok=True)
+for path in source.iterdir():
+    assert path.is_file(), path
+    shutil.copyfile(path, output / path.name)
+''')
+            fake.chmod(0o755)
+            result = subprocess.run([ROOT / 'scripts/publish-repo.sh', '--packages', str(packages) + '/',
+                                     '--output', output], env=dict(os.environ, RPMX=str(fake)),
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual({str(path.relative_to(output / 'rolling')): path.read_bytes()
+                              for path in (output / 'rolling').rglob('*.rpm')}, {
+                'x86_64/flat.rpm': canonical['x86_64/flat.rpm'],
+                'aarch64/nested.rpm': canonical['fixture-package/aarch64/nested.rpm'],
+                'SRPMS/flat.src.rpm': canonical['x86_64/src/flat.src.rpm'],
+                'SRPMS/nested.src.rpm': canonical['fixture-package/aarch64/src/nested.src.rpm'],
+            })
+
+
 if __name__ == '__main__':
     unittest.main()
