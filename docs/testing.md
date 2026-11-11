@@ -109,6 +109,24 @@ check dependency ordering, cache invalidation, report retention and failure
 handling. They complement the package tests below.
 Candidate-profile checks emit small fixture RPMs and require host `rpm` and rpmx.
 
+To reproduce a CI runtime failure on the same Ubuntu runner architecture,
+dispatch the existing `CI` workflow against an uploaded RPM artifact:
+
+```console
+gh workflow run CI --ref "$(git branch --show-current)" \
+  -f artifact_run=42983578558 -f package=glibc-2.44 -f arch=x86_64
+```
+
+This mode downloads `rpm-foundations-ARCH` from the specified run and calls
+`scripts/test-all.sh` without rebuilding package sources. Set
+`-f artifact_name=rpm-NAME-ARCH` to use a normal package artifact instead.
+The selected branch supplies the recipes and pinned rpmx revision. Tests use
+the current production test profile; this is not a replay of the original
+dependency lock. Reports include the source run URL and head SHA, GitHub's
+artifact ID and digest, and the usual RPM and resolved-root manifests.
+Replay reports upload even after a test fails. Separate architectures and
+normal builds have independent concurrency groups.
+
 The shared build and test scripts use `profiles/eternal.profile.yaml` for runtime
 test repositories. Bootstrap build exclusions therefore do not restrict production
 test dependencies. Override this with `--test-profile FILE` when necessary.
