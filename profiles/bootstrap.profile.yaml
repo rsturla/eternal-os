@@ -78,6 +78,9 @@ repositories:
       - lua*
       - meson*
       - ninja*
+      # Fedora curl requires an architecture-qualified libnghttp2 capability.
+      # Keep its matching library until the Eternal provider can replace it.
+      - nghttp2*
       - openssl3*
       - perl*
       - popt*
