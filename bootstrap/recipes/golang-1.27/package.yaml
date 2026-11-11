@@ -1,0 +1,283 @@
+# Fedora-seeded variant. Stage policy is in bootstrap/bootstrap.yaml.
+schema: 1
+
+package:
+  name: golang-1.27
+  version: "1.27.4"
+  release: 1
+  summary: The Go programming language, version 1.27
+  license: BSD-3-Clause
+  upstream: https://go.dev/
+  cpe:
+    vendor: golang
+    product: go
+
+sources:
+  - name: go1.27.4.src.tar.gz
+    kind: archive
+    digest: "sha512:bc5cb8bd8a92293afbb0ea2d949453fede75706ee94147dd163b336913acb4b5cf3c41c861d7f0c1a4a6373856720eb44032bf5916054f0d8fb926657fb5b754"
+    locators:
+      - kind: https
+        url: https://go.dev/dl/go1.27.4.src.tar.gz
+      - kind: https
+        url: https://dl.google.com/go/go1.27.4.src.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+# Hummingbird rpms at 6763fdaa373962399e8a3aff6e1fe863d3837579.
+# See README.md for patch provenance and FIPS policy.
+patches:
+  - file: patches/0015-Default-GOFIPS140-certified-fips-auto.patch
+    strip: 1
+    reason: Select the certified snapshot and activate FIPS mode on FIPS hosts
+  - file: patches/0016-strictfipsruntime.patch
+    strip: 1
+    reason: Provide an optional startup guard for FIPS hosts
+  - file: patches/0017-crypto-tests.patch
+    strip: 1
+    reason: Adapt TLS tests to the certified module
+
+build:
+  root:
+    profile: ../../../profiles/bootstrap.profile.yaml
+  packages: [golang-bin, gcc, bash, coreutils, findutils, sed, grep, diffutils, binutils]
+  sysroot: [glibc-devel]
+  environment:
+    CGO_ENABLED: "1"
+    CC: gcc
+    CC_FOR_TARGET: gcc
+    GOAMD64: v2
+    GOARM64: v8.0
+    GOENV: "off"
+    GOTOOLCHAIN: local
+    GOPROXY: "off"
+    GOSUMDB: "off"
+    GOTELEMETRY: "off"
+  pipeline:
+    - runs: |
+        set -eu
+        # Resolve Fedora's seed before make.bash changes GOROOT.
+        export GOROOT_BOOTSTRAP="$(go env GOROOT)"
+        export GOMAXPROCS="$JOBS"
+        cd src
+        bash ./make.bash
+    - runs: |
+        set -eu
+        # Upstream builds static tools. Rebuild the shipped tools as PIE.
+        ./bin/go install -p "$JOBS" -trimpath -buildmode=pie -ldflags='-s -B gobuildid' \
+          cmd/go cmd/gofmt cmd/asm cmd/cgo cmd/compile cmd/cover cmd/fix \
+          cmd/link cmd/preprofile cmd/vet
+        sed -i 's/^GOTOOLCHAIN=auto$/GOTOOLCHAIN=local/' go.env
+        printf '\nGOAMD64=v2\nGOARM64=v8.0\n' >> go.env
+        install -d "$STAGE$LIBDIR/golang-1.27" "$STAGE$PREFIX/bin"
+        cp -a bin pkg src lib go.env VERSION "$STAGE$LIBDIR/golang-1.27/"
+        # The source tree is required to compile the standard library.
+        # Keep module archives unchanged; discard only build intermediates.
+        rm -rf "$STAGE$LIBDIR/golang-1.27/pkg/obj" \
+          "$STAGE$LIBDIR/golang-1.27/pkg/bootstrap"
+        rm -f "$STAGE$LIBDIR/golang-1.27/src/cmd/dist/dist"
+        find "$STAGE$LIBDIR/golang-1.27/src" -type f -name '*_test.go' -delete
+        find "$STAGE$LIBDIR/golang-1.27/src" -type d -name testdata -prune -exec rm -rf {} +
+        # rpmx accepts only native ELF payloads, including source objects.
+        goarch=$(./bin/go env GOARCH)
+        find "$STAGE$LIBDIR/golang-1.27/src" -type f -name '*.syso' | while IFS= read -r object; do
+          case "$object" in
+            */goboringcrypto_linux_"$goarch".syso|*/race_linux_"$goarch".syso) ;;
+            */amd64v1/race_linux.syso|*/amd64v3/race_linux.syso)
+              if [ "$goarch" != amd64 ]; then rm -f "$object"; fi
+              ;;
+            *) rm -f "$object" ;;
+          esac
+        done
+        for tool in go gofmt; do
+          ln -s "$LIBDIR/golang-1.27/bin/$tool" "$STAGE$PREFIX/bin/$tool-1.27"
+          ln -s "$tool-1.27" "$STAGE$PREFIX/bin/$tool"
+        done
+        install -d "$STAGE$PREFIX/share/doc/golang-1.27"
+        cp -a doc misc "$STAGE$PREFIX/share/doc/golang-1.27/"
+    - uses: license/copy
+      with:
+        files: [LICENSE, PATENTS]
+        outputs: [golang-1.27, golang-1.27-default, golang-1.27-doc]
+
+outputs:
+  - name: golang-1.27
+    # Source-generation scripts are data, as in Fedora's source exclusion.
+    # The installed commands are ELF executables.
+    generators:
+      script: false
+      perl: false
+    files:
+      license:
+        - /usr/share/licenses/golang-1.27/LICENSE
+        - /usr/share/licenses/golang-1.27/PATENTS
+    dependencies:
+      run: [ca-certificates]
+    tests:
+      - name: compile
+        stage: installed
+        packages: [gcc, glibc-devel, grep]
+        environment:
+          GOTOOLCHAIN: local
+          GOENV: "off"
+          GOPROXY: "off"
+          GOSUMDB: "off"
+        argv:
+          - bash
+          - -eu
+          - -o
+          - pipefail
+          - -c
+          - |
+            go-1.27 version | grep -F 'go1.27.4 '
+            test "$(go-1.27 env GOROOT)" = /usr/lib64/golang-1.27
+            test "$(go-1.27 env GOFIPS140)" = certified
+            test "$(go-1.27 env GOAMD64)" = v2
+            test "$(go-1.27 env GOARM64)" = v8.0
+            test "$(env -u GOTOOLCHAIN go-1.27 env GOTOOLCHAIN)" = local
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            cd "$work"
+            cat > hello.go <<'EOF'
+            package main
+            import "fmt"
+            func main() { fmt.Println("go-ok") }
+            EOF
+            gofmt-1.27 -w hello.go
+            CGO_ENABLED=0 go-1.27 build -o hello hello.go
+            ./hello | grep -qx go-ok
+            cat > cgo.go <<'EOF'
+            package main
+            /*
+            #include <stdlib.h>
+            */
+            import "C"
+            import "fmt"
+            func main() { fmt.Println(C.abs(-42)) }
+            EOF
+            CGO_ENABLED=1 go-1.27 build -buildmode=pie -o cgo cgo.go
+            ./cgo | grep -qx 42
+            CGO_ENABLED=1 go-1.27 build -race -o hello-race hello.go
+            ./hello-race | grep -qx go-ok
+            CGO_ENABLED=0 GOARCH=arm64 go-1.27 build -o hello-arm64 hello.go
+            CGO_ENABLED=0 GOARCH=amd64 go-1.27 build -o hello-amd64 hello.go
+            go-1.27 version -m hello-arm64 | grep -F GOARM64=v8.0
+            go-1.27 version -m hello-amd64 | grep -F GOAMD64=v2
+
+      - name: native-fips
+        stage: installed
+        packages: [grep]
+        environment:
+          GOTOOLCHAIN: local
+          GOENV: "off"
+          GOPROXY: "off"
+          GOSUMDB: "off"
+          CGO_ENABLED: "0"
+        argv:
+          - bash
+          - -eu
+          - -o
+          - pipefail
+          - -c
+          - |
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            cd "$work"
+            cat > fips.go <<'EOF'
+            package main
+            import (
+              "crypto/fips140"
+              "crypto/sha256"
+              "fmt"
+            )
+            func main() {
+              fmt.Printf("enabled=%t sha256=%x\n", fips140.Enabled(), sha256.Sum256([]byte("abc")))
+            }
+            EOF
+            go-1.27 build -o fips fips.go
+            snapshot=$(cat "$(go-1.27 env GOROOT)/lib/fips140/certified.txt")
+            go-1.27 version -m fips | grep -F "GOFIPS140=$snapshot"
+            if [ -r /proc/sys/crypto/fips_enabled ] && [ "$(cat /proc/sys/crypto/fips_enabled)" = 1 ]; then
+              ./fips | grep -F 'enabled=true '
+            else
+              ./fips | grep -F 'enabled=false '
+            fi
+            GOLANG_NATIVE_HOSTFIPS_OVERRIDE=1 ./fips | grep -F 'enabled=true sha256=ba7816bf'
+            GODEBUG=fips140=off ./fips | grep -F 'enabled=false sha256=ba7816bf'
+            GODEBUG=fips140=on ./fips | grep -F 'enabled=true sha256=ba7816bf'
+            GOFIPS140=off go-1.27 build -o nonfips fips.go
+            GOLANG_NATIVE_HOSTFIPS_OVERRIDE=1 GODEBUG=fips140=off ./nonfips | grep -F 'enabled=false '
+            for flag in tag experiment; do
+              if [ "$flag" = tag ]; then
+                go-1.27 build -tags=strictfipsruntime -o guarded fips.go
+              else
+                GOEXPERIMENT=strictfipsruntime go-1.27 build -o guarded fips.go
+              fi
+              GOLANG_NATIVE_HOSTFIPS_OVERRIDE=1 ./guarded | grep -F 'enabled=true '
+              if GOLANG_NATIVE_HOSTFIPS_OVERRIDE=1 GODEBUG=fips140=off ./guarded >out 2>&1; then
+                echo 'strict FIPS guard accepted disabled runtime mode' >&2
+                exit 1
+              fi
+              grep -F 'Host FIPS mode is enabled' out
+            done
+
+      - name: coinstall-fedora
+        stage: installed
+        packages: [golang-bin, grep]
+        argv: [bash, -eu, -o, pipefail, -c, "go-1.27 version | grep -F 'go1.27.4 '; test -x /usr/bin/go; test /usr/bin/go-1.27 -ef /usr/lib64/golang-1.27/bin/go"]
+
+  - name: golang-1.27-default
+    summary: Unversioned commands for Go 1.27
+    files:
+      include:
+        - /usr/bin/go
+        - /usr/bin/gofmt
+        - /usr/share/licenses/golang-1.27-default/LICENSE
+        - /usr/share/licenses/golang-1.27-default/PATENTS
+      license:
+        - /usr/share/licenses/golang-1.27-default/LICENSE
+        - /usr/share/licenses/golang-1.27-default/PATENTS
+    dependencies:
+      run:
+        - golang-1.27 = ${package.version}-${package.release}
+      provides:
+        - golang = ${package.version}-${package.release}
+        - go = ${package.version}-${package.release}
+      conflicts: [golang-1.26-default, golang-bin]
+    tests:
+      - name: commands
+        stage: installed
+        packages: [grep]
+        argv: [bash, -eu, -o, pipefail, -c, "go version | grep -F 'go1.27.4 '; test /usr/bin/go -ef /usr/bin/go-1.27; test /usr/bin/gofmt -ef /usr/bin/gofmt-1.27"]
+
+  - name: golang-1.27-doc
+    summary: Documentation and examples for Go 1.27
+    files:
+      include:
+        - "@doc"
+        - /usr/share/licenses/golang-1.27-doc/LICENSE
+        - /usr/share/licenses/golang-1.27-doc/PATENTS
+      license:
+        - /usr/share/licenses/golang-1.27-doc/LICENSE
+        - /usr/share/licenses/golang-1.27-doc/PATENTS
+
+tests:
+  - name: upstream-fips
+    stage: build
+    argv:
+      - bash
+      - -eu
+      - -c
+      - |
+        GOFIPS140=off ./bin/go test -p "$JOBS" crypto/fips140 crypto/internal/fips140deps/... go/build
+        GOFIPS140=certified ./bin/go test -short -p "$JOBS" crypto/fips140 crypto/tls
+  - name: hardening
+    stage: build
+    pipeline:
+      # Go uses its own stack checks and assembler, without libc fortify or CET.
+      # Its internal PIE linker does not use a dynamic loader or BIND_NOW.
+      - uses: test/hardening-check
+        with:
+          paths: [/usr/lib64/golang-1.27/bin, /usr/lib64/golang-1.27/pkg/tool]
+          skip: [bind-now, stack-protector, fortify, cf-protection]
