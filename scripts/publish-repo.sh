@@ -2,8 +2,9 @@
 # Assemble the published repository tree from built artifacts.
 #
 # Inputs may be flat (out/<arch>/*.rpm, as in a single-package CI job) or
-# per-package (out/<package>/<arch>/*.rpm, as in a local full build). RPMs are
-# gathered by architecture into a staging directory before repodata is written,
+# per-package (out/<package>/<arch>/*.rpm, as in a local full build).
+# Source RPMs must be under the corresponding <arch>/src/ directory.
+# RPMs are gathered by architecture before repodata is written,
 # so a test or build never sees unrelated packages.
 #
 # The rolling repository is the enabled channel. An optional archive repository
@@ -213,23 +214,34 @@ merge_archive() {
 }
 
 assemble_repo() {
-  local packages_root=$1 repo_release=$2
+  local packages_root repo_release=$2
+  packages_root=$(realpath -e -- "$1")
   local stage="$stage_root/$repo_release"
   local source_stage="$stage/SRPMS"
   local found=0 source_found=0
-  local rpm arch
-  local -A seen=()
-  local -a cmd
+  local rpm arch relative arch_document
+  local -A seen=() valid_arches=()
+  local -a parts cmd
+  arch_document=$("$root/scripts/list-arches.sh")
+  while IFS= read -r arch; do valid_arches[$arch]=1; done < <(jq -r '.[]' <<<"$arch_document")
 
   mkdir -p "$stage"
 
-  # Group every binary RPM by its parent directory's name (the architecture).
+  # Accept only the two documented layouts and configured target architectures.
+  # Reports and quarantined producers can contain executable RPM fixtures.
   # Depth 2 covers out/<arch>/*.rpm; depth 3 covers out/<package>/<arch>/*.rpm.
   # Source RPMs live one level deeper under src/; they are collected separately
   # below and published under <release>/SRPMS.
   while IFS= read -r -d '' rpm; do
-    arch=$(basename "$(dirname "$rpm")")
-    [[ $arch == src ]] && continue
+    relative=${rpm#"$packages_root"/}
+    IFS=/ read -r -a parts <<<"$relative"
+    case ${parts[0]} in evidence|test-reports|producers|producer-*|compiler-producers) continue ;; esac
+    case ${#parts[@]} in
+      2) arch=${parts[0]} ;;
+      3) arch=${parts[1]} ;;
+      *) continue ;;
+    esac
+    [[ ${valid_arches[$arch]-} == 1 ]] || continue
     mkdir -p "$stage/$arch"
     cp -f "$rpm" "$stage/$arch/"
     seen[$arch]=1
@@ -244,10 +256,19 @@ assemble_repo() {
   # Source RPMs are architecture-independent, so the same filename from two
   # arches collapses to one copy in the source repository.
   while IFS= read -r -d '' rpm; do
+    relative=${rpm#"$packages_root"/}
+    IFS=/ read -r -a parts <<<"$relative"
+    case ${parts[0]} in evidence|test-reports|producers|producer-*|compiler-producers) continue ;; esac
+    case ${#parts[@]} in
+      3) arch=${parts[0]}; [[ ${parts[1]} == src ]] || continue ;;
+      4) arch=${parts[1]}; [[ ${parts[2]} == src ]] || continue ;;
+      *) continue ;;
+    esac
+    [[ ${valid_arches[$arch]-} == 1 ]] || continue
     mkdir -p "$source_stage"
     cp -f "$rpm" "$source_stage/"
     source_found=$((source_found + 1))
-  done < <(find "$packages_root" -type f -name '*.src.rpm' -print0)
+  done < <(find "$packages_root" -mindepth 3 -maxdepth 4 -type f -name '*.src.rpm' -print0)
 
   rm -rf "${output:?}/${repo_release:?}"
   for arch in "${!seen[@]}"; do

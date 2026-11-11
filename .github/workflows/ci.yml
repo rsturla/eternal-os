@@ -3,17 +3,36 @@ name: CI
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      artifact_run:
+        description: Existing CI run to replay, or empty for a normal build.
+        type: string
+        default: ""
+      package:
+        description: Recipe to test from the downloaded artifact.
+        type: string
+        default: glibc-2.44
+      arch:
+        description: Native architecture for runtime replay.
+        type: choice
+        options: [x86_64, aarch64]
+        default: x86_64
+      artifact_name:
+        description: Artifact name, or empty for rpm-foundations-ARCH.
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}-${{ inputs.artifact_run != '' && format('replay-{0}-{1}-{2}-{3}', inputs.artifact_run, inputs.package, inputs.arch, inputs.artifact_name) || 'build' }}
   cancel-in-progress: true
 
 jobs:
   commits:
     name: Commits
+    if: github.event_name != 'workflow_dispatch' || inputs.artifact_run == ''
     runs-on: ubuntu-26.04
     steps:
       - name: Checkout
@@ -29,12 +48,94 @@ jobs:
 
   lint:
     name: Lint
+    if: github.event_name != 'workflow_dispatch' || inputs.artifact_run == ''
     uses: ./.github/workflows/_lint.yml
 
   packages:
     name: Packages
+    if: github.event_name != 'workflow_dispatch' || inputs.artifact_run == ''
     needs: [lint, commits]
     uses: ./.github/workflows/_build-packages.yml
     with:
       selection: affected
       base: ${{ github.event.pull_request.base.sha }}
+
+  replay:
+    name: Replay ${{ inputs.package }} (${{ inputs.arch }})
+    if: github.event_name == 'workflow_dispatch' && inputs.artifact_run != ''
+    runs-on: ${{ inputs.arch == 'aarch64' && 'ubuntu-26.04-arm' || 'ubuntu-26.04' }}
+    permissions:
+      contents: read
+      actions: read
+    env:
+      ARTIFACT_RUN: ${{ inputs.artifact_run }}
+      PACKAGE: ${{ inputs.package }}
+      ARCH: ${{ inputs.arch }}
+      ARTIFACT_NAME: ${{ inputs.artifact_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate replay inputs
+        id: inputs
+        run: |
+          mkdir -p out/replay
+          jq -n '{source_run: env.ARTIFACT_RUN, artifact: env.ARTIFACT_NAME,
+            package: env.PACKAGE, arch: env.ARCH, replay_head: env.GITHUB_SHA}' \
+            > out/replay/replay-request.json
+          [[ $ARTIFACT_RUN =~ ^[0-9]+$ ]] || { echo 'artifact_run must be a numeric run ID' >&2; exit 2; }
+          [[ $PACKAGE =~ ^[a-zA-Z0-9][a-zA-Z0-9.+_-]*$ && -f packages/$PACKAGE/package.yaml ]] || {
+            echo 'package must name an existing recipe' >&2; exit 2;
+          }
+          case "$ARCH" in
+            x86_64|aarch64) ;;
+            *) echo 'arch must be x86_64 or aarch64' >&2; exit 2 ;;
+          esac
+          artifact=${ARTIFACT_NAME:-rpm-foundations-$ARCH}
+          [[ $artifact =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]] || {
+            echo 'artifact_name must contain only letters, digits, dots, underscores or hyphens' >&2; exit 2;
+          }
+          echo "artifact=$artifact" >> "$GITHUB_OUTPUT"
+
+      - name: Record source provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_NAME: ${{ steps.inputs.outputs.artifact }}
+        run: |
+          mkdir -p out/replay
+          gh api --allow-escape-sequences "repos/$GITHUB_REPOSITORY/actions/runs/$ARTIFACT_RUN" > "$RUNNER_TEMP/source-run.json"
+          gh api --allow-escape-sequences --paginate --slurp \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$ARTIFACT_RUN/artifacts?per_page=100" > "$RUNNER_TEMP/source-artifacts.json"
+          jq --arg artifact "$ARTIFACT_NAME" \
+            '[.[].artifacts[] | select(.name == $artifact)]' "$RUNNER_TEMP/source-artifacts.json" > "$RUNNER_TEMP/selected-artifact.json"
+          jq -n --slurpfile source "$RUNNER_TEMP/source-run.json" \
+            --slurpfile artifacts "$RUNNER_TEMP/selected-artifact.json" \
+            '{source_run: ($source[0] | {id, html_url, head_sha}),
+              source_artifact: ($artifacts[0][0] | {id, name, digest, size_in_bytes, expired}),
+              replay: {head_sha: env.GITHUB_SHA, package: env.PACKAGE, arch: env.ARCH}}' \
+            > out/replay/source-artifact.json
+          jq -e 'length == 1 and .[0].expired == false' "$RUNNER_TEMP/selected-artifact.json" >/dev/null
+
+      - name: Setup rpmx
+        uses: ./.github/actions/setup-rpmx
+
+      - name: Download source RPM artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ steps.inputs.outputs.artifact }}
+          run-id: ${{ inputs.artifact_run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/replay-rpms
+
+      - name: Run installed and transaction tests
+        run: |
+          ./scripts/test-all.sh --package "$PACKAGE" --arch "$ARCH" --runner bwrap \
+            --rpms "$RUNNER_TEMP/replay-rpms" --output out/replay
+
+      - name: Upload replay evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: runtime-replay-${{ inputs.package }}-${{ inputs.arch }}
+          path: out/replay/
+          if-no-files-found: warn

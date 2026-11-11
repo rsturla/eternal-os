@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # Lua 5.4 programming language interpreter and library.
-schema: 1
+schema: 2
 
 package:
   name: lua-5.4
@@ -103,16 +103,21 @@ outputs:
       provides:
         - lua = ${package.version}-${package.release}
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            lua -e 'print("lua 5.4 ok")' | grep -Fx 'lua 5.4 ok'
-            lua5.4 -e 'print("lua 5.4 ok")' | grep -Fx 'lua 5.4 ok'
-
+      - name: language-library-and-bytecode
+        packages:
+          - bash
+          - coreutils
+        files: tests
+        script: |
+          lua5.4 "$TEST_FILES/runtime.lua"
+          lua "$TEST_FILES/runtime.lua"
+          luac -o runtime.luac "$TEST_FILES/runtime.lua"
+          lua5.4 runtime.luac
+          if lua5.4 -e 'function broken(' >invalid.stdout 2>invalid.stderr; then exit 1; fi
+          case "$(<invalid.stderr)" in
+            *'(command line):1:'*expected*) ;;
+            *) echo 'Lua did not report the expected syntax error' >&2; exit 1 ;;
+          esac
   - name: lua-5.4-libs
     summary: Lua 5.4 runtime library
     files:
@@ -125,18 +130,17 @@ outputs:
       provides:
         - lua-libs = ${package.version}-${package.release}
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/liblua5.4.so.* /usr/lib/liblua5.4.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+      - name: load
+        packages:
+          - bash
+          - python3
+        script: |
+          python3 -I -c 'import ctypes; lib=ctypes.CDLL("liblua5.4.so.5.4"); lib.luaL_newstate.restype=ctypes.c_void_p; lib.lua_close.argtypes=[ctypes.c_void_p]; state=lib.luaL_newstate(); assert state; lib.lua_close(state)'
+      - name: runtime-closure
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["liblua5.4.so.*"]
   - name: lua-5.4-devel
     summary: Development files for Lua 5.4
     files:
@@ -151,17 +155,15 @@ outputs:
       provides:
         - lua-devel = ${package.version}-${package.release}
     tests:
-      - name: link
-        stage: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '#include <lua.h>\nint main(void){return 0;}\n' > /tmp/lua-test.c
-            gcc /tmp/lua-test.c $(pkg-config --cflags --libs lua5.4) -o /tmp/lua-test
-            /tmp/lua-test
-
+      - name: embed
+        packages:
+          - bash
+          - gcc
+          - pkgconf
+        files: tests
+        script: |
+          gcc "$TEST_FILES/embed.c" $(pkg-config --cflags --libs lua5.4) -o embed
+          ./embed
   - name: lua-5.4-doc
     summary: Documentation for Lua 5.4
     files:

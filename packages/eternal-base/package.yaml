@@ -8,7 +8,7 @@
 # Today most of these names come from Fedora 44. As each one gains an in-tree
 # recipe with the same package name, this file does not change; only the
 # repositories in profiles/eternal.profile.yaml do.
-schema: 1
+schema: 2
 
 package:
   name: eternal-base
@@ -56,3 +56,16 @@ outputs:
         - tzdata
         - util-linux
         - shadow-utils
+tests:
+  - name: base-system-closure
+    packages:
+      - bash
+    script: |
+      . /etc/os-release
+      test "$ID" = eternal
+      for command in sh date dnf5 useradd mount; do command -v "$command"; done
+      /bin/sh -c 'test "$((6 * 7))" = 42'
+      dnf5 --version
+      test -s /etc/ssl/certs/ca-certificates.crt
+      test -f /usr/share/zoneinfo/UTC
+      test -d /var/lib/eternal

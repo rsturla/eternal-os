@@ -2,7 +2,7 @@
 #
 # Zstandard compression tools and library. Used by tar and other tooling in
 # the minimal Eternal userland.
-schema: 1
+schema: 2
 
 package:
   name: zstd
@@ -62,17 +62,13 @@ outputs:
       run:
         - zstd-libs = ${package.version}-${package.release}
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '%s\n' hello > /tmp/file
-            zstd /tmp/file -o /tmp/file.zst
-            zstd -d /tmp/file.zst -o /tmp/file.out
-            test "$(cat /tmp/file.out)" = hello
+      - name: roundtrip
+        packages:
+          - coreutils
+          - diffutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/roundtrip.sh"
 
   - name: zstd-libs
     summary: Zstandard runtime library
@@ -85,17 +81,17 @@ outputs:
         - /usr/share/licenses/zstd-libs/COPYING
         - /usr/share/licenses/zstd-libs/LICENSE
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libzstd.so.* /usr/lib/libzstd.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+      - name: minimal-runtime-dependencies
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libzstd.so.[0-9]*"]
+      - name: runtime
+        packages:
+          - python3
+        files: tests
+        script: |
+          python3 "$TEST_FILES/runtime.py"
 
   - name: zstd-devel
     summary: Zstandard development files
@@ -114,6 +110,15 @@ outputs:
         - zstd-libs = ${package.version}-${package.release}
       provides:
         - libzstd-devel = ${package.version}-${package.release}
+    tests:
+      - name: compression-api
+        packages:
+          - gcc
+          - glibc-devel
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/compression-api.sh"
 
   - name: zstd-static
     summary: Zstandard static library
@@ -131,17 +136,14 @@ outputs:
       provides:
         - libzstd-static = ${package.version}-${package.release}
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libzstd.a /usr/lib/libzstd.a; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+      - name: static-compression-api
+        packages:
+          - gcc
+          - glibc-devel
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/static-compression-api.sh"
 
   - name: zstd-doc
     summary: Zstandard documentation
@@ -154,20 +156,3 @@ outputs:
       license:
         - /usr/share/licenses/zstd-doc/COPYING
         - /usr/share/licenses/zstd-doc/LICENSE
-
-tests:
-  - name: link
-    stage: installed
-    packages: [gcc, glibc-devel, bash-binsh, coreutils]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #include <zstd.h>
-        int main(void) {
-          return ZSTD_versionNumber() != ZSTD_VERSION_NUMBER;
-        }
-        EOF
-        gcc /tmp/test.c -lzstd -o /tmp/test
-        /tmp/test

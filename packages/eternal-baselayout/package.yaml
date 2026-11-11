@@ -4,7 +4,7 @@
 # still owns the FHS directories, so this package only claims Eternal-specific
 # paths. When the distribution self-hosts, the recipes that replace `filesystem`
 # take over /etc, /usr, /var and the rest, and this package grows with them.
-schema: 1
+schema: 2
 
 package:
   name: eternal-baselayout
@@ -70,14 +70,13 @@ outputs:
 
 tests:
   - name: layout
-    stage: build
-    argv:
-      - sh
-      - -c
-      - |
-        test -d "$STAGE/etc/eternal"
-        test -d "$STAGE/usr/lib/eternal"
-        test -d "$STAGE/usr/share/eternal"
-        test -d "$STAGE/var/lib/eternal"
-        test -d "$STAGE/var/log/eternal"
-        test -f "$STAGE/usr/lib/eternal/baselayout"
+    files: tests
+    script: |
+      bash "$TEST_FILES/layout.sh" "$TEST_PACKAGE_ROOT"
+  - name: installed-layout
+    packages:
+      - bash
+      - coreutils
+    files: tests
+    script: |
+      bash "$TEST_FILES/layout.sh" /

@@ -49,3 +49,34 @@ References:
 - [Fedora Go recipe](https://src.fedoraproject.org/rpms/golang/blob/f44/f/golang.spec)
 - [Wolfi Go recipe](https://github.com/wolfi-dev/os/blob/main/go-1.27.yaml)
 - [Upstream FIPS documentation](https://go.dev/doc/security/fips140)
+
+## Tests
+
+The runtime tests compile and execute a module through the versioned commands,
+check generic code, sorting, filesystem errors, compression errors and goroutine
+synchronization, and reject invalid source and an invalid Printf call. This
+case has no C compiler dependency. Formatting is compared with a fixed expected
+file. A separate case installs GCC for cgo, runs the same module with the race
+detector, and requires an intentional race to produce exit 66 and its diagnostic.
+Pure-Go cross builds check both architecture settings in binary build metadata.
+The default selector compiles a consumer through the unversioned commands in
+its own dependency closure. Fedora coinstallation is a separate case.
+
+The FIPS case checks the complete SHA256 known-answer value, authenticated
+AES-GCM round trips and rejection of a modified tag. It preserves the snapshot,
+host-auto, explicit override and both strict startup-guard checks. The strict
+negative requires exit 1 and the exact guard message. These tests check the
+packaging policy; they do not establish FIPS certification.
+
+`build.tests` retains the upstream FIPS dependency and certified TLS suites and
+adds short standard-library suites and requires evidence of executed passing
+tests. Installed cases disable module downloads, use private writable Go caches
+and retain reports. The runner keeps external networking disabled. Installed
+hardening checks remain separate from the source suites. Run the shared build and acceptance
+entry points described in [the testing guide](../../docs/testing.md).
+
+Test references:
+
+- [Go command and module behavior](https://pkg.go.dev/cmd/go)
+- [Race detector options and diagnostics](https://go.dev/doc/articles/race_detector)
+- [Native FIPS mode and snapshot policy](https://go.dev/doc/security/fips140)

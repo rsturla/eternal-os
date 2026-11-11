@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # libtoolize needs the aclocal macros at runtime; keep them with the tools.
-schema: 1
+schema: 2
 package:
   name: libtool
   version: 2.6.2
@@ -72,19 +72,16 @@ outputs:
     - gcc
     - make
   tests:
-  - name: link-library
-    stage: installed
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      mkdir /tmp/libtool-test
-      cd /tmp/libtool-test
-      printf 'int answer(void) { return 42; }\n' > answer.c
-      libtool --mode=compile gcc -c answer.c -o answer.lo
-      libtool --mode=link gcc -shared -o libanswer.la answer.lo -rpath /usr/lib
-       test -f .libs/libanswer.so
+    - name: shared-library
+      packages:
+        - coreutils
+        - gcc
+        - glibc-devel
+        - bash-binsh
+      files: tests
+      script: |
+        bash "$TEST_FILES/shared-library.sh"
+
 - name: libtool-libs
   files:
     license:
@@ -93,16 +90,18 @@ outputs:
     - /usr/lib*/libltdl.so.*
     - /usr/share/licenses/libtool-libs/**
   tests:
-  - name: load
-    stage: installed
-    packages:
-      - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("libltdl.so.7")'
+    - name: minimal-runtime-dependencies
+      pipeline:
+        - uses: test/runtime-linkage
+          with:
+            libraries: ["libltdl.so.[0-9]*"]
+    - name: runtime
+      packages:
+        - python3
+      files: tests
+      script: |
+        python3 "$TEST_FILES/runtime.py"
+
 - name: libtool-devel
   files:
     license:
@@ -116,22 +115,15 @@ outputs:
     run:
     - libtool-libs = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
-    stage: installed
-    packages:
-      - gcc
-      - glibc-devel
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.c <<'EOF'
-      #include <ltdl.h>
-      int main(void) { if (lt_dlinit()) return 1; return lt_dlexit(); }
-      EOF
-      gcc /tmp/test.c -lltdl -o /tmp/test
-      /tmp/test
+    - name: ltdl-api
+      packages:
+        - gcc
+        - glibc-devel
+        - coreutils
+      files: tests
+      script: |
+        bash "$TEST_FILES/ltdl-api.sh"
+
 - name: libtool-doc
   files:
     license:
@@ -141,8 +133,8 @@ outputs:
     - '@man'
     - '@info'
     - /usr/share/licenses/libtool-doc/**
+
 tests:
-- name: hardening
-  stage: build
-  pipeline:
-  - uses: test/hardening-check
+  - name: hardening
+    pipeline:
+      - uses: test/hardening-check

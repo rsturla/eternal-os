@@ -5,7 +5,7 @@
 # build-tool set while the seed is still in use. Keep this recipe buildable
 # from the current self-hosted root; promote changes here once they work
 # without bootstrap-only overrides.
-schema: 1
+schema: 2
 
 package:
   name: make
@@ -13,7 +13,7 @@ package:
   # ecosystem and package comparison stays compatible.
   epoch: 1
   version: "4.4.1"
-  release: 1
+  release: 2
   summary: GNU Make build automation tool
   description: |
     GNU Make is a tool which controls the generation of executables and other
@@ -54,10 +54,20 @@ build:
 outputs:
   - name: make
     summary: GNU Make build automation tool
+    dependencies:
+      run:
+        - /bin/sh
     # Main package: the make binary, translations and the license.
     files:
       license:
         - /usr/share/licenses/make/COPYING
+    tests:
+      - name: build-graph
+        packages:
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/build-graph.sh"
 
   - name: make-devel
     summary: GNU Make development files
@@ -67,6 +77,16 @@ outputs:
         - /usr/share/licenses/make-devel/COPYING
       license:
         - /usr/share/licenses/make-devel/COPYING
+    tests:
+      - name: make-api
+        packages:
+          - gcc
+          - glibc-devel
+          - coreutils
+          - make
+        files: tests
+        script: |
+          bash "$TEST_FILES/make-api.sh"
 
   - name: make-doc
     summary: GNU Make documentation
@@ -79,18 +99,6 @@ outputs:
         - /usr/share/licenses/make-doc/COPYING
 
 tests:
-  - name: build
-    stage: build
-    argv:
-      - sh
-      - -c
-      - ./make --version | grep -q 'GNU Make 4.4.1'
-
-  - name: installed
-    stage: installed
-    argv: [make, --version]
-
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check

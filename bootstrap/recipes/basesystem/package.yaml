@@ -8,7 +8,7 @@
 # This bootstrap variant exists because the ladder hides the seed basesystem
 # provider while a stage builds this package. The production recipe is in
 # packages/basesystem/package.yaml.
-schema: 1
+schema: 2
 
 package:
   name: basesystem
@@ -46,8 +46,16 @@ outputs:
 
 tests:
   - name: license
-    stage: build
-    argv:
-      - sh
-      - -c
-      - test -f "$STAGE/usr/share/licenses/basesystem/LICENSE"
+    script: |-
+      test -f "$TEST_PACKAGE_ROOT/usr/share/licenses/basesystem/LICENSE"
+  - name: installed-layout-closure
+    packages:
+      - bash
+      - coreutils
+    script: |
+      test -d /etc/eternal
+      test -d /usr/lib/eternal
+      test -d /usr/share/eternal
+      test -d /var/lib/eternal
+      test -L /bin
+      test "$(readlink /bin)" = usr/bin

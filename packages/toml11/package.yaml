@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Upstream publishes source tags but no separate release tarball.
 # The header-only library needs only a development output.
-schema: 1
+schema: 2
 package:
   name: toml11
   version: 4.4.0
@@ -52,20 +52,11 @@ outputs:
     - /usr/share/licenses/toml11-devel/**
   arch: noarch
   tests:
-  - name: compile-and-run
-    stage: installed
+  - name: api-behavior
     packages:
-      - gcc-c++
-      - glibc-devel
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.cc <<'EOF'
-      #include <toml.hpp>
-      #include <sstream>
-      int main(void) { std::istringstream s("answer = 42\n"); auto v = toml::parse(s, "test.toml"); return toml::find<int>(v, "answer") != 42; }
-      EOF
-      g++ /tmp/test.cc -std=c++11 -o /tmp/test
-      /tmp/test
+    - gcc-c++
+    - glibc-devel
+    files: tests
+    script: |
+      g++ -std=c++17 -Wall -Wextra  "$TEST_FILES/behavior.cc"  -o behavior
+      ./behavior

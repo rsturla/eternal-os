@@ -20,6 +20,7 @@ packages/foo/
   package.yaml      # the recipe
   files/            # optional inputs copied with `context: files`
   pipelines/        # optional local step definitions
+  tests/            # consumer programs, sample input and expected output
 ```
 
 Do not put bootstrap-only versions of a package in `packages/`. A package that
@@ -30,7 +31,7 @@ is not yet buildable from the self-hosted root belongs in
 ## Recipe anatomy
 
 ```yaml
-schema: 1
+schema: 2
 
 package:
   name: foo
@@ -51,6 +52,10 @@ build:
     - runs: |
         install -D -m 0755 foo "$STAGE/usr/bin/foo"
     - uses: strip
+  tests:
+    - name: upstream-suite
+      pipeline:
+        - uses: make/check
 
 outputs:
   # The first output is the main package. It receives everything the later
@@ -58,16 +63,11 @@ outputs:
   - name: foo
     tests:
       - name: installed-smoke
-        stage: installed
-        environment:
-          contents:
-            packages: [grep]
-        argv: ["sh", "-c", "foo --version | grep -q foo"]
-
-tests:
-  - name: smoke
-    stage: build
-    argv: ["foo", "--version"]
+        packages: [diffutils]
+        files: tests
+        script: |
+          foo "$TEST_FILES/input" > actual
+          cmp "$TEST_FILES/expected" actual
 ```
 
 Rules that matter:
@@ -87,40 +87,46 @@ Rules that matter:
 - `cpe` identifies the **upstream** project for vulnerability matching
   (`gnu:make`, `gnu:coreutils`). Do not use the Eternal package name or
   `vendor: eternal`; omit it for Eternal-owned packages with no upstream CPE.
-- `build.dependencies.tools` lists **package names**, not commands: `bash`, not
+- `build.packages` lists **package names**, not commands: `bash`, not
   `sh`; `gcc`, not `cc`.
 - Use the reusable build steps (`autotools/configure` followed by
   `make/build`/`make/install`, or `cmake/configure` and its siblings) instead
   of copying the configure/make shell sequence into every recipe.
 - Use `$STAGE` for the install root and `$PREFIX`/`$LIBDIR` for layout.
-- Include a test. `rpmx build` runs tests by default, so a green build means
-  tested.
+- Add behavioral tests. `rpmx build` runs declared tests by default.
+  A successful build establishes only the coverage those tests provide.
 
 See the rpmx recipe reference for the full schema:
 <https://github.com/rsturla/rpmx/blob/main/docs/usage/recipes.md>.
 
 ## Tests
 
-- `stage: build` runs in the build sandbox with the source tree. Use it for
-  unit tests and checks that need the compiler or build tools.
-- `stage: installed` gets its own disposable root filesystem. That root
-  contains `bash`, `coreutils`, the packages in that test's `packages`, and the
-  built RPMs. It does not reuse the build root.
-- A test under an output installs only that output and the sibling outputs that
-  provide its runtime dependencies. A recipe-level installed test installs
-  every output and is useful for integration coverage.
+Read [the testing guide](testing.md) before adding tests.
+Use installed tests for package behavior and upstream build suites for source-level coverage.
+Use transaction tests for package installation, upgrades, configuration preservation and removal.
 
-`tests[].packages` is the only place test-root packages go; there is no
-recipe-wide list. Tests with the same output and package set share one root; a
-different set gets its own disposable root. `tests[].environment` sets
-variables for that test's steps; a step's own `env` wins.
+An output-level installed test selects only that output and its runtime siblings.
+A recipe-level installed test selects every output and serves as an integration test.
+Each runtime test gets a separate writable workspace. It cannot read staged package files or the source tree.
 
-When several outputs reuse a test name, select one with
-`rpmx test --test <output>/<name>`.
+Use `script` for strict Bash checks. Use `argv` with `expect` for direct commands and exact results.
+Shell `-c` commands in `argv` are not supported.
+Put compiler inputs and sample data in `tests/`, then set `files: tests` on the test.
+The script reads them through `TEST_FILES`.
+Declare case tools in each `packages` list, including `build.tests` source suites.
+They do not become build dependencies.
 
-A CLI smoke test that only runs the packaged binary usually needs no extra
-entry; add `procps-ng`, `grep` and so on only when the test script actually
-calls them.
+Tests with the same output and dependencies reuse prepared root data, but their writable workspaces do not share state.
+`tests[].environment` sets test variables. A pipeline step's own `env` values take precedence.
+
+Select an output case with:
+
+```console
+rpmx test packages/NAME/package.yaml --install-dir out/NAME/ARCH --test OUTPUT/NAME
+```
+
+Use `scripts/test-all.sh` to test previously built RPMs without rebuilding.
+Inspect its status report before treating a run as complete.
 
 ## Sources
 
@@ -132,7 +138,7 @@ version; it updates the version, URLs and digests together.
 ## Profile changes
 
 Most packages need nothing beyond the bootstrap root. If a package needs an
-additional build tool, add it to `build.dependencies.tools`, not to the shared
+additional build tool, add it to `build.packages`, not to the shared
 profile. Change `profiles/bootstrap.profile.yaml` only when the whole
 repository needs a new toolchain component.
 

@@ -11,7 +11,7 @@
 # The release tarball ships the translated message catalogs, so the build does
 # not need msgfmt. Its own info pages are built with the `texi2any` this build
 # produces.
-schema: 1
+schema: 2
 
 package:
   name: texinfo
@@ -86,27 +86,12 @@ outputs:
       run:
         - perl
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils, perl, gcc]
-        argv:
-          - sh
-          - -c
-          - |
-            makeinfo --version | head -1 | grep -q '7.3'
-            texi2any --version | head -1 | grep -q '7.3'
-            info --version | head -1 | grep -q '7.3'
-            cat > sample.texi <<'EOF'
-            \input texinfo
-            @setfilename sample.info
-            @node Top
-            @chapter Hello
-            Eternal Texinfo works.
-            @bye
-            EOF
-            makeinfo --no-split -o sample.info sample.texi
-            grep -q 'Eternal Texinfo works.' sample.info
-            install-info --version | head -1
+      - name: document-formats
+        packages:
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/document-formats.sh"
 
   - name: texinfo-doc
     summary: Documentation for Texinfo
@@ -121,7 +106,6 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check
         with:

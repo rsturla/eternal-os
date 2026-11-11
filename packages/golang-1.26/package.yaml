@@ -1,4 +1,4 @@
-schema: 1
+schema: 2
 
 package:
   name: golang-1.26
@@ -97,6 +97,26 @@ build:
         files: [LICENSE, PATENTS]
         outputs: [golang-1.26, golang-1.26-default, golang-1.26-doc]
 
+  tests:
+    - name: upstream-fips-dependency-rules
+      script: |
+        GOFIPS140=off ./bin/go test -count=1 -json -p "$JOBS" crypto/fips140 crypto/internal/fips140deps/... go/build >upstream-fips-rules.json
+        grep -F '"Action":"pass"' upstream-fips-rules.json | grep -F '"Test":'
+      artifacts: [upstream-fips-rules.json]
+      timeout: 1h
+    - name: upstream-certified-crypto
+      script: |
+        GOFIPS140=certified ./bin/go test -short -count=1 -json -p "$JOBS" crypto/fips140 crypto/tls >upstream-certified-crypto.json
+        grep -F '"Action":"pass"' upstream-certified-crypto.json | grep -F '"Test":'
+      artifacts: [upstream-certified-crypto.json]
+      timeout: 1h
+    - name: upstream-standard-library
+      script: |
+        ./bin/go test -short -count=1 -json -p "$JOBS" archive/... bytes compress/... encoding/... errors fmt hash/... io/... math/... os/... path/... reflect regexp/... runtime/... slices strings sync/... testing/... time unicode/... >upstream-standard-library.json
+        grep -F '"Action":"pass"' upstream-standard-library.json | grep -F '"Test":'
+      artifacts: [upstream-standard-library.json]
+      timeout: 2h
+
 outputs:
   - name: golang-1.26
     # Source-generation scripts are data, as in Fedora's source exclusion.
@@ -111,117 +131,37 @@ outputs:
     dependencies:
       run: [ca-certificates]
     tests:
-      - name: compile
-        stage: installed
+      - name: pure-go-runtime-and-diagnostics
+        files: tests
+        packages: [grep, diffutils]
+        script: bash "$TEST_FILES/runtime.sh" go-1.26 gofmt-1.26 1.26.11
+        artifacts: [unit-tests.log, invalid.stderr, vet.stderr]
+        timeout: 15m
+      - name: cgo-race-and-cross-compilation
+        files: tests
         packages: [gcc, glibc-devel, grep]
-        environment:
-          GOTOOLCHAIN: local
-          GOENV: "off"
-          GOPROXY: "off"
-          GOSUMDB: "off"
-        argv:
-          - bash
-          - -eu
-          - -o
-          - pipefail
-          - -c
-          - |
-            go-1.26 version | grep -F 'go1.26.11 '
-            test "$(go-1.26 env GOROOT)" = /usr/lib64/golang-1.26
-            test "$(go-1.26 env GOFIPS140)" = certified
-            test "$(go-1.26 env GOAMD64)" = v2
-            test "$(go-1.26 env GOARM64)" = v8.0
-            test "$(env -u GOTOOLCHAIN go-1.26 env GOTOOLCHAIN)" = local
-            work=$(mktemp -d)
-            trap 'rm -rf "$work"' EXIT
-            cd "$work"
-            cat > hello.go <<'EOF'
-            package main
-            import "fmt"
-            func main() { fmt.Println("go-ok") }
-            EOF
-            gofmt-1.26 -w hello.go
-            CGO_ENABLED=0 go-1.26 build -o hello hello.go
-            ./hello | grep -qx go-ok
-            cat > cgo.go <<'EOF'
-            package main
-            /*
-            #include <stdlib.h>
-            */
-            import "C"
-            import "fmt"
-            func main() { fmt.Println(C.abs(-42)) }
-            EOF
-            CGO_ENABLED=1 go-1.26 build -buildmode=pie -o cgo cgo.go
-            ./cgo | grep -qx 42
-            CGO_ENABLED=1 go-1.26 build -race -o hello-race hello.go
-            ./hello-race | grep -qx go-ok
-            CGO_ENABLED=0 GOARCH=arm64 go-1.26 build -o hello-arm64 hello.go
-            CGO_ENABLED=0 GOARCH=amd64 go-1.26 build -o hello-amd64 hello.go
-            go-1.26 version -m hello-arm64 | grep -F GOARM64=v8.0
-            go-1.26 version -m hello-amd64 | grep -F GOAMD64=v2
-
-      - name: native-fips
-        stage: installed
+        script: bash "$TEST_FILES/cgo-race.sh" go-1.26 gofmt-1.26 1.26.11
+        artifacts: [race-clean.log, race.stderr, metadata-arm64.txt, metadata-amd64.txt]
+        timeout: 20m
+      - name: certified-fips-policy-and-startup-guard
+        files: tests
         packages: [grep]
-        environment:
-          GOTOOLCHAIN: local
-          GOENV: "off"
-          GOPROXY: "off"
-          GOSUMDB: "off"
-          CGO_ENABLED: "0"
-        argv:
-          - bash
-          - -eu
-          - -o
-          - pipefail
-          - -c
-          - |
-            work=$(mktemp -d)
-            trap 'rm -rf "$work"' EXIT
-            cd "$work"
-            cat > fips.go <<'EOF'
-            package main
-            import (
-              "crypto/fips140"
-              "crypto/sha256"
-              "fmt"
-            )
-            func main() {
-              fmt.Printf("enabled=%t sha256=%x\n", fips140.Enabled(), sha256.Sum256([]byte("abc")))
-            }
-            EOF
-            go-1.26 build -o fips fips.go
-            snapshot=$(cat "$(go-1.26 env GOROOT)/lib/fips140/certified.txt")
-            go-1.26 version -m fips | grep -F "GOFIPS140=$snapshot"
-            if [ -r /proc/sys/crypto/fips_enabled ] && [ "$(cat /proc/sys/crypto/fips_enabled)" = 1 ]; then
-              ./fips | grep -F 'enabled=true '
-            else
-              ./fips | grep -F 'enabled=false '
-            fi
-            GOLANG_NATIVE_HOSTFIPS_OVERRIDE=1 ./fips | grep -F 'enabled=true sha256=ba7816bf'
-            GODEBUG=fips140=off ./fips | grep -F 'enabled=false sha256=ba7816bf'
-            GODEBUG=fips140=on ./fips | grep -F 'enabled=true sha256=ba7816bf'
-            GOFIPS140=off go-1.26 build -o nonfips fips.go
-            GOLANG_NATIVE_HOSTFIPS_OVERRIDE=1 GODEBUG=fips140=off ./nonfips | grep -F 'enabled=false '
-            for flag in tag experiment; do
-              if [ "$flag" = tag ]; then
-                go-1.26 build -tags=strictfipsruntime -o guarded fips.go
-              else
-                GOEXPERIMENT=strictfipsruntime go-1.26 build -o guarded fips.go
-              fi
-              GOLANG_NATIVE_HOSTFIPS_OVERRIDE=1 ./guarded | grep -F 'enabled=true '
-              if GOLANG_NATIVE_HOSTFIPS_OVERRIDE=1 GODEBUG=fips140=off ./guarded >out 2>&1; then
-                echo 'strict FIPS guard accepted disabled runtime mode' >&2
-                exit 1
-              fi
-              grep -F 'Host FIPS mode is enabled' out
-            done
-
+        script: bash "$TEST_FILES/fips.sh" go-1.26 gofmt-1.26 1.26.11
+        artifacts: [fips-build-info.txt, guard-tag.stderr, guard-experiment.stderr]
+        timeout: 20m
       - name: coinstall-fedora
-        stage: installed
-        packages: [golang-bin, grep]
-        argv: [bash, -eu, -o, pipefail, -c, "go-1.26 version | grep -F 'go1.26.11 '; test -x /usr/bin/go; test /usr/bin/go-1.26 -ef /usr/lib64/golang-1.26/bin/go"]
+        files: tests
+        packages: [golang-bin]
+        script: bash "$TEST_FILES/coinstall.sh" go-1.26 gofmt-1.26 1.26.11
+        timeout: 15m
+      - name: hardening
+        pipeline:
+          # Go has its own stack checks and internal linker; the compiler
+          # tools do not use libc fortify, CET, a loader or BIND_NOW.
+          - uses: test/hardening-check
+            with:
+              paths: [/usr/lib64/golang-1.26/bin, /usr/lib64/golang-1.26/pkg/tool]
+              skip: [bind-now, stack-protector, fortify, cf-protection]
 
   - name: golang-1.26-default
     summary: Unversioned commands for Go 1.26
@@ -242,10 +182,11 @@ outputs:
         - go = ${package.version}-${package.release}
       conflicts: [golang-1.27-default, golang-bin]
     tests:
-      - name: commands
-        stage: installed
-        packages: [grep]
-        argv: [bash, -eu, -o, pipefail, -c, "go version | grep -F 'go1.26.11 '; test /usr/bin/go -ef /usr/bin/go-1.26; test /usr/bin/gofmt -ef /usr/bin/gofmt-1.26"]
+      - name: default-selector-consumer
+        files: tests
+        packages: [diffutils]
+        script: bash "$TEST_FILES/selector.sh" go gofmt 1.26.11
+        timeout: 15m
 
   - name: golang-1.26-doc
     summary: Documentation and examples for Go 1.26
@@ -257,23 +198,3 @@ outputs:
       license:
         - /usr/share/licenses/golang-1.26-doc/LICENSE
         - /usr/share/licenses/golang-1.26-doc/PATENTS
-
-tests:
-  - name: upstream-fips
-    stage: build
-    argv:
-      - bash
-      - -eu
-      - -c
-      - |
-        GOFIPS140=off ./bin/go test -p "$JOBS" crypto/fips140 crypto/internal/fips140deps/... go/build
-        GOFIPS140=certified ./bin/go test -short -p "$JOBS" crypto/fips140 crypto/tls
-  - name: hardening
-    stage: build
-    pipeline:
-      # Go uses its own stack checks and assembler, without libc fortify or CET.
-      # Its internal PIE linker does not use a dynamic loader or BIND_NOW.
-      - uses: test/hardening-check
-        with:
-          paths: [/usr/lib64/golang-1.26/bin, /usr/lib64/golang-1.26/pkg/tool]
-          skip: [bind-now, stack-protector, fortify, cf-protection]

@@ -2,7 +2,7 @@
 #
 # GNU tar archiver. Part of the minimal Eternal userland and the
 # bootstrap tool set. The source is the upstream release tarball.
-schema: 1
+schema: 2
 
 package:
   name: tar
@@ -56,22 +56,13 @@ outputs:
       license:
         - /usr/share/licenses/tar/COPYING
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            test -x /usr/libexec/tar/rmt
-            mkdir -p tree
-            printf 'content\n' > tree/file
-            tar -cf archive.tar tree
-            tar -tf archive.tar > list
-            test "$(wc -l < list)" -eq 2
-            mkdir out
-            tar -xf archive.tar -C out
-            test "$(cat out/tree/file)" = content
+      - name: archives
+        packages:
+          - coreutils
+          - diffutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/archives.sh"
 
   - name: tar-doc
     summary: GNU tar archiver documentation

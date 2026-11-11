@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Upstream publishes source tags but no separate release tarball.
-schema: 1
+schema: 2
 package:
   name: ninja
   version: 1.13.2
@@ -13,68 +13,89 @@ package:
     vendor: ninja-build
     product: ninja
 sources:
-- name: ninja-1.13.2.tar.gz
-  kind: archive
-  digest: sha512:c0b401b4db91a2eea01a474ee979b2c6f1daa97b4c8d1f856871ce5f6d567c4b26d6246bc57e2a5f914329302abcd9c00ab0d4394a25f2ad502b6b00a07903d2
-  locators:
-  - kind: https
-    url: https://github.com/ninja-build/ninja/archive/refs/tags/v1.13.2.tar.gz
-  extract:
-    format: tar.gz
-    strip-components: 1
+  - name: ninja-1.13.2.tar.gz
+    kind: archive
+    digest: sha512:c0b401b4db91a2eea01a474ee979b2c6f1daa97b4c8d1f856871ce5f6d567c4b26d6246bc57e2a5f914329302abcd9c00ab0d4394a25f2ad502b6b00a07903d2
+    locators:
+      - kind: https
+        url: https://github.com/ninja-build/ninja/archive/refs/tags/v1.13.2.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
   packages:
-  - gcc
-  - gcc-c++
-  - make
-  - bash
-  - coreutils
-  - cmake
-  - python3
-  pipeline:
-  - uses: cmake/configure
-    with:
-      args:
-      - -DCMAKE_BUILD_TYPE=Release
-      - -DBUILD_TESTING=OFF
-  - uses: cmake/build
-  - uses: cmake/install
-  - uses: license/copy
-    with:
-      files:
-      - COPYING
-      outputs:
-      - ninja
-  - uses: strip
-outputs:
-- name: ninja
-  files:
-    license:
-    - /usr/share/licenses/ninja/**
-  dependencies:
-    run:
-    - libstdc++
-    - libgcc
-    - bash-binsh
-    provides:
-    - ninja-build = ${package.version}-${package.release}
-  tests:
-  - name: build-rule
-    stage: installed
-    argv:
+    - gcc
+    - gcc-c++
+    - make
     - bash
-    - -eu
-    - -c
-    - |
-      mkdir /tmp/ninja-test
-      cd /tmp/ninja-test
-      printf 'rule write\n  command = printf ninja > $out\nbuild result: write\n' > build.ninja
-      ninja
-      test "$(cat result)" = ninja
-tests:
-- name: hardening
-  stage: build
+    - coreutils
+    - cmake
+    - python3
   pipeline:
-  - uses: test/hardening-check
+    - uses: cmake/configure
+      with:
+        args:
+          - -DCMAKE_BUILD_TYPE=Release
+          - -DBUILD_TESTING=OFF
+    - uses: cmake/build
+    - uses: cmake/install
+    - uses: license/copy
+      with:
+        files:
+          - COPYING
+        outputs:
+          - ninja
+    - uses: strip
+outputs:
+  - name: ninja
+    files:
+      license:
+        - /usr/share/licenses/ninja/**
+    dependencies:
+      run:
+        - libstdc++
+        - libgcc
+        - bash-binsh
+      provides:
+        - ninja-build = ${package.version}-${package.release}
+    tests:
+      - name: dependency-incremental-clean-and-failure
+        packages:
+          - bash
+          - coreutils
+          - diffutils
+          - grep
+        files: tests
+        script: |
+          cp "$TEST_FILES/build.ninja" .
+          printf 'first\n' > input
+          ninja -v
+          cmp input second
+          ninja -n > dry-run.txt
+          grep -F 'no work to do' dry-run.txt
+          touch -d @0 first second
+          printf 'second payload\n' > input
+          touch -d @1 input
+          ninja -v
+          cmp input second
+          ninja -t targets all > targets.txt
+          grep '^second:' targets.txt
+          status=0
+          ninja broken >failure.stdout 2>failure.stderr || status=$?
+          test "$status" = 1
+          grep -F 'subcommand failed' failure.stdout
+          ninja -t clean
+          test ! -e first
+          test ! -e second
+          test -f input
+          ninja
+          cmp input second
+        artifacts:
+          - failure.stdout
+          - failure.stderr
+tests:
+  - name: hardening
+    pipeline:
+      - uses: test/hardening-check

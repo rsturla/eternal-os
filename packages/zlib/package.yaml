@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # A library implementing the zlib compression algorithms. A dependency for the minimal Eternal build root.
-schema: 1
+schema: 2
 
 package:
   name: zlib
@@ -45,6 +45,16 @@ build:
         outputs: [zlib, zlib-devel, zlib-static, zlib-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages:
+        - diffutils
+      artifacts:
+        - test-suite.log
+        - tests/test-suite.log
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: zlib
     summary: A library implementing the zlib compression algorithms
@@ -55,18 +65,11 @@ outputs:
       provides:
         - zlib-ng-compat = ${package.version}-${package.release}
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libz.so.* /usr/lib/libz.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+      - name: runtime-linkage
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libz.so.*"]
   - name: zlib-devel
     summary: zlib development files
     files:
@@ -83,6 +86,17 @@ outputs:
       provides:
         - zlib-ng-compat-devel = ${package.version}-${package.release}
 
+    tests:
+      - name: api-behavior
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists zlib
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags zlib) "$TEST_FILES/behavior.c" $(pkg-config --libs zlib) -o behavior
+          ./behavior
   - name: zlib-static
     summary: zlib static library
     files:
@@ -97,18 +111,27 @@ outputs:
       provides:
         - zlib-ng-compat-static = ${package.version}-${package.release}
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libz.a /usr/lib/libz.a; do
-              test -e "$lib" && exit 0
-            done
+      - name: static-api-behavior
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+          - binutils
+          - grep
+        files: tests
+        script: |
+          pkg-config --exists zlib
+          private_libs=()
+          for flag in $(pkg-config --static --libs zlib); do
+            if test "$flag" != -lz; then private_libs+=("$flag"); fi
+          done
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags zlib) "$TEST_FILES/behavior.c" "$(pkg-config --variable=libdir zlib)/libz.a" "$${private_libs[@]}" -o behavior
+          ./behavior
+          readelf -d behavior > dynamic.txt
+          if grep -E 'NEEDED.*\[libz\.so' dynamic.txt; then
+            echo "static test linked the shared library" >&2
             exit 1
-
+          fi
   - name: zlib-doc
     summary: zlib documentation
     files:
@@ -118,20 +141,3 @@ outputs:
         - /usr/share/licenses/zlib-doc/LICENSE
       license:
         - /usr/share/licenses/zlib-doc/LICENSE
-
-tests:
-  - name: link
-    stage: installed
-    packages: [gcc, glibc-devel, bash-binsh]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #include <zlib.h>
-        int main(void) {
-          return zlibVersion() == 0;
-        }
-        EOF
-        gcc /tmp/test.c -lz -o /tmp/test
-        /tmp/test

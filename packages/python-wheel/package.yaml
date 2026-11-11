@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-wheel.yaml
-schema: 1
+schema: 2
 package:
   name: python-wheel
   version: 0.48.0
@@ -79,11 +79,7 @@ outputs:
     run:
     - python-${matrix.python.version}-packaging
   tests:
-  - name: functional
-    stage: installed
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - from wheel.wheelfile import WheelFile; import tempfile, pathlib; p = pathlib.Path(tempfile.mkdtemp())
-      / "demo-1.0-py3-none-any.whl"; w = WheelFile(p, "w"); w.writestr("demo.py", "value = 42\n"); w.close();
-      assert p.is_file()
+  - name: behavior
+    files: tests
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/test_behavior.py" "${matrix.python.version}" "wheel" "${package.version}"

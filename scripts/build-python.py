@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Prepare unpublished Python dependencies during the initial bootstrap.
 
-Temporary normal-build integration. Retain new-interpreter bootstrap support
+Explicit bootstrap support for unpublished interpreter streams. Retain it
 until rpmx can prepare unpublished source dependencies.
 Track removal at https://github.com/rsturla/eternal-os/issues/41.
 """
@@ -14,7 +14,9 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
+from urllib.parse import unquote
 
 import yaml
 
@@ -28,7 +30,7 @@ def bootstrap_recipes(root):
             yield recipe
 
 
-def dependency_order(plans, name):
+def dependency_order(plans, name, *, include_tests=True):
     providers = {
         output["name"]: source
         for source, plan in plans.items()
@@ -51,6 +53,11 @@ def dependency_order(plans, name):
                 dependencies.update(step["needs"])
             for output in cell["outputs"]:
                 dependencies.update(output["requires"])
+            if include_tests:
+                for test in [*cell.get("build_tests", []), *cell.get("tests", [])]:
+                    dependencies.update(test.get("packages", []))
+                    for step in test.get("pipeline", []):
+                        dependencies.update(step.get("needs", []))
         for dependency in sorted(dependencies):
             provider = providers.get(dependency.split()[0])
             if provider and provider != source:
@@ -73,13 +80,106 @@ def bootstrap_hashes(order, hashes):
     return result
 
 
+def test_junit_path(output, arch):
+    return output / arch / "junit.xml"
+
+
+def collect_test_evidence(output, destination, arch):
+    """Copy reports and logs, including a failed build's declared artifacts."""
+    collected = False
+    for source, target in [
+        (test_junit_path(output, arch), destination / "junit.xml"),
+        (output / arch / "test-results", destination / "test-results"),
+        (output / arch / "acceptance", destination / "acceptance"),
+        (output / arch / "build", destination / "build"),
+    ]:
+        if source.is_file():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+            collected = True
+        elif source.is_dir():
+            if target.exists():
+                shutil.rmtree(target)
+            shutil.copytree(source, target)
+            collected = True
+    if collected:
+        print(f"==> test evidence {destination}", file=sys.stderr)
+
+
+def build_with_evidence(command, output, destination, arch, root, acceptance=None):
+    """Keep the build failure if evidence collection also fails."""
+    # An early setup failure must not publish an earlier run's successful tests.
+    test_junit_path(output, arch).unlink(missing_ok=True)
+    test_junit_path(output, arch).parent.mkdir(parents=True, exist_ok=True)
+    previous_results = [output / arch / "test-results", output / arch / "acceptance", output / arch / "build"]
+    if destination is not None:
+        previous_results.append(destination)
+    for previous in previous_results:
+        if previous.exists():
+            shutil.rmtree(previous)
+    for report in (output / "run-report.json", output / "run-report.xml"):
+        report.unlink(missing_ok=True)
+    failure = None
+    try:
+        subprocess.run(command, check=True, cwd=root)
+        report = json.loads((output / "run-report.json").read_text())
+        if (report["document"] != "rpmx-run-report" or report["version"] != 1
+                or report["outcome"] != "passed" or not report["build_tests_requested"]
+                or any(case["status"] != "passed" for case in report["build_tests"])):
+            raise subprocess.CalledProcessError(1, command)
+        if acceptance is not None:
+            subprocess.run(acceptance, check=True, cwd=root)
+    except subprocess.CalledProcessError as error:
+        failure = error
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        print(f"invalid build report in {output}: {error}", file=sys.stderr)
+        failure = subprocess.CalledProcessError(1, command)
+    try:
+        if (output / "run-report.xml").is_file():
+            shutil.copy2(output / "run-report.xml", test_junit_path(output, arch))
+        report_path = output / "run-report.json"
+        if report_path.is_file():
+            build_reports = output / arch / "build"
+            build_reports.mkdir(parents=True, exist_ok=True)
+            for report_file in (report_path, output / "run-report.xml"):
+                if report_file.is_file():
+                    shutil.copy2(report_file, build_reports / report_file.name)
+            for evidence in json.loads(report_path.read_text()).get("evidence", []):
+                source = Path(evidence)
+                target = build_reports / "evidence" / source.resolve().relative_to(output.resolve())
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if source.is_dir():
+                    shutil.copytree(source, target, dirs_exist_ok=True)
+                elif source.is_file():
+                    shutil.copy2(source, target)
+        if destination is not None:
+            collect_test_evidence(output, destination, arch)
+        else:
+            print(f"==> test evidence {output}", file=sys.stderr)
+    except OSError as error:
+        print(f"cannot collect test evidence in {destination}: {error}", file=sys.stderr)
+        if failure is None:
+            raise
+    if failure is not None:
+        raise failure
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("name")
     parser.add_argument("--output", required=True)
     parser.add_argument("--arch", default=os.uname().machine)
+    parser.add_argument("--test-reports", type=Path,
+                        help="Collect dependency reports here; default: OUTPUT/test-reports")
+    parser.add_argument("--fingerprint", action="store_true",
+                        help="Print the local dependency and test policy identity without building")
     parser.add_argument("--profile", type=Path, help="Bootstrap profile for the new interpreter stream")
+    parser.add_argument("--test-profile", type=Path,
+                        default=Path(__file__).resolve().parent.parent / "profiles/eternal.profile.yaml",
+                        help="Repository profile for installed tests")
     args, build_args = parser.parse_known_args()
+    if args.arch == "all":
+        parser.error("Python dependency bootstrap requires one concrete --arch; run each architecture separately")
     root = Path(__file__).resolve().parent.parent
     rpmx = os.environ.get("RPMX", "rpmx")
 
@@ -90,52 +190,77 @@ def main():
         recipe.parent.name: json.loads(capture(rpmx, "plan", str(recipe), "--json"))["plan"]
         for recipe in bootstrap_recipes(root)
     }
-    order = dependency_order(plans, args.name)
+    order = dependency_order(plans, args.name, include_tests="--no-tests" not in build_args)
     hashes = dict(line.split() for line in capture(
         str(root / "scripts/package-hash.sh"), *order
     ).splitlines())
     hashes = bootstrap_hashes(order, hashes)
     profile_path = (args.profile or root / "profiles/bootstrap-python.profile.yaml").resolve()
     profile = yaml.safe_load(profile_path.read_text())
+    test_profile_path = args.test_profile.resolve()
+    test_profile = yaml.safe_load(test_profile_path.read_text())
     variant = hashlib.sha256(json.dumps([
-        build_args, str(profile_path), profile,
+        build_args, str(profile_path), profile, str(test_profile_path), test_profile,
     ], sort_keys=True).encode()).hexdigest()[:12]
-    # Each build gets a private mount. Podman's private SELinux labels cannot
-    # safely share a repository directory between parallel build jobs.
+    if args.fingerprint:
+        print(hashlib.sha256(json.dumps([
+            args.arch, hashes[args.name], variant,
+        ]).encode()).hexdigest())
+        return
+    # Keep unpublished dependency RPMs private to this build.
     with tempfile.TemporaryDirectory(prefix="rpmx-python-") as scratch:
         work = Path(scratch)
         local = work / "repo"
         local.mkdir()
-        for repository in profile["repositories"]:
-            url = repository.get("baseurl", "")
-            if url.startswith("file://"):
-                path = (profile_path.parent / url[7:]).resolve()
-                repository["baseurl"] = path.as_uri()
-                # The compiler policy package also needs a private label.
-                if repository["id"] == "eternal-toolchain":
-                    shutil.copytree(path, work / "toolchain")
-                    repository["baseurl"] = (work / "toolchain").as_uri()
+        for settings, source in [(profile, profile_path), (test_profile, test_profile_path)]:
+            for repository in settings["repositories"]:
+                for field in ("baseurl", "gpgkey"):
+                    url = repository.get(field, "")
+                    if url.startswith("file://"):
+                        path = (source.parent / unquote(url[7:])).resolve()
+                        # rpmx anchors file:// values as literal host paths.
+                        repository[field] = f"file://{path}"
         profile_file = work / "profile.yaml"
+        test_profile_file = work / "test-profile.yaml"
         # Include interpreter-qualified package names and declared capabilities.
         available = set()
         for name in order:
-            for repository in profile["repositories"]:
-                if repository["id"] in ("fedora", "updates"):
-                    repository["exclude"] = sorted(set(repository.get("exclude", [])) | available)
+            for settings in (profile, test_profile):
+                for repository in settings["repositories"]:
+                    if repository["id"] != "python-local":
+                        repository["exclude"] = sorted(set(repository.get("exclude", [])) | available)
             profile_file.write_text(yaml.safe_dump(profile, sort_keys=False))
+            test_profile_file.write_text(yaml.safe_dump(test_profile, sort_keys=False))
             cache = root / ".work/python-deps" / args.arch / name / f"{hashes[name]}-{variant}"
             output = Path(args.output).resolve() if name == args.name else cache
+            reports = (args.test_reports or Path(args.output) / "test-reports").resolve()
+            reports = reports / "python" / args.name / args.arch / name / f"{hashes[name]}-{variant}"
+            if name == args.name:
+                reports = None  # Consumer evidence already lives in the public output.
             stamp = cache / ".complete"
             if name == args.name or not stamp.is_file():
                 print(f"==> Python matrix {name}", flush=True)
-                subprocess.run([
+                command = [
                     rpmx, "build", str(root / "packages" / name / "package.yaml"),
                     "--profile", str(profile_file), "--arch", args.arch,
-                    "--output", str(output), *build_args,
-                ], check=True, cwd=root)
+                    "--output", str(output),
+                ]
+                if "--no-tests" not in build_args:
+                    acceptance = [sys.executable, str(root / "scripts/accept-rpms.py"),
+                                  str(root / "packages" / name / "package.yaml"),
+                                  "--install-dir", str(output / args.arch),
+                                  "--output", str(output / args.arch / "acceptance"),
+                                  "--arch", args.arch, "--test-profile", str(test_profile_file)]
+                    if "--build-release" in build_args:
+                        acceptance.extend(["--build-release", build_args[build_args.index("--build-release") + 1]])
+                    build_with_evidence([*command, *build_args], output, reports, args.arch, root, acceptance)
+                else:
+                    subprocess.run([*command, *build_args], check=True, cwd=root)
                 if name != args.name:
                     cache.mkdir(parents=True, exist_ok=True)
                     stamp.write_text("complete\n")
+            elif "--no-tests" not in build_args:
+                collect_test_evidence(output, reports, args.arch)
             rpms = [p for p in (output / args.arch).glob("*.rpm") if not p.name.endswith(".src.rpm")]
             if not rpms:
                 raise SystemExit(f"{name} produced no binary RPMs")
@@ -148,8 +273,9 @@ def main():
                         if re.fullmatch(r"python-(?:\d+\.\d+-)?[A-Za-z0-9._+-]+", capability):
                             available.add(capability)
             subprocess.run([rpmx, "repo", "--rpms", str(local), "--output", str(local)], check=True)
-            if not any(r["id"] == "python-local" for r in profile["repositories"]):
-                profile["repositories"].insert(0, {"id": "python-local", "baseurl": local.as_uri()})
+            for settings in (profile, test_profile):
+                if not any(r["id"] == "python-local" for r in settings["repositories"]):
+                    settings["repositories"].insert(0, {"id": "python-local", "baseurl": f"file://{local}"})
 
 
 if __name__ == "__main__":

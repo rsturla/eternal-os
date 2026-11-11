@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/rhash.yaml
 # Link OpenSSL directly, as in Wolfi. Keep the library independent of the commands.
-schema: 1
+schema: 2
 package:
   name: rhash
   version: 1.4.6
@@ -70,14 +70,9 @@ outputs:
     - rhash-libs = ${package.version}-${package.release}
   tests:
   - name: digest
-    stage: installed
     packages:
     - grep
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       printf abc > /tmp/input
       rhash --sha256 /tmp/input > /tmp/digest
       grep -q ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad /tmp/digest
@@ -92,16 +87,11 @@ outputs:
     run:
     - openssl-libs
   tests:
-  - name: load
-    stage: installed
-    packages:
-    - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("librhash.so.1")'
+  - name: runtime-linkage
+    pipeline:
+      - uses: test/runtime-linkage
+        with:
+          libraries: ["librhash.so.*"]
 - name: rhash-devel
   files:
     include:
@@ -113,23 +103,16 @@ outputs:
     run:
     - rhash-libs = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
-    stage: installed
+  - name: api-behavior
     packages:
     - gcc
     - glibc-devel
     - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.c <<'EOF'
-      #include <rhash.h>
-      int main(void) { rhash_library_init(); return rhash_get_digest_size(RHASH_SHA256) != 32; }
-      EOF
-      gcc /tmp/test.c $(pkg-config --cflags --libs librhash) -o /tmp/test
-      /tmp/test
+    files: tests
+    script: |
+      pkg-config --exists librhash
+      gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags librhash) "$TEST_FILES/behavior.c" $(pkg-config --libs librhash) -o behavior
+      ./behavior
 - name: rhash-doc
   files:
     include:
@@ -140,6 +123,5 @@ outputs:
     - /usr/share/licenses/rhash-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check

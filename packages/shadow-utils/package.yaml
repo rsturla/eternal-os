@@ -2,7 +2,7 @@
 #
 # PAM login and account management utilities. This is the provider of
 # useradd/groupadd/passwd and the /etc/login.defs defaults.
-schema: 1
+schema: 2
 
 package:
   name: shadow-utils
@@ -117,19 +117,50 @@ outputs:
         - libxcrypt
         - pam
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils, gcc]
-        argv:
-          - sh
-          - -c
-          - |
-            useradd --help
-            groupadd --help
-            passwd --help
-            chage --help
-            test -n "$(useradd -D)"
-
+      - name: account-lifecycle
+        mode: transaction
+        packages:
+          - bash
+          - coreutils
+          - grep
+          - libc-bin
+        script: |
+          # Minimal test roots may have no entry for the namespace's root caller.
+          if ! getent passwd 0; then
+            printf 'root:x:0:0:root:/root:/bin/bash\n' >> /etc/passwd
+          fi
+          for database in /etc/shadow /etc/gshadow; do
+            if test ! -e "$database"; then install -m 0600 /dev/null "$database"; fi
+          done
+          groupadd --gid 24567 rpmx-probe-group
+          useradd --uid 24567 --gid rpmx-probe-group --no-create-home --shell /bin/sh rpmx-probe
+          getent passwd rpmx-probe > passwd.txt
+          grep '^rpmx-probe:[^:]*:24567:24567:' passwd.txt
+          if useradd --uid 24568 --no-create-home rpmx-probe; then exit 1; fi
+          usermod --comment 'rpmx account test' --shell /bin/false rpmx-probe
+          getent passwd rpmx-probe > modified.txt
+          grep 'rpmx account test:.*:/bin/false$' modified.txt
+          usermod --lock rpmx-probe
+          passwd -S rpmx-probe > status.txt
+          grep '^rpmx-probe L' status.txt
+          chage -M 90 -W 7 rpmx-probe
+          chage -l rpmx-probe > aging.txt
+          grep -E '^Maximum number of days between password change[[:space:]]*:[[:space:]]*90$' aging.txt
+          grep -E '^Number of days of warning before password expires[[:space:]]*:[[:space:]]*7$' aging.txt
+          userdel rpmx-probe
+          if getent passwd rpmx-probe; then exit 1; fi
+          groupdel rpmx-probe-group
+          if getent group rpmx-probe-group; then exit 1; fi
+        artifacts:
+          - passwd.txt
+          - modified.txt
+          - status.txt
+          - aging.txt
+      - name: runtime-closure
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libsubid.so.*"]
   - name: shadow-utils-devel
     summary: Development files for shadow-utils
     files:
@@ -142,17 +173,18 @@ outputs:
       run:
         - shadow-utils = ${package.version}-${package.release}
     tests:
-      - name: link
-        stage: installed
-        packages: [bash-binsh, coreutils, gcc]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '#include <shadow/subid.h>\nint main(void){return 0;}\n' > /tmp/subid.c
-            gcc /tmp/subid.c -lsubid -o /tmp/subid-test
-            /tmp/subid-test
-
+      - name: subordinate-id-api
+        mode: transaction
+        packages:
+          - bash
+          - gcc
+        files: tests
+        script: |
+          printf 'root:x:0:0:root:/root:/bin/sh\nrpmx-owner:x:24567:24567::/:/bin/false\nrpmx-empty:x:24568:24568::/:/bin/false\n' > /etc/passwd
+          printf '24567:200000:100\n24567:300000:200\n' > /etc/subuid
+          printf '24567:500000:50\n' > /etc/subgid
+          gcc -Wall -Wextra -Werror "$TEST_FILES/subid.c" -lsubid -o subid
+          ./subid
   - name: shadow-utils-doc
     summary: Documentation for shadow-utils
     files:

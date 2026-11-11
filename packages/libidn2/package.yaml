@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/libidn2.yaml
 # Disable NLS, as in Wolfi. Use the release tarball to avoid gnulib bootstrap tools.
-schema: 1
+schema: 2
 package:
   name: libidn2
   version: 2.3.8
@@ -55,6 +55,16 @@ build:
       - libidn2-devel
       - libidn2-doc
   - uses: strip
+  tests:
+  - name: upstream
+    packages:
+    - diffutils
+    artifacts:
+    - test-suite.log
+    - tests/test-suite.log
+    pipeline:
+    - uses: make/check
+
 outputs:
 - name: libidn2
   files:
@@ -65,12 +75,9 @@ outputs:
     - libidn2-libs = ${package.version}-${package.release}
   tests:
   - name: idna
-    stage: installed
-    argv:
-    - bash
-    - -eu
-    - -c
-    - "export LC_ALL=C.UTF-8\ntest \"$(idn2 m\xFCnchen.de)\" = xn--mnchen-3ya.de\n"
+    script: |
+      export LC_ALL=C.UTF-8
+      test "$(idn2 münchen.de)" = xn--mnchen-3ya.de
 - name: libidn2-libs
   files:
     include:
@@ -82,16 +89,11 @@ outputs:
     run:
     - libunistring
   tests:
-  - name: load
-    stage: installed
-    packages:
-    - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("libidn2.so.0")'
+  - name: runtime-linkage
+    pipeline:
+      - uses: test/runtime-linkage
+        with:
+          libraries: ["libidn2.so.*"]
 - name: libidn2-devel
   files:
     include:
@@ -103,23 +105,16 @@ outputs:
     run:
     - libidn2-libs = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
-    stage: installed
+  - name: api-behavior
     packages:
     - gcc
     - glibc-devel
     - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.c <<'EOF'
-      #include <idn2.h>
-      int main(void) { char *out = 0; if (idn2_lookup_u8((const uint8_t *)"example.com", (uint8_t **)&out, 0)) return 1; idn2_free(out); return 0; }
-      EOF
-      gcc /tmp/test.c $(pkg-config --cflags --libs libidn2) -o /tmp/test
-      /tmp/test
+    files: tests
+    script: |
+      pkg-config --exists libidn2
+      gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libidn2) "$TEST_FILES/behavior.c" $(pkg-config --libs libidn2) -o behavior
+      ./behavior
 - name: libidn2-doc
   files:
     include:
@@ -131,6 +126,5 @@ outputs:
     - /usr/share/licenses/libidn2-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check

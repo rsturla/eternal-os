@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/libuv.yaml
 # Use upstream CMake support for the release archive. Keep static archives separate.
-schema: 1
+schema: 2
 package:
   name: libuv
   version: 1.53.0
@@ -57,16 +57,11 @@ outputs:
     license:
     - /usr/share/licenses/libuv/**
   tests:
-  - name: load
-    stage: installed
-    packages:
-    - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("libuv.so.1")'
+  - name: runtime-linkage
+    pipeline:
+      - uses: test/runtime-linkage
+        with:
+          libraries: ["libuv.so.*"]
 - name: libuv-devel
   files:
     include:
@@ -78,23 +73,16 @@ outputs:
     run:
     - libuv = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
-    stage: installed
+  - name: api-behavior
     packages:
     - gcc
     - glibc-devel
     - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.c <<'EOF'
-      #include <uv.h>
-      int main(void) { uv_loop_t loop; if (uv_loop_init(&loop)) return 1; return uv_loop_close(&loop); }
-      EOF
-      gcc /tmp/test.c $(pkg-config --cflags --libs libuv) -o /tmp/test
-      /tmp/test
+    files: tests
+    script: |
+      pkg-config --exists libuv
+      gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libuv) "$TEST_FILES/behavior.c" $(pkg-config --libs libuv) -o behavior
+      ./behavior
 - name: libuv-static
   files:
     include:
@@ -105,8 +93,29 @@ outputs:
   dependencies:
     run:
     - libuv-devel = ${package.version}-${package.release}
+  tests:
+  - name: static-api-behavior
+    packages:
+    - gcc
+    - glibc-devel
+    - pkgconf
+    - binutils
+    - grep
+    files: tests
+    script: |
+      pkg-config --exists libuv
+      private_libs=()
+      for flag in $(pkg-config --static --libs libuv); do
+        if test "$flag" != -luv; then private_libs+=("$flag"); fi
+      done
+      gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libuv) "$TEST_FILES/behavior.c" "$(pkg-config --variable=libdir libuv)/libuv.a" "$${private_libs[@]}" -o behavior
+      ./behavior
+      readelf -d behavior > dynamic.txt
+      if grep -E 'NEEDED.*\[libuv\.so' dynamic.txt; then
+        echo "static test linked the shared library" >&2
+        exit 1
+      fi
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check

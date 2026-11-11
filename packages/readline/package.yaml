@@ -7,7 +7,7 @@
 # Readline is configured against ncurses instead of a standalone termcap so
 # that libreadline records its real terminfo dependency. An underlinked
 # readline works until something links it with `-Wl,--no-as-needed`.
-schema: 1
+schema: 2
 
 package:
   name: readline
@@ -81,18 +81,11 @@ outputs:
       run:
         - ncurses-libs
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libreadline.so.* /usr/lib/libreadline.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+      - name: runtime-linkage
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libreadline.so.*", "libhistory.so.*"]
   - name: readline-devel
     summary: Development files for readline
     files:
@@ -106,29 +99,16 @@ outputs:
         - readline = ${package.version}-${package.release}
         - ncurses-devel
     tests:
-      - name: link
-        stage: installed
-        packages: [gcc, glibc-devel, pkgconf, grep, bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            test -f /usr/include/readline/readline.h
-            cat > /tmp/hist.c <<'EOF'
-            #include <stdio.h>
-            #include <readline/readline.h>
-            #include <readline/history.h>
-            int main(void) {
-              add_history("eternal");
-              printf("%d\n", history_length);
-              return 0;
-            }
-            EOF
-            # --no-as-needed proves libreadline itself records its terminfo
-            # dependency instead of relying on the program's link line.
-            gcc /tmp/hist.c -Wl,--no-as-needed -lreadline -o /tmp/hist
-            test "$(/tmp/hist)" = 1
-
+      - name: api-behavior
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists readline
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags readline) "$TEST_FILES/behavior.c" -Wl,--no-as-needed $(pkg-config --libs readline) -o behavior
+          ./behavior
   - name: readline-doc
     summary: Documentation for readline
     files:
@@ -142,6 +122,5 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check

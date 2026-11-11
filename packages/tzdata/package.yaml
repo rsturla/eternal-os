@@ -2,7 +2,7 @@
 #
 # IANA timezone data. The zoneinfo tree is compiled at build time with the zic
 # shipped by the same release, so the package does not depend on a host zic.
-schema: 1
+schema: 2
 
 package:
   name: tzdata
@@ -59,13 +59,20 @@ outputs:
       license:
         - /usr/share/licenses/tzdata/**
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            test -f /usr/share/zoneinfo/UTC
-            test -f /usr/share/zoneinfo/right/UTC
-            test "$(TZ=America/New_York date +%Z)" = EST
+      - name: historical-dst-and-unusual-offsets
+        packages:
+          - bash
+          - coreutils
+        script: |
+          zone=/usr/share/zoneinfo
+          for name in UTC right/UTC America/New_York Europe/London Asia/Kathmandu Australia/Lord_Howe Pacific/Chatham; do
+           test -s "$zone/$name"
+          done
+          test "$(TZ=UTC date -d @0 '+%F %T %z')" = '1970-01-01 00:00:00 +0000'
+          test "$(TZ=America/New_York date -d '2024-03-10 06:59:59 UTC' '+%T %z')" = '01:59:59 -0500'
+          test "$(TZ=America/New_York date -d '2024-03-10 07:00:00 UTC' '+%T %z')" = '03:00:00 -0400'
+          test "$(TZ=America/New_York date -d '2024-11-03 06:00:00 UTC' '+%T %z')" = '01:00:00 -0500'
+          test "$(TZ=Asia/Kathmandu date -d '2024-01-01 UTC' +%z)" = +0545
+          test "$(TZ=Australia/Lord_Howe date -d '2024-01-01 UTC' +%z)" = +1100
+          test "$(TZ=Australia/Lord_Howe date -d '2024-07-01 UTC' +%z)" = +1030
+          test "$(TZ=Pacific/Chatham date -d '2024-01-01 UTC' +%z)" = +1345

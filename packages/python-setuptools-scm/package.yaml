@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-setuptools-scm.yaml
-schema: 1
+schema: 2
 package:
   name: python-setuptools-scm
   version: 10.3.4
@@ -82,10 +82,9 @@ outputs:
     - python-${matrix.python.version}-vcs-versioning
     - python-${matrix.python.version}-packaging
   tests:
-  - name: functional
-    stage: installed
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - from setuptools_scm import get_version; import os, tempfile; os.chdir(tempfile.mkdtemp()); version =
-      get_version(root=".", fallback_version="1.2.3"); assert version == "1.2.3", version
+  - name: behavior
+    files: tests
+    packages:
+    - git
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/test_behavior.py" "${matrix.python.version}" "setuptools-scm" "${package.version}"

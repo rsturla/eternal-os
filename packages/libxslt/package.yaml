@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # libexslt has no fortifiable libc call. Check its other hardening properties.
 # Check all properties on xsltproc and libxslt.
-schema: 1
+schema: 2
 package:
   name: libxslt
   version: 1.1.45
@@ -68,17 +68,17 @@ outputs:
     - libxslt-libs = ${package.version}-${package.release}
   tests:
   - name: transform
-    stage: installed
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      printf '<root>ok</root>\n' > /tmp/input.xml
-      cat > /tmp/style.xsl <<'EOF'
-      <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"><xsl:output method="text"/><xsl:template match="/"><xsl:value-of select="root"/></xsl:template></xsl:stylesheet>
-      EOF
-      test "$(xsltproc --nonet /tmp/style.xsl /tmp/input.xml)" = ok
+    files: tests
+    script: |
+      test "$(xsltproc --nonet "$TEST_FILES/exslt.xsl" "$TEST_FILES/input.xml")" = 42
+  - name: xslt-cli
+    files: tests
+    script: |
+      test "$(xsltproc --nonet "$TEST_FILES/transform.xsl" "$TEST_FILES/input.xml")" = 42
+      if xsltproc --nonet "$TEST_FILES/input.xml" "$TEST_FILES/input.xml"; then
+        echo "accepted an XML document as an XSLT stylesheet" >&2
+        exit 1
+      fi
 - name: libxslt-libs
   files:
     license:
@@ -91,16 +91,11 @@ outputs:
     run:
     - libxml2
   tests:
-  - name: load
-    stage: installed
-    packages:
-      - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("libxslt.so.1")'
+  - name: runtime-linkage
+    pipeline:
+      - uses: test/runtime-linkage
+        with:
+          libraries: ["libxslt.so.*", "libexslt.so.*"]
 - name: libxslt-devel
   files:
     license:
@@ -114,23 +109,16 @@ outputs:
     run:
     - libxslt-libs = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
-    stage: installed
+  - name: api-behavior
     packages:
-      - gcc
-      - glibc-devel
-      - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.c <<'EOF'
-      #include <libxslt/xslt.h>
-      int main(void) { xsltInit(); xsltCleanupGlobals(); return 0; }
-      EOF
-      gcc /tmp/test.c $(pkg-config --cflags --libs libxslt) -o /tmp/test
-      /tmp/test
+    - gcc
+    - glibc-devel
+    - pkgconf
+    files: tests
+    script: |
+      pkg-config --exists libxslt libexslt
+      gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libxslt libexslt) "$TEST_FILES/behavior.c" $(pkg-config --libs libxslt libexslt) -o behavior
+      ./behavior
 - name: libxslt-doc
   files:
     license:
@@ -143,7 +131,6 @@ outputs:
     - /usr/share/gtk-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check
     with:

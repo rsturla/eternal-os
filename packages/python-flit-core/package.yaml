@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-flit-core.yaml
-schema: 1
+schema: 2
 package:
   name: python-flit-core
   version: 3.12.0
@@ -75,9 +75,7 @@ outputs:
     license:
     - /usr/share/licenses/python-${matrix.python.version}-flit-core/**
   tests:
-  - name: functional
-    stage: installed
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - from flit_core import buildapi; assert callable(buildapi.build_wheel)
+  - name: offline-behavior
+    files: tests
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/check.py" "${matrix.python.version}" "flit-core" "${package.version}"

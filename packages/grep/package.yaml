@@ -2,7 +2,7 @@
 #
 # GNU grep pattern matcher. Part of the minimal Eternal userland and the
 # bootstrap tool set. The source is the upstream release tarball.
-schema: 1
+schema: 2
 
 package:
   name: grep
@@ -47,6 +47,13 @@ build:
         outputs: [grep, grep-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+      artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: grep
     summary: GNU grep pattern matcher
@@ -54,17 +61,28 @@ outputs:
       license:
         - /usr/share/licenses/grep/COPYING
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils]
+      - name: patterns
+        packages:
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/patterns.sh"
+      - name: no-match
         argv:
-          - sh
-          - -c
-          - |
-            printf 'alpha\nbeta\n' > file
-            test "$(grep beta file)" = beta
-            test "$(grep -c . file)" = 2
-            printf 'abc123\n' | grep -P '\d+' > /dev/null
+          - grep
+          - missing
+          - /dev/null
+        expect:
+          exit-code: 1
+          stdout: ''
+      - name: invalid-expression
+        argv:
+          - grep
+          - '['
+          - /dev/null
+        expect:
+          exit-code: 2
+          stdout: ''
 
   - name: grep-doc
     summary: GNU grep pattern matcher documentation

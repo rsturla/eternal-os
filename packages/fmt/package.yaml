@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # A modern C++ formatting library.
-schema: 1
+schema: 2
 
 package:
   name: fmt
@@ -60,18 +60,11 @@ outputs:
       license:
         - /usr/share/licenses/fmt/**
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils, gcc-c++, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libfmt.so.* /usr/lib/libfmt.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+      - name: runtime-linkage
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libfmt.so.*"]
   - name: fmt-static
     summary: Static library for fmt
     files:
@@ -84,18 +77,22 @@ outputs:
       run:
         - fmt-devel = ${package.version}-${package.release}
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils, gcc-c++, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libfmt*.a /usr/lib/libfmt*.a; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+      - name: static-c-binding
+        packages:
+          - gcc-c++
+          - glibc-devel
+          - pkgconf
+          - binutils
+          - grep
+        files: tests
+        script: |
+          pkg-config --exists fmt
+          # Upstream builds the C binding as an archive backed by the shared C++ library.
+          gcc -std=c17 $(pkg-config --cflags fmt) -c "$TEST_FILES/c-binding.c" -o c-binding.o
+          g++ c-binding.o "$(pkg-config --variable=libdir fmt)/libfmt-c.a" $(pkg-config --libs fmt) -o behavior
+          ./behavior
+          nm --defined-only behavior > symbols.txt
+          grep -E ' [Tt] fmt_vformat$' symbols.txt
   - name: fmt-devel
     summary: Development files for fmt
     files:
@@ -108,13 +105,13 @@ outputs:
       run:
         - fmt = ${package.version}-${package.release}
     tests:
-      - name: link
-        stage: installed
-        packages: [bash-binsh, coreutils, gcc-c++, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '#include <fmt/core.h>\nint main(){fmt::print("ok\\n");}\n' > /tmp/fmt.cc
-            g++ /tmp/fmt.cc -lfmt -o /tmp/fmt-test
-            /tmp/fmt-test | grep -Fx ok
+      - name: api-behavior
+        packages:
+          - gcc-c++
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists fmt
+          g++ -std=c++17 -Wall -Wextra $(pkg-config --cflags fmt) "$TEST_FILES/behavior.cc" $(pkg-config --libs fmt) -o behavior
+          ./behavior

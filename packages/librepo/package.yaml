@@ -1,11 +1,11 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # Library for downloading and verifying rpm repository metadata.
-schema: 1
+schema: 2
 
 package:
   name: librepo
-  version: "1.22.0"
+  version: 1.22.0
   release: 1
   summary: Repodata downloading library
   description: |
@@ -21,7 +21,7 @@ package:
 sources:
   - name: librepo-1.22.0.tar.gz
     kind: archive
-    digest: "sha512:1a2c1753721196753ebb4af5eef483fba28b06a26ebff764accaee3e5b153327c181f04869e98fccc9b9a085f171e367f129511616549a25efd4530d38e9bedf"
+    digest: sha512:1a2c1753721196753ebb4af5eef483fba28b06a26ebff764accaee3e5b153327c181f04869e98fccc9b9a085f171e367f129511616549a25efd4530d38e9bedf
     locators:
       - kind: https
         url: https://github.com/rpm-software-management/librepo/archive/refs/tags/1.22.0.tar.gz
@@ -72,23 +72,16 @@ outputs:
         - rpm-libs
         - zchunk-libs
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/librepo.so.* /usr/lib/librepo.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+      - name: runtime-linkage
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["librepo.so.*"]
   - name: librepo-devel
     summary: Development files for librepo
     files:
       include:
-        - "@dev"
+        - '@dev'
         - /usr/share/licenses/librepo-devel/**
       license:
         - /usr/share/licenses/librepo-devel/**
@@ -96,13 +89,13 @@ outputs:
       run:
         - librepo = ${package.version}-${package.release}
     tests:
-      - name: link
-        stage: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '#include <librepo/librepo.h>\nint main(void){return 0;}\n' > /tmp/librepo.c
-            gcc /tmp/librepo.c $(pkg-config --cflags --libs librepo) -o /tmp/librepo-test
-            /tmp/librepo-test
+      - name: api-behavior
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists librepo
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags librepo) "$TEST_FILES/behavior.c" $(pkg-config --libs librepo) -o behavior
+          ./behavior "$TEST_FILES/repository"

@@ -2,7 +2,7 @@
 #
 # A library for arbitrary precision arithmetic. A build dependency for the GNU toolchain and the
 # rest of the minimal Eternal userland.
-schema: 1
+schema: 2
 
 package:
   name: gmp
@@ -56,6 +56,16 @@ build:
         outputs: [gmp, gmp-devel, gmp-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages:
+        - diffutils
+      artifacts:
+        - test-suite.log
+        - tests/test-suite.log
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: gmp
     summary: A library for arbitrary precision arithmetic
@@ -64,18 +74,11 @@ outputs:
         - /usr/share/licenses/gmp/COPYING.LESSERv3
         - /usr/share/licenses/gmp/COPYINGv3
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libgmp.so.* /usr/lib/libgmp.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+      - name: runtime-linkage
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libgmp.so.*"]
   - name: gmp-devel
     summary: GMP development files
     files:
@@ -90,6 +93,17 @@ outputs:
       run:
         - gmp = ${package.version}-${package.release}
 
+    tests:
+      - name: api-behavior
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists gmp
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags gmp) "$TEST_FILES/behavior.c" $(pkg-config --libs gmp) -o behavior
+          ./behavior
   - name: gmp-doc
     summary: GMP documentation
     files:
@@ -102,25 +116,3 @@ outputs:
       license:
         - /usr/share/licenses/gmp-doc/COPYING.LESSERv3
         - /usr/share/licenses/gmp-doc/COPYINGv3
-
-tests:
-  - name: link
-    stage: installed
-    packages: [gcc, glibc-devel, bash-binsh]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #include <gmp.h>
-        int main(void) {
-          mpz_t value;
-          mpz_init_set_ui(value, 2);
-          mpz_mul_ui(value, value, 3);
-          int result = mpz_cmp_ui(value, 6) != 0;
-          mpz_clear(value);
-          return result;
-        }
-        EOF
-        gcc /tmp/test.c -lgmp -o /tmp/test
-        /tmp/test

@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Use the non-namespaced stylesheets expected by existing DocBook build tools.
-schema: 1
+schema: 2
 package:
   name: docbook-style-xsl
   version: 1.79.2
@@ -10,69 +10,71 @@ package:
   license: LicenseRef-DocBook-XSL
   upstream: https://github.com/docbook/xslt10-stylesheets
 sources:
-- name: docbook-style-xsl-1.79.2.tar.gz
-  kind: archive
-  digest: sha512:8764c4176abd9662f9005e7d76b1cfcceb18882404c11256a8c19bf3b44cbe4e5ff9c73b1902c4d6611708cc9ae483fe21e6185a19a3b9aeb2abcb9c19e73862
-  locators:
-  - kind: https
-    url: https://github.com/docbook/xslt10-stylesheets/releases/download/release/1.79.2/docbook-xsl-nons-1.79.2.tar.gz
-  extract:
-    format: tar.gz
-    strip-components: 1
+  - name: docbook-style-xsl-1.79.2.tar.gz
+    kind: archive
+    digest: sha512:8764c4176abd9662f9005e7d76b1cfcceb18882404c11256a8c19bf3b44cbe4e5ff9c73b1902c4d6611708cc9ae483fe21e6185a19a3b9aeb2abcb9c19e73862
+    locators:
+      - kind: https
+        url: https://github.com/docbook/xslt10-stylesheets/releases/download/release/1.79.2/docbook-xsl-nons-1.79.2.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
   packages:
-  - bash
-  - coreutils
-  pipeline:
-  - runs: |
-      dest="$STAGE/usr/share/sgml/docbook/xsl-stylesheets"
-      install -d "$dest"
-      cp -a VERSION VERSION.xsl catalog.xml assembly common eclipse epub epub3 fo highlighting html htmlhelp images javahelp lib manpages params profiling roundtrip slides template webhelp website xhtml xhtml-1_1 xhtml5 "$dest/"
-      install -d "$STAGE/usr/share/doc/docbook-style-xsl"
-      cp -a README RELEASE-NOTES.txt "$STAGE/usr/share/doc/docbook-style-xsl/"
-
-      # Omit the optional Perl PDF indexing helper from the stylesheet data.
-      rm -f "$dest/fo/pdf2index"
-  - uses: license/copy
-    with:
-      files:
-      - COPYING
-      outputs:
-      - docbook-style-xsl
-      - docbook-style-xsl-doc
-outputs:
-- name: docbook-style-xsl
-  files:
-    license:
-    - /usr/share/licenses/docbook-style-xsl/**
-  arch: noarch
-  tests:
-  - name: transform
-    stage: installed
-    packages:
-      - libxslt
-      - grep
-    argv:
     - bash
-    - -eu
-    - -c
-    - |
-      printf '<article><title>Smoke</title><para>payload</para></article>\n' > /tmp/article.xml
-      xsltproc --nonet /usr/share/sgml/docbook/xsl-stylesheets/html/docbook.xsl /tmp/article.xml > /tmp/article.html
-      grep -q payload /tmp/article.html
-- name: docbook-style-xsl-doc
-  files:
-    license:
-    - /usr/share/licenses/docbook-style-xsl-doc/**
-    include:
-    - '@doc'
-    - /usr/share/licenses/docbook-style-xsl-doc/**
+    - coreutils
+  pipeline:
+    - runs: |
+        dest="$STAGE/usr/share/sgml/docbook/xsl-stylesheets"
+        install -d "$dest"
+        cp -a VERSION VERSION.xsl catalog.xml assembly common eclipse epub epub3 fo highlighting html htmlhelp images javahelp lib manpages params profiling roundtrip slides template webhelp website xhtml xhtml-1_1 xhtml5 "$dest/"
+        install -d "$STAGE/usr/share/doc/docbook-style-xsl"
+        cp -a README RELEASE-NOTES.txt "$STAGE/usr/share/doc/docbook-style-xsl/"
+
+        # Omit the optional Perl PDF indexing helper from the stylesheet data.
+        rm -f "$dest/fo/pdf2index"
+    - uses: license/copy
+      with:
+        files:
+          - COPYING
+        outputs:
+          - docbook-style-xsl
+          - docbook-style-xsl-doc
+outputs:
+  - name: docbook-style-xsl
+    files:
+      license:
+        - /usr/share/licenses/docbook-style-xsl/**
+    arch: noarch
+    tests:
+      - name: html-and-formatting-object-transforms
+        packages:
+          - bash
+          - libxslt
+          - grep
+        files: tests
+        script: |
+          xsltproc --nonet /usr/share/sgml/docbook/xsl-stylesheets/html/docbook.xsl "$TEST_FILES/article.xml" > article.html
+          grep -F 'Eternal test article' article.html
+          grep -F 'Fixture payload' article.html
+          grep -F 'First item' article.html
+          grep -F 'href="#details"' article.html
+          xsltproc --nonet /usr/share/sgml/docbook/xsl-stylesheets/fo/docbook.xsl "$TEST_FILES/article.xml" > article.fo
+          grep -F 'http://www.w3.org/1999/XSL/Format' article.fo
+          grep -F 'Fixture payload' article.fo
+  - name: docbook-style-xsl-doc
+    files:
+      license:
+        - /usr/share/licenses/docbook-style-xsl-doc/**
+      include:
+        - '@doc'
+        - /usr/share/licenses/docbook-style-xsl-doc/**
 patches:
-- file: patches/docbook-xsl-non-constant-expressions.patch
-  strip: 1
-  reason: Fedora fix for nonconstant XSLT match expressions
-- file: patches/docbook-style-xsl-non-recursive-string-subst.patch
-  strip: 2
-  reason: Fedora backport of upstream nonrecursive string substitution; avoid libxslt recursion limits
+  - file: patches/docbook-xsl-non-constant-expressions.patch
+    strip: 1
+    reason: Fedora fix for nonconstant XSLT match expressions
+  - file: patches/docbook-style-xsl-non-recursive-string-subst.patch
+    strip: 2
+    reason: Fedora backport of upstream nonrecursive string substitution; avoid libxslt recursion limits

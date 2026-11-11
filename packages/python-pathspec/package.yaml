@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-pathspec.yaml
-schema: 1
+schema: 2
 package:
   name: python-pathspec
   version: 1.1.1
@@ -76,10 +76,7 @@ outputs:
     license:
     - /usr/share/licenses/python-${matrix.python.version}-pathspec/**
   tests:
-  - name: functional
-    stage: installed
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - from pathspec import PathSpec; p = PathSpec.from_lines("gitwildmatch", ["*.py"]); assert p.match_file("demo.py");
-      assert not p.match_file("demo.c")
+  - name: offline-behavior
+    files: tests
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/check.py" "${matrix.python.version}" "pathspec" "${package.version}"

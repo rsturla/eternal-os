@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/libpsl.yaml
 # Use libidn2 instead of ICU. The release archive includes its pinned public suffix data.
-schema: 1
+schema: 2
 package:
   name: libpsl
   version: 0.23.3
@@ -56,6 +56,16 @@ build:
       - libpsl-devel
       - libpsl-doc
   - uses: strip
+  tests:
+  - name: upstream
+    packages:
+    - diffutils
+    artifacts:
+    - test-suite.log
+    - tests/test-suite.log
+    pipeline:
+    - uses: make/check
+
 outputs:
 - name: libpsl
   files:
@@ -66,12 +76,7 @@ outputs:
     - libpsl-libs = ${package.version}-${package.release}
   tests:
   - name: suffix
-    stage: installed
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       test "$(psl --use-builtin-data --print-reg-domain example.co.uk)" = "example.co.uk: example.co.uk"
 - name: libpsl-libs
   files:
@@ -84,16 +89,11 @@ outputs:
     run:
     - libunistring
   tests:
-  - name: load
-    stage: installed
-    packages:
-    - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("libpsl.so.5")'
+  - name: runtime-linkage
+    pipeline:
+      - uses: test/runtime-linkage
+        with:
+          libraries: ["libpsl.so.*"]
 - name: libpsl-devel
   files:
     include:
@@ -106,23 +106,16 @@ outputs:
     run:
     - libpsl-libs = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
-    stage: installed
+  - name: api-behavior
     packages:
     - gcc
     - glibc-devel
     - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.c <<'EOF'
-      #include <libpsl.h>
-      int main(void) { const psl_ctx_t *p = psl_builtin(); return !p || !psl_is_public_suffix(p, "com"); }
-      EOF
-      gcc /tmp/test.c $(pkg-config --cflags --libs libpsl) -o /tmp/test
-      /tmp/test
+    files: tests
+    script: |
+      pkg-config --exists libpsl
+      gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libpsl) "$TEST_FILES/behavior.c" $(pkg-config --libs libpsl) -o behavior
+      ./behavior
 - name: libpsl-doc
   files:
     include:
@@ -133,6 +126,5 @@ outputs:
     - /usr/share/licenses/libpsl-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check

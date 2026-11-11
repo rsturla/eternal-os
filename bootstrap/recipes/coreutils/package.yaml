@@ -4,7 +4,7 @@
 # bootstrap variant exists because the ladder hides the seed provider while a
 # stage builds this package, so the EVR does not need to outrank Fedora's copy.
 # The production recipe is in packages/coreutils/package.yaml.
-schema: 1
+schema: 2
 
 package:
   name: coreutils
@@ -67,6 +67,12 @@ outputs:
       provides:
         - coreutils-full
         - coreutils-single
+    tests:
+      - name: filesystem-and-text
+        packages: []
+        files: tests
+        script: |
+          bash "$TEST_FILES/filesystem-and-text.sh"
 
   - name: coreutils-doc
     summary: GNU core utilities documentation
@@ -78,15 +84,3 @@ outputs:
         - /usr/share/licenses/coreutils-doc/COPYING
       license:
         - /usr/share/licenses/coreutils-doc/COPYING
-
-tests:
-  - name: build
-    stage: build
-    argv:
-      - sh
-      - -c
-      - test -x "$STAGE/usr/bin/ls" && test -x "$STAGE/usr/bin/cat"
-
-  - name: installed
-    stage: installed
-    argv: [ls, --version]

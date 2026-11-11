@@ -2,7 +2,7 @@
 #
 # Integer set library for the polyhedral model. A build dependency for the GNU toolchain and the
 # rest of the minimal Eternal userland.
-schema: 1
+schema: 2
 
 package:
   name: isl
@@ -52,6 +52,16 @@ build:
         outputs: [isl, isl-devel]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages:
+        - diffutils
+      artifacts:
+        - test-suite.log
+        - tests/test-suite.log
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: isl
     summary: Integer set library for the polyhedral model
@@ -59,18 +69,11 @@ outputs:
       license:
         - /usr/share/licenses/isl/LICENSE
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libisl.so.* /usr/lib/libisl.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+      - name: runtime-linkage
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libisl.so.*"]
   - name: isl-devel
     summary: ISL development files
     files:
@@ -84,24 +87,14 @@ outputs:
         - isl = ${package.version}-${package.release}
         - gmp-devel
 
-tests:
-  - name: link
-    stage: installed
-    packages: [gcc, glibc-devel, bash-binsh]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #include <isl/ctx.h>
-        int main(void) {
-          isl_ctx *context = isl_ctx_alloc();
-          if (context == 0) {
-            return 1;
-          }
-          isl_ctx_free(context);
-          return 0;
-        }
-        EOF
-        gcc /tmp/test.c -lisl -o /tmp/test
-        /tmp/test
+    tests:
+      - name: api-behavior
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists isl
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags isl) "$TEST_FILES/behavior.c" $(pkg-config --libs isl) -o behavior
+          ./behavior

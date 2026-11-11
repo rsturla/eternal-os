@@ -12,7 +12,7 @@
 # so `make` would regenerate the man page with help2man. The shipped page is
 # the 2.6.4 page; it is touched to keep it, which avoids carrying help2man and
 # a full Perl tool chain just for one roff file.
-schema: 1
+schema: 2
 
 package:
   name: flex
@@ -83,28 +83,14 @@ outputs:
         - flex-libs = ${package.version}-${package.release}
         - m4
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, gcc, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            set -eu
-            flex --version | head -1 | grep -q '2.6.4'
-            cat > scan.l <<'EOF'
-            %%
-            [0-9]+  { printf("NUMBER:%s\n", yytext); }
-            .       { }
-            %%
-            int yywrap(void) { return 1; }
-            int main(void) { yylex(); return 0; }
-            EOF
-            flex -o scan.c scan.l
-            cc -o scanner scan.c
-            printf '42' | ./scanner | grep -Fx 'NUMBER:42'
-            lex -o lex.c scan.l
-            test -s lex.c
+      - name: scanner
+        packages:
+          - coreutils
+          - gcc
+          - glibc-devel
+        files: tests
+        script: |
+          bash "$TEST_FILES/scanner.sh"
 
   - name: flex-libs
     summary: The flex scanner runtime library
@@ -114,6 +100,20 @@ outputs:
         - /usr/share/licenses/flex-libs/COPYING
       license:
         - /usr/share/licenses/flex-libs/COPYING
+    tests:
+      - name: minimal-runtime-dependencies
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libfl.so.[0-9]*"]
+      - name: runtime
+        packages:
+          - gcc
+          - glibc-devel
+        files: tests
+        script: |
+          gcc -Wall -Wextra -Werror "$TEST_FILES/flex-api.c" -Wl,-l:libfl.so.2 -o runtime
+          ./runtime
 
   - name: flex-devel
     summary: Development files for flex
@@ -128,21 +128,14 @@ outputs:
       run:
         - flex-libs = ${package.version}-${package.release}
     tests:
-      - name: link
-        stage: installed
-        packages: [gcc, gcc-c++, glibc-devel, bash-binsh, coreutils, grep, m4]
-        argv:
-          - sh
-          - -c
-          - |
-            set -eu
-            cat > /tmp/flexlexer.cc <<'EOF'
-            #include <FlexLexer.h>
-            extern "C" int yylex() { return 0; }
-            int main(void) { return 0; }
-            EOF
-            g++ /tmp/flexlexer.cc -lfl -o /tmp/flexlexer
-            /tmp/flexlexer
+      - name: flex-api
+        packages:
+          - gcc
+          - glibc-devel
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/flex-api.sh"
 
   - name: flex-doc
     summary: flex documentation
@@ -157,7 +150,6 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       # libfl is a few hundred bytes of wrapper code with no stack buffers and
       # no libc string calls, so the stack-protector and fortify probes have

@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
-schema: 1
+schema: 2
 package:
   name: autoconf
   version: '2.73'
@@ -67,18 +67,17 @@ outputs:
     - sed
     - grep
   tests:
-  - name: generate
-    stage: installed
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      mkdir /tmp/autoconf-test
-      cd /tmp/autoconf-test
-      printf 'AC_INIT([smoke], [1])\nAC_CONFIG_SRCDIR([configure.ac])\nAC_OUTPUT\n' > configure.ac
-      autoconf
-      ./configure
+    - name: configure-project
+      packages:
+        - coreutils
+        - gcc
+        - glibc-devel
+        - make
+        - bash-binsh
+      files: tests
+      script: |
+        bash "$TEST_FILES/configure-project.sh"
+
 - name: autoconf-doc
   files:
     license:

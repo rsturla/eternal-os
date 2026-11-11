@@ -7,7 +7,7 @@
 # This bootstrap variant exists because the ladder hides the seed filesystem
 # provider while a stage builds this package. The production recipe is in
 # packages/filesystem/package.yaml.
-schema: 1
+schema: 2
 
 package:
   name: filesystem
@@ -60,40 +60,40 @@ outputs:
       license:
         - /usr/share/licenses/filesystem/LICENSE
       directories:
-        - { path: /boot, mode: "0755", user: root, group: root }
-        - { path: /dev, mode: "0755", user: root, group: root }
-        - { path: /etc, mode: "0755", user: root, group: root }
-        - { path: /home, mode: "0755", user: root, group: root }
-        - { path: /media, mode: "0755", user: root, group: root }
-        - { path: /mnt, mode: "0755", user: root, group: root }
-        - { path: /opt, mode: "0755", user: root, group: root }
-        - { path: /proc, mode: "0555", user: root, group: root }
-        - { path: /root, mode: "0700", user: root, group: root }
-        - { path: /run, mode: "0755", user: root, group: root }
-        - { path: /srv, mode: "0755", user: root, group: root }
-        - { path: /sys, mode: "0555", user: root, group: root }
-        - { path: /tmp, mode: "1777", user: root, group: root }
-        - { path: /usr, mode: "0755", user: root, group: root }
-        - { path: /usr/bin, mode: "0755", user: root, group: root }
-        - { path: /usr/include, mode: "0755", user: root, group: root }
-        - { path: /usr/lib, mode: "0755", user: root, group: root }
-        - { path: /usr/lib64, mode: "0755", user: root, group: root }
-        - { path: /usr/libexec, mode: "0755", user: root, group: root }
-        - { path: /usr/local, mode: "0755", user: root, group: root }
-        - { path: /usr/local/bin, mode: "0755", user: root, group: root }
-        - { path: /usr/local/include, mode: "0755", user: root, group: root }
-        - { path: /usr/local/lib, mode: "0755", user: root, group: root }
-        - { path: /usr/local/lib64, mode: "0755", user: root, group: root }
-        - { path: /usr/local/sbin, mode: "0755", user: root, group: root }
-        - { path: /usr/local/share, mode: "0755", user: root, group: root }
-        - { path: /usr/sbin, mode: "0755", user: root, group: root }
-        - { path: /usr/share, mode: "0755", user: root, group: root }
-        - { path: /var, mode: "0755", user: root, group: root }
-        - { path: /var/cache, mode: "0755", user: root, group: root }
-        - { path: /var/lib, mode: "0755", user: root, group: root }
-        - { path: /var/log, mode: "0755", user: root, group: root }
-        - { path: /var/spool, mode: "0755", user: root, group: root }
-        - { path: /var/tmp, mode: "1777", user: root, group: root }
+        - {path: /boot, mode: "0755", user: root, group: root}
+        - {path: /dev, mode: "0755", user: root, group: root}
+        - {path: /etc, mode: "0755", user: root, group: root}
+        - {path: /home, mode: "0755", user: root, group: root}
+        - {path: /media, mode: "0755", user: root, group: root}
+        - {path: /mnt, mode: "0755", user: root, group: root}
+        - {path: /opt, mode: "0755", user: root, group: root}
+        - {path: /proc, mode: "0555", user: root, group: root}
+        - {path: /root, mode: "0700", user: root, group: root}
+        - {path: /run, mode: "0755", user: root, group: root}
+        - {path: /srv, mode: "0755", user: root, group: root}
+        - {path: /sys, mode: "0555", user: root, group: root}
+        - {path: /tmp, mode: "1777", user: root, group: root}
+        - {path: /usr, mode: "0755", user: root, group: root}
+        - {path: /usr/bin, mode: "0755", user: root, group: root}
+        - {path: /usr/include, mode: "0755", user: root, group: root}
+        - {path: /usr/lib, mode: "0755", user: root, group: root}
+        - {path: /usr/lib64, mode: "0755", user: root, group: root}
+        - {path: /usr/libexec, mode: "0755", user: root, group: root}
+        - {path: /usr/local, mode: "0755", user: root, group: root}
+        - {path: /usr/local/bin, mode: "0755", user: root, group: root}
+        - {path: /usr/local/include, mode: "0755", user: root, group: root}
+        - {path: /usr/local/lib, mode: "0755", user: root, group: root}
+        - {path: /usr/local/lib64, mode: "0755", user: root, group: root}
+        - {path: /usr/local/sbin, mode: "0755", user: root, group: root}
+        - {path: /usr/local/share, mode: "0755", user: root, group: root}
+        - {path: /usr/sbin, mode: "0755", user: root, group: root}
+        - {path: /usr/share, mode: "0755", user: root, group: root}
+        - {path: /var, mode: "0755", user: root, group: root}
+        - {path: /var/cache, mode: "0755", user: root, group: root}
+        - {path: /var/lib, mode: "0755", user: root, group: root}
+        - {path: /var/log, mode: "0755", user: root, group: root}
+        - {path: /var/spool, mode: "0755", user: root, group: root}
+        - {path: /var/tmp, mode: "1777", user: root, group: root}
     dependencies:
       # The layout package cannot require itself; the repository default
       # would otherwise apply to it like every other output.
@@ -106,15 +106,28 @@ outputs:
 
 tests:
   - name: layout
-    stage: build
-    argv:
-      - sh
-      - -c
-      - |
-        test -L "$STAGE/bin" && test "$(readlink "$STAGE/bin")" = usr/bin
-        test -L "$STAGE/sbin" && test "$(readlink "$STAGE/sbin")" = usr/sbin
-        test -L "$STAGE/lib" && test "$(readlink "$STAGE/lib")" = usr/lib
-        test -L "$STAGE/lib64" && test "$(readlink "$STAGE/lib64")" = usr/lib64
-        test -d "$STAGE/usr/bin" && test -d "$STAGE/usr/lib64"
-        test "$(stat -c %a "$STAGE/tmp")" = 1777
-        test "$(stat -c %a "$STAGE/root")" = 700
+    script: |
+      test -L "$TEST_PACKAGE_ROOT/bin" && test "$(readlink "$TEST_PACKAGE_ROOT/bin")" = usr/bin
+      test -L "$TEST_PACKAGE_ROOT/sbin" && test "$(readlink "$TEST_PACKAGE_ROOT/sbin")" = usr/sbin
+      test -L "$TEST_PACKAGE_ROOT/lib" && test "$(readlink "$TEST_PACKAGE_ROOT/lib")" = usr/lib
+      test -L "$TEST_PACKAGE_ROOT/lib64" && test "$(readlink "$TEST_PACKAGE_ROOT/lib64")" = usr/lib64
+      test -d "$TEST_PACKAGE_ROOT/usr/bin" && test -d "$TEST_PACKAGE_ROOT/usr/lib64"
+      test "$(stat -c %a "$TEST_PACKAGE_ROOT/tmp")" = 1777
+      test "$(stat -c %a "$TEST_PACKAGE_ROOT/root")" = 700
+  - name: installed-merged-usr-and-permissions
+    packages:
+      - bash
+      - coreutils
+    script: |
+      for name in bin sbin lib lib64; do
+       test -L "/$name"
+       test "$(readlink "/$name")" = "usr/$name"
+      done
+      test "$(readlink /var/run)" = ../run
+      test "$(readlink /var/lock)" = ../run/lock
+      for path in /tmp /var/tmp; do test "$(stat -c %a "$path")" = 1777; done
+      test "$(stat -c %a /root)" = 700
+      for path in /usr/bin /usr/lib /usr/lib64 /usr/local/share /var/cache /var/lib /var/log; do
+       test -d "$path"
+       test "$(stat -c %a "$path")" = 755
+      done

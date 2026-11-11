@@ -2,7 +2,7 @@
 #
 # Terminal display library and terminfo tools. Bash links against libtinfo and
 # the base image needs a terminfo database for tput/infocmp.
-schema: 1
+schema: 2
 
 package:
   name: ncurses
@@ -110,19 +110,32 @@ outputs:
         - ncurses-base = ${package.version}-${package.release}
         - ncurses-libs = ${package.version}-${package.release}
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            tput --version
-            infocmp --version
-            tic --version
-            TERM=xterm tput cols
-
-
+      - name: terminfo-roundtrip
+        packages:
+          - coreutils
+          - diffutils
+        files: tests
+        script: |
+          mkdir database
+          tic -x -o database "$TEST_FILES/eternal.terminfo"
+          infocmp -A "$PWD/database" eternal-test > regenerated.terminfo
+          text=$(cat regenerated.terminfo)
+          [[ $text == *'cols#80,'* && $text == *'lines#24,'* && $text == *'colors#8,'* ]] || {
+            printf 'unexpected custom terminal capabilities:\n%s\n' "$text" >&2
+            exit 1
+          }
+          mkdir second-database
+          tic -x -o second-database regenerated.terminfo
+          cmp database/e/eternal-test second-database/e/eternal-test
+          # ncurses deliberately ignores TERMINFO for uid 0. Test tput against shipped data.
+          export TERM=xterm
+          unset LINES COLUMNS
+          test "$(tput colors)" = 8
+          test "$(tput cup 2 3)" = $'\e[3;4H'
+          if tput nonexistent-capability; then
+            echo "accepted an unknown terminal capability" >&2
+            exit 1
+          fi
   - name: ncurses-base
     summary: Descriptions of common terminals
     files:
@@ -168,16 +181,16 @@ outputs:
       license:
         - /usr/share/licenses/ncurses-base/**
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils, ncurses-libs]
-        argv:
-          - sh
-          - -c
-          - |
-            test -f /usr/share/terminfo/x/xterm
-            test -f /usr/share/terminfo/l/linux
-
+      - name: terminfo-entry
+        packages:
+          - ncurses
+        script: |
+          infocmp xterm > entry
+          entry=$(<entry)
+          [[ $entry == *'cols#80,'* && $entry == *'lines#24,'* && $entry == *'colors#8,'* ]] || {
+            printf 'unexpected xterm capabilities:\n%s\n' "$entry" >&2
+            exit 1
+          }
   - name: ncurses-term
     summary: Additional terminal descriptions
     files:
@@ -228,15 +241,16 @@ outputs:
       run:
         - ncurses-base = ${package.version}-${package.release}
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils, ncurses-libs]
-        argv:
-          - sh
-          - -c
-          - |
-            test -f /usr/share/terminfo/a/ansi80x25
-
+      - name: terminfo-entry
+        packages:
+          - ncurses
+        script: |
+          infocmp ansi80x25 > entry
+          entry=$(<entry)
+          [[ $entry == *'cols#80,'* && $entry == *'lines#25,'* && $entry == *'colors#8,'* ]] || {
+            printf 'unexpected ansi80x25 capabilities:\n%s\n' "$entry" >&2
+            exit 1
+          }
   - name: ncurses-libs
     summary: Terminal handling runtime libraries
     files:
@@ -252,18 +266,11 @@ outputs:
       run:
         - ncurses-base = ${package.version}-${package.release}
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libncurses.so.* /usr/lib/libncurses.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+      - name: runtime-linkage
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libncurses.so.*", "libncursesw.so.*", "libtinfo.so.*"]
   - name: ncurses-devel
     summary: Development files for ncurses
     files:
@@ -277,6 +284,17 @@ outputs:
       run:
         - ncurses-libs = ${package.version}-${package.release}
 
+    tests:
+      - name: api-behavior
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists ncursesw
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags ncursesw) "$TEST_FILES/behavior.c" $(pkg-config --libs ncursesw) -o behavior
+          ./behavior
   - name: ncurses-doc
     summary: Documentation for ncurses
     files:

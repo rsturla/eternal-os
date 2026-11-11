@@ -2,7 +2,7 @@
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/libcap-ng.yaml
 # Upstream publishes this release as a tag without a release archive. Omit Python bindings.
 # The preload helper has no arrays or fortifiable libc calls. Check its other ELF properties.
-schema: 1
+schema: 2
 package:
   name: libcap-ng
   version: 0.9.6
@@ -69,14 +69,16 @@ outputs:
     - libcap-ng-libs = ${package.version}-${package.release}
   tests:
   - name: capabilities
-    stage: installed
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      pscap -p $$
-      filecap /usr/bin/bash
+    script: |
+      trap 'printf "line %s: %s\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
+      pscap -a -p $$
+      printf 'ordinary file without capabilities\n' > ordinary-file
+      test -z "$(filecap "$PWD/ordinary-file")"
+      status=0
+      filecap "$PWD/ordinary-file" eternal_invalid_capability > diagnostic 2>&1 || status=$?
+      test "$status" = 1
+      diagnostic=$(<diagnostic)
+      [[ $diagnostic == *'Unrecognized capability'* ]]
 - name: libcap-ng-libs
   files:
     include:
@@ -86,16 +88,11 @@ outputs:
     license:
     - /usr/share/licenses/libcap-ng-libs/**
   tests:
-  - name: load
-    stage: installed
-    packages:
-    - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("libcap-ng.so.0")'
+  - name: runtime-linkage
+    pipeline:
+      - uses: test/runtime-linkage
+        with:
+          libraries: ["libcap-ng.so.*", "libdrop_ambient.so.*"]
 - name: libcap-ng-devel
   files:
     include:
@@ -107,23 +104,16 @@ outputs:
     run:
     - libcap-ng-libs = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
-    stage: installed
+  - name: api-behavior
     packages:
     - gcc
     - glibc-devel
     - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.c <<'EOF'
-      #include <cap-ng.h>
-      int main(void) { capng_clear(CAPNG_SELECT_BOTH); return capng_have_capabilities(CAPNG_SELECT_BOTH) != CAPNG_NONE; }
-      EOF
-      gcc /tmp/test.c $(pkg-config --cflags --libs libcap-ng) -o /tmp/test
-      /tmp/test
+    files: tests
+    script: |
+      pkg-config --exists libcap-ng
+      gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libcap-ng) "$TEST_FILES/behavior.c" $(pkg-config --libs libcap-ng) -o behavior
+      ./behavior
 - name: libcap-ng-doc
   files:
     include:
@@ -134,7 +124,6 @@ outputs:
     - /usr/share/licenses/libcap-ng-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check
     with:

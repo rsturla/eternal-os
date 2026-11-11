@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-editables.yaml
-schema: 1
+schema: 2
 package:
   name: python-editables
   version: '0.6'
@@ -76,10 +76,7 @@ outputs:
     license:
     - /usr/share/licenses/python-${matrix.python.version}-editables/**
   tests:
-  - name: functional
-    stage: installed
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - from editables import EditableProject; p = EditableProject("demo", "/tmp"); p.add_to_path("."); assert
-      list(p.files())
+  - name: offline-behavior
+    files: tests
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/check.py" "${matrix.python.version}" "editables" "${package.version}"

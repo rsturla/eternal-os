@@ -2,7 +2,7 @@
 #
 # GNU patch. Part of the minimal Eternal userland and the
 # bootstrap tool set. The source is the upstream release tarball.
-schema: 1
+schema: 2
 
 package:
   name: patch
@@ -46,6 +46,13 @@ build:
         outputs: [patch, patch-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+      artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: patch
     summary: GNU patch
@@ -53,17 +60,13 @@ outputs:
       license:
         - /usr/share/licenses/patch/COPYING
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            printf 'old\n' > file
-            printf '%s\n' '--- file' '+++ file' '@@ -1 +1 @@' '-old' '+new' > change.diff
-            patch file < change.diff
-            test "$(cat file)" = new
+      - name: apply-and-reverse
+        packages:
+          - coreutils
+          - diffutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/apply-and-reverse.sh"
 
   - name: patch-doc
     summary: GNU patch documentation

@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # Portable foreign function interface library. A dependency for the minimal Eternal build root.
-schema: 1
+schema: 2
 
 package:
   name: libffi
@@ -45,6 +45,22 @@ build:
         outputs: [libffi, libffi-devel, libffi-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      environment:
+        USER: rpmx-test
+        LOGNAME: rpmx-test
+      packages:
+        - dejagnu
+        - diffutils
+      artifacts:
+        - test/test-suite.log
+        - test-suite.log
+        - testsuite/libffi.log
+        - testsuite/libffi.sum
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: libffi
     summary: Portable foreign function interface library
@@ -52,18 +68,11 @@ outputs:
       license:
         - /usr/share/licenses/libffi/LICENSE
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libffi.so.* /usr/lib/libffi.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+      - name: runtime-linkage
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libffi.so.*"]
   - name: libffi-devel
     summary: libffi development files
     files:
@@ -76,6 +85,17 @@ outputs:
       run:
         - libffi = ${package.version}-${package.release}
 
+    tests:
+      - name: api-behavior
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists libffi
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libffi) "$TEST_FILES/behavior.c" $(pkg-config --libs libffi) -o behavior
+          ./behavior
   - name: libffi-doc
     summary: libffi documentation
     files:
@@ -86,22 +106,3 @@ outputs:
         - /usr/share/licenses/libffi-doc/LICENSE
       license:
         - /usr/share/licenses/libffi-doc/LICENSE
-
-tests:
-  - name: link
-    stage: installed
-    packages: [gcc, glibc-devel, bash-binsh]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #include <ffi.h>
-        int main(void) {
-          ffi_cif cif;
-          (void)cif;
-          return 0;
-        }
-        EOF
-        gcc /tmp/test.c -lffi -o /tmp/test
-        /tmp/test

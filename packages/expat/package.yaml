@@ -2,7 +2,7 @@
 #
 # XML parser library. A build dependency for gettext and other tooling in the
 # minimal Eternal userland.
-schema: 1
+schema: 2
 
 package:
   name: expat
@@ -51,6 +51,16 @@ build:
         outputs: [expat, expat-libs, expat-devel, expat-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages:
+        - diffutils
+      artifacts:
+        - test-suite.log
+        - tests/test-suite.log
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: expat
     summary: XML parser tools
@@ -62,15 +72,16 @@ outputs:
         - expat-libs = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
-        packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            xmlwf -v
-            printf '<root/>' | xmlwf
-
+        script: |
+          trap 'printf "line %s: %s\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
+          xmlwf -v
+          printf '<root/>' | xmlwf
+          printf '<root><child></root>' > malformed.xml
+          status=0
+          xmlwf malformed.xml > diagnostic 2>&1 || status=$?
+          test "$status" = 2
+          diagnostic=$(<diagnostic)
+          [[ $diagnostic == *'mismatched tag'* ]]
   - name: expat-libs
     summary: Expat runtime library
     files:
@@ -80,18 +91,11 @@ outputs:
       license:
         - /usr/share/licenses/expat-libs/COPYING
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libexpat.so.* /usr/lib/libexpat.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+      - name: runtime-linkage
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libexpat.so.*"]
   - name: expat-devel
     summary: Expat development files
     files:
@@ -104,6 +108,17 @@ outputs:
       run:
         - expat-libs = ${package.version}-${package.release}
 
+    tests:
+      - name: api-behavior
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists expat
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags expat) "$TEST_FILES/behavior.c" $(pkg-config --libs expat) -o behavior
+          ./behavior
   - name: expat-doc
     summary: Expat documentation
     files:
@@ -113,23 +128,3 @@ outputs:
         - /usr/share/licenses/expat-doc/COPYING
       license:
         - /usr/share/licenses/expat-doc/COPYING
-
-tests:
-  - name: link
-    stage: installed
-    packages: [gcc, glibc-devel, bash-binsh]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #include <expat.h>
-        int main(void) {
-          XML_Parser parser = XML_ParserCreate(0);
-          if (parser == 0) return 1;
-          XML_ParserFree(parser);
-          return 0;
-        }
-        EOF
-        gcc /tmp/test.c -lexpat -o /tmp/test
-        /tmp/test

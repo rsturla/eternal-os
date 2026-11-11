@@ -7,12 +7,12 @@
 # The loader, binaries, iconv modules and development files are separate
 # outputs. `glibc-2.44` is the runtime library set; `ld-linux-2.44` owns the
 # ELF interpreter and loader configuration; `libc-bin-2.44` owns the utilities.
-schema: 1
+schema: 2
 
 package:
   name: glibc-2.44
   version: "2.44"
-  release: 4
+  release: 5
   summary: The GNU C Library
   description: |
     The GNU C Library provides the C runtime, dynamic loader interfaces,
@@ -138,7 +138,8 @@ build:
     - uses: license/copy
       with:
         files: [COPYINGv2, COPYING.LIB]
-        outputs: [glibc-2.44, ld-linux-2.44, libc-bin-2.44, glibc-2.44-iconv, glibc-2.44-locales, glibc-2.44-locale-posix, glibc-2.44-locale-ca, glibc-2.44-locale-de, glibc-2.44-locale-en, glibc-2.44-locale-es, glibc-2.44-locale-fr, glibc-2.44-locale-extra, nss-db-2.44, glibc-2.44-devel, glibc-2.44-static, glibc-2.44-doc]
+        outputs: [glibc-2.44, ld-linux-2.44, libc-bin-2.44, glibc-2.44-iconv, glibc-2.44-locales, glibc-2.44-locale-posix, glibc-2.44-locale-ca, glibc-2.44-locale-de, glibc-2.44-locale-en,
+              glibc-2.44-locale-es, glibc-2.44-locale-fr, glibc-2.44-locale-extra, nss-db-2.44, glibc-2.44-devel, glibc-2.44-static, glibc-2.44-doc]
     - runs: |
         # The loader configuration is owned by ld-linux-2.44, not by the
         # library package.
@@ -151,6 +152,22 @@ build:
           '/usr/lib64' \
           > "$STAGE/etc/ld.so.conf"
     - uses: strip
+
+  tests:
+    - name: upstream
+      files: tests
+      packages:
+        - perl
+        - gawk
+        # NSS tests need real passwd/group records for root and the runner user.
+        - setup
+      pipeline:
+        - runs: |
+            bash "$TEST_FILES/upstream.sh"
+      artifacts:
+        - build/tests.sum
+        - upstream-reports
+      timeout: 4h
 
 outputs:
   - name: glibc-2.44
@@ -170,6 +187,26 @@ outputs:
         - glibc = ${package.version}-${package.release}
         - glibc-2.44 = ${package.version}-${package.release}
 
+    tests:
+      - name: posix-runtime
+        packages:
+          - bash
+          - gcc
+          - binutils
+          - grep
+          - glibc-2.44-devel
+        files: tests
+        script: |
+          gcc -O2 -Wall -Wextra -Werror -pthread "$TEST_FILES/runtime.c" -lm -o runtime
+          version=$(./runtime)
+          test "$version" = 2.44
+          readelf -d runtime > dynamic.txt
+          if grep -F '.so-' dynamic.txt; then exit 1; fi
+      - name: runtime-closure
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libc.so.*", "libm.so.*", "libresolv.so.*"]
   - name: ld-linux-2.44
     summary: The GNU C Library ELF interpreter
     files:
@@ -188,6 +225,24 @@ outputs:
         - ld-linux = ${package.version}-${package.release}
         - rtld(GNU_HASH)
 
+    tests:
+      - name: loader-resolution
+        packages:
+          - bash
+          - coreutils
+          - grep
+        script: |
+          case "$(uname -m)" in
+            x86_64) name=ld-linux-x86-64.so.2 ;;
+            aarch64) name=ld-linux-aarch64.so.1 ;;
+            *) exit 1 ;;
+          esac
+          loader=/usr/lib64/$name
+          if test ! -x "$loader"; then loader=/usr/lib/$name; fi
+          "$loader" --verify /usr/bin/bash
+          "$loader" --list /usr/bin/bash > dependencies.txt
+          if grep -F 'not found' dependencies.txt; then exit 1; fi
+          "$loader" /usr/bin/bash --noprofile --norc -c 'test "$((6 * 7))" = 42'
   - name: libc-bin-2.44
     summary: GNU C Library binaries
     files:
@@ -206,9 +261,27 @@ outputs:
     dependencies:
       run:
         - glibc-2.44 = ${package.version}-${package.release}
+        # localedef decompresses the shipped .gz charmaps through this helper.
+        - gzip
       provides:
         - libc-bin = ${package.version}-${package.release}
 
+    tests:
+      - name: utilities
+        packages:
+          - bash
+          - coreutils
+          - grep
+        script: |
+          test "$(getconf GNU_LIBC_VERSION)" = 'glibc 2.44'
+          test "$(getconf LONG_BIT)" = 64
+          test "$(LC_ALL=C locale charmap)" = ANSI_X3.4-1968
+          getent rpc portmapper > rpc.txt
+          grep '^portmapper' rpc.txt
+          printf 'hello\n' > input
+          printf 'hello\n' > expected
+          getconf PAGESIZE > page-size
+          test "$(cat page-size)" -ge 4096
   - name: glibc-2.44-iconv
     summary: GNU C Library iconv modules
     files:
@@ -226,6 +299,24 @@ outputs:
       provides:
         - glibc-iconv = ${package.version}-${package.release}
 
+    tests:
+      - name: character-conversion
+        packages:
+          - bash
+          - coreutils
+          - diffutils
+        script: |
+          printf '\303\251\342\202\254\n' > utf8
+          iconv -f UTF-8 -t UTF-16LE utf8 > utf16
+          iconv -f UTF-16LE -t UTF-8 utf16 > roundtrip
+          cmp utf8 roundtrip
+          printf '\351\n' > latin1
+          iconv -f ISO-8859-1 -t UTF-8 latin1 > converted
+          printf '\303\251\n' > expected
+          cmp expected converted
+          printf '\377' > invalid
+          if iconv -f UTF-8 -t UTF-16LE invalid >invalid.out 2>invalid.err; then exit 1; fi
+          test -s invalid.err
   - name: glibc-2.44-locale-posix
     summary: POSIX UTF-8 locale data for glibc
     files:
@@ -239,6 +330,26 @@ outputs:
       provides:
         - glibc-locale-posix = ${package.version}-${package.release}
 
+    tests:
+      - name: locale-encoding-numbers-and-dates
+        packages:
+          - bash
+          - coreutils
+          - libc-bin-2.44
+        script: |
+          mkdir locale
+          found=0
+          for directory in /usr/lib/locale/C.utf8 /usr/lib64/locale/C.utf8; do
+            test -d "$directory" || continue
+            cp -R "$directory" locale/C.utf8
+            found=1
+            break
+          done
+          test "$found" = 1
+          export LOCPATH="$PWD/locale"
+          test "$(LC_ALL=C.utf8 locale charmap)" = UTF-8
+          test "$(LC_ALL=C.utf8 locale decimal_point)" = '.'
+          test "$(LC_ALL=C.utf8 date -u -d @946684800 +%B)" = 'January'
   - name: glibc-2.44-locale-ca
     summary: CA locale data for glibc
     files:
@@ -254,6 +365,26 @@ outputs:
       provides:
         - glibc-locale-ca = ${package.version}-${package.release}
 
+    tests:
+      - name: locale-encoding-numbers-and-dates
+        packages:
+          - bash
+          - coreutils
+          - libc-bin-2.44
+        script: |
+          mkdir locale
+          found=0
+          for directory in /usr/lib/locale/ca_ES.utf8 /usr/lib64/locale/ca_ES.utf8; do
+            test -d "$directory" || continue
+            cp -R "$directory" locale/ca_ES.utf8
+            found=1
+            break
+          done
+          test "$found" = 1
+          export LOCPATH="$PWD/locale"
+          test "$(LC_ALL=ca_ES.utf8 locale charmap)" = UTF-8
+          test "$(LC_ALL=ca_ES.utf8 locale decimal_point)" = ','
+          test "$(LC_ALL=ca_ES.utf8 date -u -d @946684800 +%B)" = 'de gener'
   - name: glibc-2.44-locale-de
     summary: DE locale data for glibc
     files:
@@ -269,6 +400,26 @@ outputs:
       provides:
         - glibc-locale-de = ${package.version}-${package.release}
 
+    tests:
+      - name: locale-encoding-numbers-and-dates
+        packages:
+          - bash
+          - coreutils
+          - libc-bin-2.44
+        script: |
+          mkdir locale
+          found=0
+          for directory in /usr/lib/locale/de_DE.utf8 /usr/lib64/locale/de_DE.utf8; do
+            test -d "$directory" || continue
+            cp -R "$directory" locale/de_DE.utf8
+            found=1
+            break
+          done
+          test "$found" = 1
+          export LOCPATH="$PWD/locale"
+          test "$(LC_ALL=de_DE.utf8 locale charmap)" = UTF-8
+          test "$(LC_ALL=de_DE.utf8 locale decimal_point)" = ','
+          test "$(LC_ALL=de_DE.utf8 date -u -d @946684800 +%B)" = 'Januar'
   - name: glibc-2.44-locale-en
     summary: EN locale data for glibc
     files:
@@ -284,6 +435,26 @@ outputs:
       provides:
         - glibc-locale-en = ${package.version}-${package.release}
 
+    tests:
+      - name: locale-encoding-numbers-and-dates
+        packages:
+          - bash
+          - coreutils
+          - libc-bin-2.44
+        script: |
+          mkdir locale
+          found=0
+          for directory in /usr/lib/locale/en_US.utf8 /usr/lib64/locale/en_US.utf8; do
+            test -d "$directory" || continue
+            cp -R "$directory" locale/en_US.utf8
+            found=1
+            break
+          done
+          test "$found" = 1
+          export LOCPATH="$PWD/locale"
+          test "$(LC_ALL=en_US.utf8 locale charmap)" = UTF-8
+          test "$(LC_ALL=en_US.utf8 locale decimal_point)" = '.'
+          test "$(LC_ALL=en_US.utf8 date -u -d @946684800 +%B)" = 'January'
   - name: glibc-2.44-locale-es
     summary: ES locale data for glibc
     files:
@@ -299,6 +470,26 @@ outputs:
       provides:
         - glibc-locale-es = ${package.version}-${package.release}
 
+    tests:
+      - name: locale-encoding-numbers-and-dates
+        packages:
+          - bash
+          - coreutils
+          - libc-bin-2.44
+        script: |
+          mkdir locale
+          found=0
+          for directory in /usr/lib/locale/es_ES.utf8 /usr/lib64/locale/es_ES.utf8; do
+            test -d "$directory" || continue
+            cp -R "$directory" locale/es_ES.utf8
+            found=1
+            break
+          done
+          test "$found" = 1
+          export LOCPATH="$PWD/locale"
+          test "$(LC_ALL=es_ES.utf8 locale charmap)" = UTF-8
+          test "$(LC_ALL=es_ES.utf8 locale decimal_point)" = ','
+          test "$(LC_ALL=es_ES.utf8 date -u -d @946684800 +%B)" = 'enero'
   - name: glibc-2.44-locale-fr
     summary: FR locale data for glibc
     files:
@@ -314,6 +505,26 @@ outputs:
       provides:
         - glibc-locale-fr = ${package.version}-${package.release}
 
+    tests:
+      - name: locale-encoding-numbers-and-dates
+        packages:
+          - bash
+          - coreutils
+          - libc-bin-2.44
+        script: |
+          mkdir locale
+          found=0
+          for directory in /usr/lib/locale/fr_FR.utf8 /usr/lib64/locale/fr_FR.utf8; do
+            test -d "$directory" || continue
+            cp -R "$directory" locale/fr_FR.utf8
+            found=1
+            break
+          done
+          test "$found" = 1
+          export LOCPATH="$PWD/locale"
+          test "$(LC_ALL=fr_FR.utf8 locale charmap)" = UTF-8
+          test "$(LC_ALL=fr_FR.utf8 locale decimal_point)" = ','
+          test "$(LC_ALL=fr_FR.utf8 date -u -d @946684800 +%B)" = 'janvier'
   - name: glibc-2.44-locale-extra
     summary: Other locale data for glibc
     files:
@@ -336,6 +547,26 @@ outputs:
       provides:
         - glibc-locale-extra = ${package.version}-${package.release}
 
+    tests:
+      - name: locale-encoding-numbers-and-dates
+        packages:
+          - bash
+          - coreutils
+          - libc-bin-2.44
+        script: |
+          mkdir locale
+          found=0
+          for directory in /usr/lib/locale/ja_JP.utf8 /usr/lib64/locale/ja_JP.utf8; do
+            test -d "$directory" || continue
+            cp -R "$directory" locale/ja_JP.utf8
+            found=1
+            break
+          done
+          test "$found" = 1
+          export LOCPATH="$PWD/locale"
+          test "$(LC_ALL=ja_JP.utf8 locale charmap)" = UTF-8
+          test "$(LC_ALL=ja_JP.utf8 locale decimal_point)" = '.'
+          test "$(LC_ALL=ja_JP.utf8 date -u -d @946684800 +%B)" = '1月'
   - name: glibc-2.44-locales
     summary: GNU C Library locale data and translations
     files:
@@ -349,6 +580,18 @@ outputs:
       provides:
         - glibc-locales = ${package.version}-${package.release}
 
+    tests:
+      - name: compile-locale
+        packages:
+          - bash
+          - coreutils
+          - libc-bin-2.44
+        files: tests
+        script: |
+          bash "$TEST_FILES/compile-locale.sh"
+        artifacts:
+          - locale
+          - locale-context.txt
   - name: nss-db-2.44
     summary: GNU C Library NSS database support
     files:
@@ -364,6 +607,22 @@ outputs:
       provides:
         - nss-db = ${package.version}-${package.release}
 
+    tests:
+      - name: build-and-read-rpc-database
+        packages:
+          - bash
+          - coreutils
+          - make
+          - gawk
+          - grep
+          - libc-bin-2.44
+        script: |
+          mkdir db
+          make -f /var/db/Makefile VAR_DB="$PWD/db" DATABASES=/etc/rpc
+          test -s db/rpc.db
+          makedb -u db/rpc.db > database.txt
+          grep '^.portmapper ' database.txt
+          grep '^=100000 ' database.txt
   - name: glibc-2.44-devel
     summary: GNU C Library development headers and libraries
     files:
@@ -399,79 +658,95 @@ outputs:
         - glibc-devel = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages:
           - binutils
           - gcc
           - grep
-        argv:
-          - sh
-          - -c
-          - |
-            set -eu
-            libdir="$LIBDIR"
-            test -f "$libdir/libc.so-2.44"
-            test -f "$libdir/libm.so-2.44"
-            test ! -L "$libdir/libc.so-2.44"
-            test ! -L "$libdir/libm.so-2.44"
-            case "$(cat "$libdir/libc.so")" in
-              *"$libdir/libc.so-2.44"*) ;;
-              *) echo "libc.so is not pinned"; exit 1 ;;
-            esac
-            case "$(cat "$libdir/libm.so")" in
-              *"$libdir/libm.so-2.44"*) ;;
-              *) echo "libm.so is not pinned"; exit 1 ;;
-            esac
-            test -f "$libdir/libc_nonshared.a"
-            test -f "$libdir/libpthread.a"
-            for so in libanl.so libBrokenLocale.so libc_malloc_debug.so \
-                      libmvec.so libnss_compat.so libnss_db.so libnss_hesiod.so \
-                      libresolv.so libthread_db.so; do
-              [ -e "$libdir/$so" ] || continue
-              test -f "$libdir/$so" || { echo "$libdir/$so is not a regular file"; exit 1; }
-              test ! -L "$libdir/$so" || { echo "$libdir/$so is still a symlink"; exit 1; }
-            done
-            cat >/tmp/glibc-devel-test.c <<'EOF'
-            #define _GNU_SOURCE
-            #include <gnu/libc-version.h>
-            #include <locale.h>
-            #include <math.h>
-            #include <pthread.h>
-            #include <stdio.h>
-            #include <string.h>
+          - bash
+        script: |
+          libdir="$LIBDIR"
+          test -f "$libdir/libc.so-2.44"
+          test -f "$libdir/libm.so-2.44"
+          test ! -L "$libdir/libc.so-2.44"
+          test ! -L "$libdir/libm.so-2.44"
+          case "$(cat "$libdir/libc.so")" in
+            *"$libdir/libc.so-2.44"*) ;;
+            *) echo "libc.so is not pinned"; exit 1 ;;
+          esac
+          case "$(cat "$libdir/libm.so")" in
+            *"$libdir/libm.so-2.44"*) ;;
+            *) echo "libm.so is not pinned"; exit 1 ;;
+          esac
+          test -f "$libdir/libc_nonshared.a"
+          test -f "$libdir/libpthread.a"
+          for so in libanl.so libBrokenLocale.so libc_malloc_debug.so \
+                    libmvec.so libnss_compat.so libnss_db.so libnss_hesiod.so \
+                    libresolv.so libthread_db.so; do
+            [ -e "$libdir/$so" ] || continue
+            test -f "$libdir/$so" || { echo "$libdir/$so is not a regular file"; exit 1; }
+            test ! -L "$libdir/$so" || { echo "$libdir/$so is still a symlink"; exit 1; }
+          done
+          cat >/tmp/glibc-devel-test.c <<'EOF'
+          #define _GNU_SOURCE
+          #include <gnu/libc-version.h>
+          #include <math.h>
+          #include <pthread.h>
+          #include <stdio.h>
+          #include <string.h>
 
-            static void *worker(void *arg) {
-              (void)arg;
-              return NULL;
-            }
+          static void *worker(void *arg) {
+            (void)arg;
+            return NULL;
+          }
 
-            int main(void) {
-              if (setlocale(LC_ALL, "C.UTF-8") == NULL) return 1;
-              pthread_t thread;
-              if (pthread_create(&thread, NULL, worker, NULL) != 0) return 1;
-              pthread_join(thread, NULL);
+          int main(void) {
+            pthread_t thread;
+            if (pthread_create(&thread, NULL, worker, NULL) != 0) return 1;
+            pthread_join(thread, NULL);
 
-              char buf[8];
-              if (strlcpy(buf, "abc", sizeof buf) != 3) return 1;
-              if (strcmp(buf, "abc") != 0) return 1;
+            char buf[8];
+            if (strlcpy(buf, "abc", sizeof buf) != 3) return 1;
+            if (strcmp(buf, "abc") != 0) return 1;
 
-              double x = log(exp(2.0));
-              if (fabs(x - 2.0) > 1e-9) return 1;
+            double x = log(exp(2.0));
+            if (fabs(x - 2.0) > 1e-9) return 1;
 
-              printf("%s\n", gnu_get_libc_version());
-              return 0;
-            }
-            EOF
-            gcc -O2 -Wall -Wextra -Werror -fstack-protector-all -pthread \
-              -Wl,--hash-style=gnu \
-              -o /tmp/glibc-devel-test /tmp/glibc-devel-test.c -lm
-            readelf -d /tmp/glibc-devel-test | grep -q GNU_HASH
-            /tmp/glibc-devel-test
-            if readelf -d /tmp/glibc-devel-test |
-                grep -q '\.so-'; then
-              echo "test binary links a pinned library soname"; exit 1
-            fi
-
+            printf("%s\n", gnu_get_libc_version());
+            return 0;
+          }
+          EOF
+          gcc -O2 -Wall -Wextra -Werror -fstack-protector-all -pthread \
+            -o /tmp/glibc-devel-test /tmp/glibc-devel-test.c -lm
+          /tmp/glibc-devel-test
+          readelf -d /tmp/glibc-devel-test > dynamic-pinned.txt
+          if grep -F '.so-' dynamic-pinned.txt; then
+            echo "test binary links a pinned library soname"; exit 1
+          fi
+      - name: startup-object-branch-protection
+        packages:
+          - binutils
+          - grep
+        files: tests
+        script: |
+          bash "$TEST_FILES/crt-branch-protection.sh" "$LIBDIR" "$RPMX_TARGET_ARCH"
+        artifacts:
+          - crt-branch-protection
+      - name: headers-and-linker-inputs
+        packages:
+          - bash
+          - gcc
+          - binutils
+          - grep
+        files: tests
+        script: |
+          gcc -O2 -Wall -Wextra -Werror -pthread -Wl,--hash-style=gnu "$TEST_FILES/runtime.c" -lm -o runtime
+          readelf -d runtime > dynamic.txt
+          grep -F GNU_HASH dynamic.txt
+          if grep -F '.so-' dynamic.txt; then
+            echo 'consumer records pinned linker input as a runtime SONAME' >&2
+            exit 1
+          fi
+          ./runtime
   - name: glibc-2.44-static
     summary: GNU C Library static libraries
     files:
@@ -494,6 +769,19 @@ outputs:
       provides:
         - glibc-static = ${package.version}-${package.release}
 
+    tests:
+      - name: static-runtime
+        packages:
+          - bash
+          - gcc
+          - binutils
+          - grep
+        files: tests
+        script: |
+          gcc -static -O2 -pthread "$TEST_FILES/runtime.c" -lm -o static-runtime
+          ./static-runtime
+          readelf -l static-runtime > segments.txt
+          if grep -F INTERP segments.txt; then exit 1; fi
   - name: glibc-2.44-doc
     summary: GNU C Library documentation
     files:
@@ -507,22 +795,17 @@ outputs:
         - /usr/share/licenses/glibc-2.44-doc/COPYING.LIB
 
 tests:
-  - name: build
-    stage: build
-    argv:
-      - sh
-      - -c
-      - |
-        set -eu
-        case "${arch}" in
-          x86_64) loader="$STAGE/usr/lib64/ld-linux-x86-64.so.2" ;;
-          aarch64) loader="$STAGE/usr/lib/ld-linux-aarch64.so.1" ;;
-          *) echo "unsupported arch"; exit 1 ;;
-        esac
-        test -x "$loader"
-        test ! -L "$loader"
-        test -f "$STAGE/usr/lib64/libc.so.6" || test -f "$STAGE/usr/lib/libc.so.6"
-        test -f "$STAGE/etc/ld.so.conf"
-        test -f "$STAGE/etc/rpc"
-        test -f "$STAGE/usr/share/i18n/locales/C"
-        test -f "$STAGE/var/db/Makefile"
+  - name: payload-layout
+    script: |
+      case "${arch}" in
+        x86_64) loader="$TEST_PACKAGE_ROOT/usr/lib64/ld-linux-x86-64.so.2" ;;
+        aarch64) loader="$TEST_PACKAGE_ROOT/usr/lib/ld-linux-aarch64.so.1" ;;
+        *) echo "unsupported arch"; exit 1 ;;
+      esac
+      test -x "$loader"
+      test ! -L "$loader"
+      test -f "$TEST_PACKAGE_ROOT/usr/lib64/libc.so.6" || test -f "$TEST_PACKAGE_ROOT/usr/lib/libc.so.6"
+      test -f "$TEST_PACKAGE_ROOT/etc/ld.so.conf"
+      test -f "$TEST_PACKAGE_ROOT/etc/rpc"
+      test -f "$TEST_PACKAGE_ROOT/usr/share/i18n/locales/C"
+      test -f "$TEST_PACKAGE_ROOT/var/db/Makefile"

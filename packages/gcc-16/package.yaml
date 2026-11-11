@@ -7,14 +7,14 @@
 #
 # The compiler is built without bootstrap (the seed compiler is the build
 # compiler) and without Fortran for the first import. The runtime libraries are
-# split the same way Wolfi splits them: libstdc++, libatomic and the compiler
-# proper are independent outputs.
-schema: 1
+# split into independently useful libgcc, libstdc++ and libatomic outputs.
+# Compiler and link-time support stay in the main output.
+schema: 2
 
 package:
   name: gcc-16
   version: "16.2.0"
-  release: 2
+  release: 3
   summary: The GNU Compiler Collection, version 16
   description: |
     GCC 16 provides the C and C++ compilers, the GNU runtime libraries and the
@@ -83,7 +83,7 @@ build:
         configure: ../configure
         args:
           - --program-suffix=-16
-          - '--with-pkgversion="Eternal gcc-16-1"'
+          - '--with-pkgversion="Eternal gcc-16-2"'
           - --with-glibc-version=2.44
           - --with-sysroot=/
           - --enable-languages=c,c++
@@ -98,6 +98,8 @@ build:
           - --enable-tls
           - --enable-default-pie
           - --enable-default-ssp
+          # The in-tree compiler builds target CRT objects outside the wrapper.
+          - '$(if [ "$RPMX_TARGET_ARCH" = aarch64 ]; then printf %s --enable-standard-branch-protection; fi)'
           - --enable-initfini-array
           - --enable-gnu-indirect-function
           - --enable-gnu-unique-object
@@ -116,7 +118,7 @@ build:
     - uses: license/copy
       with:
         files: [COPYING3, COPYING3.LIB, COPYING.RUNTIME]
-        outputs: [gcc-16, gcc-16-default, libstdc++-16, libstdc++-16-devel, libstdc++-16-static, libatomic-16, gcc-16-doc]
+        outputs: [gcc-16, gcc-16-default, libgcc-16, libstdc++-16, libstdc++-16-devel, libstdc++-16-static, libatomic-16, gcc-16-doc]
     - runs: |
         # The default package owns the stable command names. The versioned
         # names stay with gcc-16.
@@ -132,12 +134,38 @@ build:
         ln -sf gcc-16 "$STAGE/usr/bin/c99"
     - uses: strip
 
+  tests:
+    - name: upstream
+      environment:
+        USER: rpmx-test
+        LOGNAME: rpmx-test
+      packages:
+        - dejagnu
+        - expect
+      pipeline:
+        - runs: |
+            status=0
+            make -C build -j2 -k check-gcc check-target-libstdc++-v3 || status=$?
+            mkdir -p upstream-reports
+            find build -type f \( -name '*.sum' -o -name '*.log' \) -exec cp --parents '{}' upstream-reports/ \;
+            test "$status" = 0
+            for suite in gcc g++ libstdc++; do
+              find build -type f -name "$suite.sum" -exec cat '{}' + > "upstream-reports/$suite.summary"
+              grep -E '# of expected passes[[:space:]]+[1-9][0-9]*' "upstream-reports/$suite.summary"
+              if grep -E '^(FAIL|XPASS|ERROR|UNRESOLVED):' "upstream-reports/$suite.summary"; then
+                echo "unexpected DejaGNU result in $suite" >&2
+                exit 1
+              fi
+            done
+      artifacts:
+        - upstream-reports
+      timeout: 4h
+
 outputs:
   - name: gcc-16
-    summary: GCC 16 compiler and runtime
-    # Main package: driver, cc1/cc1plus, runtime libraries, compiler
-    # static archives and the license. libgcc.a and friends stay here because
-    # GCC needs them at link time, even in the main package.
+    summary: GCC 16 compiler and link-time support
+    # Keep compiler archives, CRT objects and the unversioned linker stub here.
+    # The libgcc SONAME lives in its own runtime-only output below.
     files:
       license:
         - /usr/share/licenses/gcc-16/COPYING3
@@ -150,10 +178,113 @@ outputs:
       run:
         - binutils
         - glibc-devel
+        - libgcc-16 = ${package.version}-${package.release}
         - libstdc++-16 = ${package.version}-${package.release}
       provides:
         - gcc-16 = ${package.version}-${package.release}
 
+    tests:
+      - name: c-runtime
+        packages:
+          - bash
+          - coreutils
+          - grep
+        files: tests
+        script: |
+          for optimization in -O0 -O2 -O3 -Os; do
+            gcc-16 -std=c11 "$optimization" -Wall -Wextra -Werror -pthread "$TEST_FILES/runtime.c" -o runtime
+            ./runtime
+          done
+          gcc-16 -fopenmp -O2 "$TEST_FILES/openmp.c" -o openmp
+          ./openmp
+          cp "$TEST_FILES/runtime.c" coverage.c
+          gcc-16 --coverage -pthread coverage.c -o coverage
+          ./coverage
+          gcov-16 coverage.c
+          grep -E '^[[:space:]]*1:[[:space:]]*[0-9]+:.*puts\("c-runtime-ok"\)' coverage.c.gcov
+        artifacts:
+          - coverage.c.gcov
+      - name: linker-lto-and-diagnostics
+        packages:
+          - bash
+          - coreutils
+        files: tests
+        script: |
+          gcc-16 -O2 -flto -c "$TEST_FILES/library.c" -o library.o
+          gcc-ar-16 rcs libprobe.a library.o
+          gcc-ranlib-16 libprobe.a
+          gcc-16 -flto "$TEST_FILES/main.c" libprobe.a -o linked
+          ./linked
+          gcc-16 -fPIC -shared "$TEST_FILES/library.c" -o libprobe.so
+          gcc-16 "$TEST_FILES/main.c" -L. -lprobe -Wl,-rpath,'$ORIGIN' -o dynamic
+          ./dynamic
+          if gcc-16 -Werror -c "$TEST_FILES/invalid.c" -o invalid.o >invalid.stdout 2>invalid.stderr; then
+            echo 'invalid C unexpectedly compiled'; exit 1
+          fi
+          case "$(<invalid.stderr)" in
+            *missing_identifier*) ;;
+            *) echo 'compiler did not diagnose missing_identifier' >&2; exit 1 ;;
+          esac
+          gcc-16 -E "$TEST_FILES/main.c" > preprocessed.c
+          gcc-16 preprocessed.c libprobe.a -o preprocessed
+          ./preprocessed
+        artifacts:
+          - invalid.stderr
+      - name: target-runtime-branch-protection
+        packages: [bash, binutils, coreutils, grep]
+        files: tests
+        script: |
+          bash "$TEST_FILES/branch-protection.sh" /usr/bin/gcc-16
+        artifacts:
+          - branch-protection
+      - name: runtime-closure
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libgomp.so.*", "libitm.so.*"]
+  - name: libgcc-16
+    summary: GCC 16 shared compiler runtime
+    files:
+      include:
+        - /usr/lib*/libgcc_s.so.*
+        - /usr/share/licenses/libgcc-16/**
+      license:
+        - /usr/share/licenses/libgcc-16/COPYING3
+        - /usr/share/licenses/libgcc-16/COPYING3.LIB
+        - /usr/share/licenses/libgcc-16/COPYING.RUNTIME
+    dependencies:
+      provides:
+        - libgcc = ${package.version}-${package.release}
+    tests:
+      - name: runtime-only-payload-and-closure
+        files: tests
+        pipeline:
+          - runs: bash "$TEST_FILES/runtime-payload.sh"
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libgcc_s.so.*"]
+      - name: unwind-callbacks
+        files: tests
+        packages: [python-3.14]
+        script: /usr/bin/python3.14 -I "$TEST_FILES/unwind.py" "$LIBDIR/libgcc_s.so.1"
+        timeout: 1m
+      - name: certificate-and-find-runtime-consumers
+        packages: [ca-certificates, findutils]
+        script: |
+          # A fresh root must install these consumers without bringing the
+          # compiler/binutils/development closure into their RPM scriptlets.
+          for compiler in /usr/bin/gcc /usr/bin/gcc-* /usr/bin/g++; do
+            if [[ -e $compiler ]]; then
+              echo "certificate runtime unexpectedly installed $compiler" >&2
+              exit 1
+            fi
+          done
+          find /etc /usr/share -type f \
+            \( -path '*/ca-certificates/*' -o -path '*/pki/*' -o -path '*/ssl/*' \) \
+            \( -name '*.crt' -o -name '*.pem' -o -name '*.p11-kit' \) \
+            -print >certificate-files.txt
+          test -s certificate-files.txt
+        artifacts: [certificate-files.txt]
   - name: gcc-16-default
     summary: Stable command names for GCC 16
     files:
@@ -191,18 +322,23 @@ outputs:
         - cpp = ${package.version}-${package.release}
         - cc = ${package.version}-${package.release}
     tests:
-      - name: cxx-link
-        stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -eu
-          - -c
-          - |
-            printf '#include <iostream>\nint main() { std::cout << "ok"; }\n' > /tmp/gcc-cxx-test.cc
-            c++ /tmp/gcc-cxx-test.cc -o /tmp/gcc-cxx-test
-            test "$(/tmp/gcc-cxx-test)" = ok
-
+      - name: default-command-links
+        packages:
+          - bash
+          - coreutils
+        files: tests
+        script: |
+          for command in gcc cc c89 c99; do
+           test "$(readlink /usr/bin/$command)" = gcc-16
+           "$command" -std=c11 -pthread "$TEST_FILES/runtime.c" -o "probe-$command"
+           ./"probe-$command"
+          done
+          for command in g++ c++; do
+           test "$(readlink /usr/bin/$command)" = g++-16
+           "$command" -std=c++17 -pthread "$TEST_FILES/containers.cc" -o "probe-$command"
+           output=$(./"probe-$command")
+           test "$output" = cxx-runtime-ok
+          done
   - name: libstdc++-16
     summary: GNU Standard C++ Library
     files:
@@ -218,6 +354,21 @@ outputs:
         - libstdc++ = ${package.version}-${package.release}
         - libstdc++-16 = ${package.version}-${package.release}
 
+    tests:
+      - name: containers-exceptions-and-threads
+        packages:
+          - bash
+          - gcc-16
+          - libstdc++-16-devel
+        files: tests
+        script: |
+          g++-16 -std=c++17 -O2 -Wall -Wextra -Werror -pthread "$TEST_FILES/containers.cc" -o containers
+          ./containers
+      - name: runtime-closure
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libstdc++.so.*"]
   - name: libstdc++-16-devel
     summary: GNU Standard C++ Library development files
     files:
@@ -243,6 +394,15 @@ outputs:
       provides:
         - libstdc++-devel = ${package.version}-${package.release}
 
+    tests:
+      - name: containers-exceptions-and-threads
+        packages:
+          - bash
+          - gcc-16
+        files: tests
+        script: |
+          g++-16 -std=c++17 -O2 -Wall -Wextra -Werror -pthread "$TEST_FILES/containers.cc" -o containers
+          ./containers
   - name: libstdc++-16-static
     summary: GNU Standard C++ Library static archives
     files:
@@ -261,6 +421,19 @@ outputs:
       provides:
         - libstdc++-static = ${package.version}-${package.release}
 
+    tests:
+      - name: static-cxx-runtime
+        packages:
+          - bash
+          - gcc-16
+          - binutils
+          - grep
+        files: tests
+        script: |
+          g++-16 -std=c++17 -pthread -static-libstdc++ -static-libgcc "$TEST_FILES/containers.cc" -o containers
+          ./containers
+          readelf -d containers > dynamic.txt
+          if grep -F 'libstdc++' dynamic.txt; then exit 1; fi
   - name: libatomic-16
     summary: GCC atomic operations runtime
     files:
@@ -276,6 +449,20 @@ outputs:
       provides:
         - libatomic = ${package.version}-${package.release}
 
+    tests:
+      - name: non-lock-free-atomics
+        packages:
+          - bash
+          - gcc-16
+        files: tests
+        script: |
+          gcc-16 "$TEST_FILES/atomic.c" -latomic -o atomic
+          ./atomic
+      - name: runtime-closure
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libatomic.so.*"]
   - name: gcc-16-doc
     summary: GCC 16 documentation
     files:
@@ -287,25 +474,3 @@ outputs:
         - /usr/share/licenses/gcc-16-doc/COPYING3
         - /usr/share/licenses/gcc-16-doc/COPYING3.LIB
         - /usr/share/licenses/gcc-16-doc/COPYING.RUNTIME
-
-tests:
-  - name: build
-    stage: build
-    argv:
-      - sh
-      - -c
-      - |
-        "$STAGE/usr/bin/gcc-16" --version | grep -q '16.2.0'
-        "$STAGE/usr/bin/g++-16" --version | grep -q '16.2.0'
-        "$STAGE/usr/bin/cc" --version | grep -q '16.2.0'
-        "$STAGE/usr/bin/c++" --version | grep -q '16.2.0'
-        printf '#include <stdio.h>\nint main(void) { puts("gcc-ok"); return 0; }\n' > /tmp/gcc-16-test.c
-        "$STAGE/usr/bin/gcc-16" /tmp/gcc-16-test.c -o /tmp/gcc-16-test
-        /tmp/gcc-16-test | grep -q gcc-ok
-        "$STAGE/usr/bin/cc" /tmp/gcc-16-test.c -o /tmp/gcc-16-test-cc
-        /tmp/gcc-16-test-cc | grep -q gcc-ok
-        printf '#include <iostream>\nint main() { std::cout << "g++-ok\\n"; }\n' > /tmp/gcc-16-test.cc
-        "$STAGE/usr/bin/g++-16" /tmp/gcc-16-test.cc -o /tmp/gcc-16-test-cxx
-        /tmp/gcc-16-test-cxx | grep -q g++-ok
-        "$STAGE/usr/bin/c++" /tmp/gcc-16-test.cc -o /tmp/gcc-16-test-cxx-default
-        /tmp/gcc-16-test-cxx-default | grep -q g++-ok

@@ -3,7 +3,7 @@
 # dnf5 package manager and the libdnf5 libraries. The build keeps the core
 # package manager, the CLI library and libdnf5, and disables the daemon,
 # modulemd, comps, systemd, Python/Perl/Ruby bindings, plugins, tests and docs.
-schema: 1
+schema: 2
 
 package:
   name: dnf5
@@ -120,16 +120,42 @@ outputs:
         - libdnf5-cli = ${package.version}-${package.release}
         - rpm
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            dnf5 --version
-            dnf5 --help >/dev/null
-
+      - name: offline-installed-query
+        packages:
+          - bash
+          - grep
+        script: |
+          # Installed roots are read-only. Keep DNF's query state in the workspace.
+          state=(--setopt=persistdir="$PWD/persist" --setopt=cachedir="$PWD/cache" --setopt=logdir="$PWD/log")
+          dnf5 "$${state[@]}" --version
+          dnf5 "$${state[@]}" --disablerepo='*' --setopt=plugins=False repo list
+          dnf5 "$${state[@]}" --disablerepo='*' --setopt=plugins=False list --installed dnf5 > installed.txt
+          grep -F dnf5 installed.txt
+          # Resolve the invalid request without requiring a writable transaction root.
+          status=0
+          dnf5 "$${state[@]}" --disablerepo='*' --setopt=plugins=False install --assumeno eternal-rpmx-missing >missing.stdout 2>missing.stderr || status=$?
+          test "$status" = 1
+          grep -F 'eternal-rpmx-missing' missing.stderr
+        artifacts:
+          - installed.txt
+          - missing.stdout
+          - missing.stderr
+      - name: offline-local-package-transaction
+        mode: transaction
+        packages:
+          - bash
+          - coreutils
+        files: tests
+        script: |
+          mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+          rpmbuild -bb "$TEST_FILES/probe.spec" --define "_topdir $PWD/rpmbuild" \
+           --define 'probe_version 1' --define '__os_install_post %{nil}'
+          dnf5 --disablerepo='*' --setopt=plugins=False --setopt=gpgcheck=False --setopt=localpkg_gpgcheck=False install -y rpmbuild/RPMS/noarch/eternal-rpmx-probe-1-1.noarch.rpm
+          rpm -q eternal-rpmx-probe
+          test "$(cat /usr/share/eternal-rpmx-probe/payload)" = payload-1
+          dnf5 --disablerepo='*' --setopt=plugins=False --setopt=clean_requirements_on_remove=False remove -y eternal-rpmx-probe
+          if rpm -q eternal-rpmx-probe; then exit 1; fi
+          test ! -e /usr/share/eternal-rpmx-probe/payload
   - name: libdnf5
     summary: Core library for dnf5
     files:
@@ -152,18 +178,17 @@ outputs:
         - sqlite-libs
         - zchunk-libs
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libdnf5.so.* /usr/lib/libdnf5.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+      - name: runtime-loader
+        packages:
+          - bash
+          - python3
+        script: |
+          python3 -I -c 'import ctypes,glob,os; paths=glob.glob("/usr/lib*/libdnf5.so.*"); assert paths; ctypes.CDLL(paths[0],mode=os.RTLD_NOW)'
+      - name: runtime-closure
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libdnf5.so.*"]
   - name: libdnf5-devel
     summary: Development files for libdnf5
     files:
@@ -178,6 +203,17 @@ outputs:
       run:
         - libdnf5 = ${package.version}-${package.release}
 
+    tests:
+      - name: cxx-api
+        packages:
+          - bash
+          - gcc
+          - gcc-c++
+          - pkgconf
+        files: tests
+        script: |
+          g++ -std=c++20 "$TEST_FILES/base.cc" $(pkg-config --cflags --libs libdnf5) -o api
+          ./api
   - name: libdnf5-cli
     summary: Command line interface library for dnf5
     files:
@@ -193,18 +229,17 @@ outputs:
         - json-c
         - libsmartcols
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libdnf5-cli.so.* /usr/lib/libdnf5-cli.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+      - name: runtime-loader
+        packages:
+          - bash
+          - python3
+        script: |
+          python3 -I -c 'import ctypes,glob,os; paths=glob.glob("/usr/lib*/libdnf5-cli.so.*"); assert paths; ctypes.CDLL(paths[0],mode=os.RTLD_NOW)'
+      - name: runtime-closure
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libdnf5-cli.so.*"]
   - name: libdnf5-cli-devel
     summary: Development files for libdnf5-cli
     files:
@@ -219,3 +254,14 @@ outputs:
       run:
         - libdnf5-cli = ${package.version}-${package.release}
         - libdnf5-devel = ${package.version}-${package.release}
+    tests:
+      - name: cxx-api
+        packages:
+          - bash
+          - gcc
+          - gcc-c++
+          - pkgconf
+        files: tests
+        script: |
+          g++ -std=c++20 "$TEST_FILES/cli.cc" $(pkg-config --cflags --libs libdnf5-cli libdnf5) -o api
+          ./api

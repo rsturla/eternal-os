@@ -1,13 +1,12 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
-schema: 1
+schema: 2
 package:
   name: libxcrypt
   version: 4.5.2
   release: 1
   summary: Password hashing library
   description: Password hashing library.
-  license: LGPL-2.1-or-later AND BSD-3-Clause AND BSD-2-Clause AND BSD-2-Clause-FreeBSD AND 0BSD AND CC0-1.0
-    AND LicenseRef-Public-Domain
+  license: LGPL-2.1-or-later AND BSD-3-Clause AND BSD-2-Clause AND BSD-2-Clause-FreeBSD AND 0BSD AND CC0-1.0 AND LicenseRef-Public-Domain
   upstream: https://github.com/besser82/libxcrypt
 sources:
 - name: libxcrypt-4.5.2.tar.xz
@@ -58,16 +57,11 @@ outputs:
     license:
     - /usr/share/licenses/libxcrypt/**
   tests:
-  - name: load
-    stage: installed
-    packages:
-      - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("libcrypt.so.2")'
+  - name: runtime-linkage
+    pipeline:
+      - uses: test/runtime-linkage
+        with:
+          libraries: ["libcrypt.so.*"]
 - name: libxcrypt-devel
   files:
     license:
@@ -79,24 +73,16 @@ outputs:
     run:
     - libxcrypt = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
-    stage: installed
+  - name: api-behavior
     packages:
-      - gcc
-      - glibc-devel
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.c <<'EOF'
-      #define _GNU_SOURCE
-      #include <crypt.h>
-      #include <string.h>
-      int main(void) { char *p = crypt("password", "$6$test$"); return !p || strncmp(p, "$6$test$", 8); }
-      EOF
-      gcc /tmp/test.c -lcrypt -o /tmp/test
-      /tmp/test
+    - gcc
+    - glibc-devel
+    - pkgconf
+    files: tests
+    script: |
+      pkg-config --exists libxcrypt
+      gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libxcrypt) "$TEST_FILES/behavior.c" $(pkg-config --libs libxcrypt) -o behavior
+      ./behavior
 - name: libxcrypt-doc
   files:
     license:
@@ -108,11 +94,9 @@ outputs:
     - /usr/share/licenses/libxcrypt-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check
 patches:
 - file: patches/libxcrypt-4.5.2-Werror_discarded-qualifiers.patch
   strip: 1
-  reason: Upstream 174c24d6e87a, carried by Fedora and Wolfi; preserve const qualification with current
-    GCC headers
+  reason: Upstream 174c24d6e87a, carried by Fedora and Wolfi; preserve const qualification with current GCC headers

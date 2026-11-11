@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
-schema: 1
+schema: 2
 
 package:
   name: python-3.12
@@ -85,31 +85,34 @@ outputs:
         - python-3.12 = ${package.version}-${package.release}
         - python3.12 = ${package.version}-${package.release}
     tests:
-      - name: installed
-        stage: installed
-        packages: [bzip2-libs, expat, libffi, zstd-libs, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            python3.12 -c 'import sys; print("%d.%d" % sys.version_info[:2])' | grep -qx 3.12
-            python3.12 -c 'import bz2, ctypes, decimal, hashlib, json, lzma, sqlite3, unicodedata, zlib; print("modules ok")'
-            python3.12 -c 'import cgi'
-            test ! -x /usr/lib/python3.12/cgi.py
-            python3.12 -c 'import ssl; print(ssl.OPENSSL_VERSION)'
-            python3.12 -c 'import readline; print("readline ok")'
-            python3.12 -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])' | grep -qx /usr/lib/python3.12
-      - name: coinstall-default
-        stage: installed
-        packages: [python3]
-        argv:
+      - name: stdlib-and-native-modules
+        packages:
           - bash
-          - -eu
-          - -c
-          - |
-            python3.12 -c 'import sys; assert sys.version_info[:2] == (3, 12)'
-            python3 -c 'import sys; assert sys.version_info[:2] == (3, 14)'
-
+        files: tests
+        script: |
+          python3.12 -I "$TEST_FILES/runtime.py" 3.12
+          python3.12 -I -c 'import cgi'
+          test ! -x /usr/lib/python3.12/cgi.py
+      - name: syntax-error
+        packages:
+          - bash
+          - coreutils
+        script: |
+          status=0
+          python3.12 -I -c 'def broken(' >stdout.log 2>syntax.stderr || status=$?
+          test "$status" = 1
+          case "$(<syntax.stderr)" in
+            *SyntaxError*) ;;
+            *) echo 'Python did not report the expected syntax error' >&2; exit 1 ;;
+          esac
+        artifacts:
+          - syntax.stderr
+      - name: coinstall-default
+        packages: [bash, coreutils, python-3.14-default]
+        script: |
+          test "$(readlink /usr/bin/python3)" = python3.14
+          python3.12 -I -c 'import sys; assert sys.version_info[:2] == (3, 12)'
+          python3 -I -c 'import sys; assert sys.version_info[:2] == (3, 14)'
   - name: python-3.12-libs
     summary: Python 3.12 runtime library
     files:
@@ -119,18 +122,17 @@ outputs:
       license:
         - /usr/share/licenses/python-3.12-libs/LICENSE
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libpython3.12.so.* /usr/lib/libpython3.12.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+      - name: load-runtime
+        packages:
+          - bash
+          - python-3.12
+        script: |
+          python3.12 -I -c 'import ctypes; lib=ctypes.CDLL("libpython3.12.so.1.0"); lib.Py_GetVersion.restype=ctypes.c_char_p; assert lib.Py_GetVersion().startswith(b"3.12.")'
+      - name: runtime-closure
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libpython3.12.so.*"]
   - name: python-3.12-default
     summary: Unversioned Python 3.12 command names
     files:
@@ -153,16 +155,16 @@ outputs:
         - python-3.14-default
         - python-3.15-default
     tests:
-      - name: installed
-        stage: installed
-        packages: [bzip2-libs, expat, libffi, zstd-libs, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])' | grep -qx 3.12
-            pydoc3 -h >/dev/null
-
+      - name: default-interpreter
+        packages:
+          - bash
+          - coreutils
+        files: tests
+        script: |
+          test "$(readlink /usr/bin/python3)" = python3.12
+          python3 -I "$TEST_FILES/runtime.py" 3.12
+          pydoc3 json > json-help.txt
+          test -s json-help.txt
   - name: python-3.12-devel
     summary: Development files for Python 3.12
     files:
@@ -178,24 +180,19 @@ outputs:
       run:
         - python-3.12-libs = ${package.version}-${package.release}
     tests:
-      - name: embed
-        stage: installed
-        packages: [gcc, glibc-devel, grep, sed, bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            cat > /tmp/embed.c <<'EOF'
-            #include <Python.h>
-            int main(void) {
-              Py_Initialize();
-              PyRun_SimpleString("print('embedded')");
-              return Py_FinalizeEx() == 0 ? 0 : 1;
-            }
-            EOF
-            gcc /tmp/embed.c $(python3.12-config --embed --cflags --ldflags) -o /tmp/embed
-            /tmp/embed | grep -qx embedded
-
+      - name: embed-and-extension
+        packages:
+          - bash
+          - gcc
+          - pkgconf
+          - python-3.12
+        files: tests
+        script: |
+          gcc "$TEST_FILES/embed.c" $(python3.12-config --embed --cflags --ldflags) -o embed
+          ./embed
+          gcc -shared -fPIC "$TEST_FILES/extension.c" $(python3.12-config --cflags --ldflags) -o "probe$(python3.12-config --extension-suffix)"
+          python3.12 -c 'import probe; assert probe.answer() == 42'
+          pkg-config --exists python-3.12-embed
   - name: python-3.12-doc
     summary: Documentation for Python 3.12
     files:
@@ -208,7 +205,6 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       # The launcher only forwards to Py_BytesMain: it has no stack buffer and
       # no libc call to fortify, so those two properties cannot appear in it.

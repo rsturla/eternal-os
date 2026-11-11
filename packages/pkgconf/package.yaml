@@ -2,7 +2,7 @@
 #
 # An implementation of pkg-config. Part of the minimal Eternal userland and the
 # bootstrap tool set. The source is the upstream release tarball.
-schema: 1
+schema: 2
 
 package:
   name: pkgconf
@@ -58,15 +58,12 @@ outputs:
         - pkgconfig = ${package.version}-${package.release}
         - pkgconf-pkg-config = ${package.version}-${package.release}
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            test "$(pkgconf --version)" = 3.0.10
-            test "$(pkg-config --version)" = 3.0.10
+      - name: dependency-resolution
+        packages:
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/dependency-resolution.sh"
 
   - name: pkgconf-libs
     summary: pkgconf runtime library
@@ -77,17 +74,17 @@ outputs:
       license:
         - /usr/share/licenses/pkgconf-libs/COPYING
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libpkgconf.so.* /usr/lib/libpkgconf.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+      - name: minimal-runtime-dependencies
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libpkgconf.so.[0-9]*"]
+      - name: runtime
+        packages:
+          - python3
+        files: tests
+        script: |
+          python3 "$TEST_FILES/runtime.py"
 
   - name: pkgconf-devel
     summary: pkgconf development files
@@ -100,6 +97,16 @@ outputs:
     dependencies:
       run:
         - pkgconf-libs = ${package.version}-${package.release}
+    tests:
+      - name: pkgconf-api
+        packages:
+          - gcc
+          - glibc-devel
+          - coreutils
+          - pkgconf
+        files: tests
+        script: |
+          bash "$TEST_FILES/pkgconf-api.sh"
 
   - name: pkgconf-static
     summary: pkgconf static libraries
@@ -113,14 +120,15 @@ outputs:
       run:
         - pkgconf-devel = ${package.version}-${package.release}
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            test -f /usr/lib64/libpkgconf.a
+      - name: static-pkgconf-api
+        packages:
+          - gcc
+          - glibc-devel
+          - coreutils
+          - pkgconf
+        files: tests
+        script: |
+          bash "$TEST_FILES/static-pkgconf-api.sh"
 
   - name: pkgconf-doc
     summary: An implementation of pkg-config documentation

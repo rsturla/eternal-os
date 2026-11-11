@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Disable optional host services and install private helpers under libexec/pam.
 # Keep PAM modules separate from the linkable runtime libraries.
-schema: 1
+schema: 2
 package:
   name: pam
   version: 1.7.3
@@ -87,12 +87,7 @@ outputs:
     - libxcrypt
   tests:
   - name: modules
-    stage: installed
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       test -f /usr/lib/security/pam_permit.so || test -f /usr/lib64/security/pam_permit.so
       test -x /usr/libexec/pam/unix_chkpwd
 - name: pam-libs
@@ -105,16 +100,11 @@ outputs:
     - /usr/lib*/libpamc.so.*
     - /usr/share/licenses/pam-libs/**
   tests:
-  - name: load
-    stage: installed
-    packages:
-      - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("libpam.so.0")'
+  - name: runtime-linkage
+    pipeline:
+      - uses: test/runtime-linkage
+        with:
+          libraries: ["libpam.so.*", "libpam_misc.so.*", "libpamc.so.*"]
 - name: pam-devel
   files:
     license:
@@ -128,61 +118,30 @@ outputs:
     run:
     - pam-libs = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
-    stage: installed
+  - name: api-behavior
     packages:
-      - gcc
-      - glibc-devel
-      - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.c <<'EOF'
-      #include <security/pam_appl.h>
-      int main(void) { return pam_strerror(0, PAM_SUCCESS) == 0; }
-      EOF
-      gcc /tmp/test.c $(pkg-config --cflags --libs pam) -o /tmp/test
-      /tmp/test
+    - gcc
+    - glibc-devel
+    - pkgconf
+    files: tests
+    script: |
+      pkg-config --exists pam
+      gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags pam) "$TEST_FILES/behavior.c" $(pkg-config --libs pam) -o behavior
+      ./behavior
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check
     with:
       paths:
       - /usr/lib64/libpam.so.0.85.1
       - /usr/lib/libpam.so.0.85.1
-- name: authenticate-with-permit-module
-  stage: installed
+- name: authentication-stacks
   packages:
-    - gcc
-    - glibc-devel
-  argv:
-  - bash
-  - -eu
-  - -c
-  - |
-    mkdir -p /tmp/pam.d
-    printf 'auth required pam_permit.so\naccount required pam_permit.so\n' > /tmp/pam.d/eternal-test
-    cat > /tmp/pam-test.c <<'EOF'
-    #include <security/pam_appl.h>
-    static int converse(int n, const struct pam_message **m,
-                        struct pam_response **r, void *data) {
-        (void)n; (void)m; (void)r; (void)data;
-        return PAM_CONV_ERR;
-    }
-    int main(void) {
-        pam_handle_t *handle = 0;
-        struct pam_conv conv = { converse, 0 };
-        int status = pam_start_confdir("eternal-test", "root", &conv, "/tmp/pam.d", &handle);
-        if (status != PAM_SUCCESS) return 1;
-        status = pam_authenticate(handle, 0);
-        if (status == PAM_SUCCESS) status = pam_acct_mgmt(handle, 0);
-        int end = pam_end(handle, status);
-        return status != PAM_SUCCESS || end != PAM_SUCCESS;
-    }
-    EOF
-    gcc /tmp/pam-test.c -lpam -o /tmp/pam-test
-    /tmp/pam-test
+  - gcc
+  - glibc-devel
+  files: tests
+  script: |
+    gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror "$TEST_FILES/authentication.c" -lpam -o authentication
+    ./authentication "$TEST_FILES/pam.d" permit
+    ./authentication "$TEST_FILES/pam.d" deny

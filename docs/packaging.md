@@ -420,6 +420,10 @@ Rules:
 - Do not add a runtime dependency on a development package unless the package
   genuinely cannot work without it; GCC needing glibc headers to compile is a
   deliberate exception.
+- Keep shared compiler runtimes in separate outputs. An application that needs
+  `libgcc_s.so.1` must not pull in the compiler, binutils or development headers.
+  Such dependencies can also create installation cycles that break scriptlets.
+  Test the runtime output in a root without compiler or development tools.
 
 ## 4. Build pipeline
 
@@ -600,36 +604,53 @@ Build steps can branch on `${arch}`:
 
 ## 7. Tests
 
-Every package needs at least one test that would fail if its primary behavior
-were missing or broken.
+Tests must establish package behavior, error handling and installation correctness.
+A file-presence check or version command alone does not establish runtime coverage.
+Use [the testing guide](testing.md) for commands, fixtures and review criteria.
 
-- `stage: build` runs in the build sandbox with the source tree. Use it for
-  compilation and unit checks.
-- `stage: installed` gets a disposable root containing the built RPMs plus its
-  test dependencies. Use it for command-level smoke tests.
+- `build.tests` runs named source suites in independent workspace copies. Each case extends the pinned build closure with its own test tools.
+- Output or recipe `tests` use packaged RPMs in a separate root and a fresh workspace.
+- `mode: transaction` selects a private writable root for real RPM installation, upgrade and removal checks.
 
-Add an output-level test when the output has a user-facing command or runtime
-behavior. A `-doc`, `-locales` or empty metapackage output does not need an
-artificial test of its own; a package-level integration test can cover it.
+Choose one execution form: `script`, `argv` or `pipeline`.
+`script` runs Bash with `-euo pipefail`. Shell `-c` commands in `argv` are errors.
+Use direct `argv` with `expect` for exact exit codes, stdout and stderr.
+Test pipeline shell steps also use strict Bash options.
+
+Add an output-level test for every output with runtime behavior or a usable development interface.
+Output-level installed tests select that output and its declared runtime siblings.
+A recipe-level runtime test installs all outputs, so it cannot prove individual dependency closure.
+Documentation outputs need no artificial test. Test their data through the consumer when the data has runtime effects.
+A metapackage test must check its useful installed closure.
+
+Use package-local `tests/` directories for source files, sample input and expected output:
 
 ```yaml
 outputs:
-  - name: gcc-16
+  - name: example-devel
     tests:
-      - name: installed
-        stage: installed
-        argv: ["gcc-16", "--version"]
-
-  - name: gcc-16-default
-    tests:
-      - name: installed
-        stage: installed
-        argv: ["sh", "-c", "gcc --version && cc --version"]
+      - name: compile-and-run
+        packages: [gcc, glibc-devel, pkgconf]
+        files: tests
+        script: |
+          gcc "$TEST_FILES/consumer.c" $(pkg-config --cflags --libs example) -o consumer
+          ./consumer
 ```
 
-Only add `packages` to a test when the test actually invokes those packages. A simple binary smoke test usually needs no extra test packages.
+The `files` directory is relative to the root recipe. rpmx bundles its contents in the SRPM and recipe digest.
+`TEST_FILES` points to a private read-only copy. Use `TEST_PACKAGE_ROOT` for
+read-only candidate payload checks. Do not use `$STAGE` to test installed behavior.
+Declare only tools the test uses in `tests[].packages`.
+Source-case tools extend a separate pinned build environment. They do not enter
+the build root. Acceptance tools join only the selected output test root.
+Keep tools needed by configure or compilation in `build.packages`.
+Do not add runtime libraries to test packages to hide missing runtime dependencies.
 
-Tests must not rely on the network.
+Tests must not use the external network. Use fixed local input and isolated loopback services when needed.
+Assert the response content as well as the command status. Include relevant rejected input and failure paths.
+Avoid sleeps, wall-clock dates, external account databases and host filesystem assumptions.
+Use `artifacts` to preserve upstream reports and diagnostic files after failure.
+A skipped test does not establish coverage.
 
 ## 8. Versioned toolchain example: GCC 16
 
@@ -882,8 +903,10 @@ bootstrap variant; the production recipe stays.
       it. Library-only packages do not get a `-libs` output.
 - [ ] Every separately installable output has its own license copy and claims
       it in `files.include` and `files.license`.
-- [ ] Every user-facing output has a test, or the package-level test covers it.
-      Doc, locale and metapackage outputs are exempt.
+- [ ] Each functional output has an installed interface test. Package-level
+      integration tests supplement these output checks.
+- [ ] Data and locale outputs have consumer tests; metapackages check their
+      dependency closure. Only documentation-only outputs are exempt.
 - [ ] Build dependencies are package names; test-only packages are on tests.
 - [ ] `source-date-epoch` is explicit, derivable from the source, or covered
       by the repository fallback; `cpe` names the upstream project.

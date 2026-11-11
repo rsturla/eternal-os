@@ -2,9 +2,10 @@
 #
 # Eternal Linux is greenfield, but a distribution still needs a working
 # toolchain before it can build itself. This profile borrows Fedora 44 to run
-# rpmx build steps and to provide the packages the first recipes need. It is a
-# build dependency, not the distribution identity: Eternal owns its release
-# package, repository and images.
+# rpmx build steps and to provide the packages the first recipes need. The root
+# uses Eternal's release package and filesystem alongside adopted Eternal tools
+# and Fedora build dependencies. Eternal's release package supplies
+# system-release for setup's account data.
 #
 # As packages are brought in-tree, remove them from `packages.install` here and
 # add them to `eternal-base` instead. The bootstrap root should shrink over
@@ -35,13 +36,15 @@ repositories:
     # libxml2 2.15 provides libxml2.so.16; the Fedora util-linux packages also
     # require the matching libsmartcols/libuuid release. Mixing both providers
     # makes the offline root transaction fail with file and version conflicts.
+    # Keep Eternal's system-release provider available for setup's real
+    # account data. Fedora's release chain requires its newer filesystem RPM.
     exclude:
       - basesystem
-      - eternal-release
       - eternal-base
       - eternal-baselayout
       - glibc-*
       - gcc-*
+      - libgcc-*
       - ld-linux-*
       - libc-bin-*
       - libstdc++-*

@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/jsoncpp.yaml
 # Disable unused object and static libraries. Run the upstream C++ tests.
-schema: 1
+schema: 2
 package:
   name: jsoncpp
   version: 1.9.8
@@ -42,7 +42,6 @@ build:
       - -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF
       - -DJSONCPP_WITH_EXAMPLE=OFF
   - uses: cmake/build
-  - uses: cmake/check
   - uses: cmake/install
   - uses: license/copy
     with:
@@ -52,22 +51,24 @@ build:
       - jsoncpp
       - jsoncpp-devel
   - uses: strip
+  tests:
+  - name: upstream
+    artifacts:
+    - build/Testing
+    pipeline:
+    - uses: cmake/check
+
 outputs:
 - name: jsoncpp
   files:
     license:
     - /usr/share/licenses/jsoncpp/**
   tests:
-  - name: load
-    stage: installed
-    packages:
-    - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("libjsoncpp.so.27")'
+  - name: runtime-linkage
+    pipeline:
+      - uses: test/runtime-linkage
+        with:
+          libraries: ["libjsoncpp.so.*"]
 - name: jsoncpp-devel
   files:
     include:
@@ -79,25 +80,17 @@ outputs:
     run:
     - jsoncpp = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
-    stage: installed
+  - name: api-behavior
     packages:
     - gcc-c++
     - glibc-devel
     - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.cc <<'EOF'
-      #include <json/json.h>
-      int main(void) { Json::Value v; v["answer"] = 42; return v["answer"].asInt() != 42; }
-      EOF
-      g++ /tmp/test.cc $(pkg-config --cflags --libs jsoncpp) -o /tmp/test
-      /tmp/test
+    files: tests
+    script: |
+      pkg-config --exists jsoncpp
+      g++ -std=c++17 -Wall -Wextra $(pkg-config --cflags jsoncpp) "$TEST_FILES/behavior.cc" $(pkg-config --libs jsoncpp) -o behavior
+      ./behavior
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check

@@ -5,7 +5,7 @@
 # build-tool set while the seed is still in use. Keep this recipe buildable
 # from the current self-hosted root; promote changes here once they work
 # without bootstrap-only overrides.
-schema: 1
+schema: 2
 
 package:
   name: coreutils
@@ -66,6 +66,12 @@ outputs:
       provides:
         - coreutils-full
         - coreutils-single
+    tests:
+      - name: filesystem-and-text
+        packages: []
+        files: tests
+        script: |
+          bash "$TEST_FILES/filesystem-and-text.sh"
 
   - name: coreutils-doc
     summary: GNU core utilities documentation
@@ -79,18 +85,6 @@ outputs:
         - /usr/share/licenses/coreutils-doc/COPYING
 
 tests:
-  - name: build
-    stage: build
-    argv:
-      - sh
-      - -c
-      - test -x "$STAGE/usr/bin/ls" && test -x "$STAGE/usr/bin/cat"
-
-  - name: installed
-    stage: installed
-    argv: [ls, --version]
-
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check

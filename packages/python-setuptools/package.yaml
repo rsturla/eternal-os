@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-setuptools.yaml
 # Declare the public Python metadata explicitly; nested vendor dist-info is private.
-schema: 1
+schema: 2
 package:
   name: python-setuptools
   version: 84.2.1
@@ -81,12 +81,11 @@ outputs:
     run:
     - python(abi) = ${matrix.python.version}
   tests:
-  - name: functional
-    stage: installed
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - 'from setuptools import Distribution; d = Distribution({"name": "demo", "version": "1.0"}); assert d.get_name()
-      == "demo"; assert d.get_version() == "1.0"'
+  - name: behavior
+    files: tests
+    packages:
+    - python-${matrix.python.version}-installer
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/test_behavior.py" "${matrix.python.version}" "setuptools" "${package.version}"
   generators:
     python: false

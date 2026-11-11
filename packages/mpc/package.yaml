@@ -2,7 +2,7 @@
 #
 # Multiple-precision C library. A build dependency for the GNU toolchain and the
 # rest of the minimal Eternal userland.
-schema: 1
+schema: 2
 
 package:
   name: mpc
@@ -51,6 +51,16 @@ build:
         outputs: [mpc, mpc-devel, mpc-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages:
+        - diffutils
+      artifacts:
+        - test-suite.log
+        - tests/test-suite.log
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: mpc
     summary: Multiple-precision C library
@@ -64,18 +74,11 @@ outputs:
       provides:
         - libmpc = ${package.version}-${package.release}
     tests:
-      - name: installed
-        stage: installed
-        packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libmpc.so.* /usr/lib/libmpc.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+      - name: runtime-linkage
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libmpc.so.*"]
   - name: mpc-devel
     summary: MPC development files
     files:
@@ -92,6 +95,17 @@ outputs:
       provides:
         - libmpc-devel = ${package.version}-${package.release}
 
+    tests:
+      - name: api-behavior
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists mpc mpfr
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags mpc mpfr) "$TEST_FILES/behavior.c" $(pkg-config --libs mpc mpfr) -o behavior
+          ./behavior
   - name: mpc-doc
     summary: MPC documentation
     files:
@@ -102,24 +116,3 @@ outputs:
         - /usr/share/licenses/mpc-doc/COPYING.LESSER
       license:
         - /usr/share/licenses/mpc-doc/COPYING.LESSER
-
-tests:
-  - name: link
-    stage: installed
-    packages: [gcc, glibc-devel, bash-binsh]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #include <mpc.h>
-        int main(void) {
-          mpc_t value;
-          mpc_init2(value, 64);
-          mpc_set_ui_ui(value, 1, 2, MPC_RNDNN);
-          mpc_clear(value);
-          return 0;
-        }
-        EOF
-        gcc /tmp/test.c -lmpc -lmpfr -lgmp -o /tmp/test
-        /tmp/test

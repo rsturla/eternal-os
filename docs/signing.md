@@ -70,6 +70,11 @@ Use the same scripts and flags as CI:
 
 ```
 
+The publisher accepts binaries only at `out/<arch>/*.rpm` or
+`out/<package>/<arch>/*.rpm`, using the architectures in the distribution profile.
+Source RPMs must be directly under the corresponding `<arch>/src/` directory.
+Evidence, test reports and quarantined producer trees are excluded.
+
 To publish both channels locally, export `AWS_ACCESS_KEY_ID` and
 `AWS_SECRET_ACCESS_KEY` first (use `--endpoint-url` for R2):
 

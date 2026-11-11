@@ -18,9 +18,14 @@ runs:
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends \
           bubblewrap podman fuse-overlayfs uidmap python3-yaml createrepo-c gnupg rpm
-        # Ubuntu 26.04 restricts unprivileged user namespaces via AppArmor,
-        # which rootless podman needs for root resolution.
-        sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+        if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+        fi
+        # Ubuntu's separate Bubblewrap profile denies child capabilities,
+        # including DAC access needed by private package transactions.
+        if [ -f /etc/apparmor.d/bwrap-userns-restrict ]; then
+          sudo apparmor_parser -R /etc/apparmor.d/bwrap-userns-restrict
+        fi
 
     - name: Install Rust
       if: inputs.artifact == ''

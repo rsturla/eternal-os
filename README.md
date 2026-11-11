@@ -82,6 +82,7 @@ make bootstrap     # cargo install the pinned rpmx revision
 make doctor        # check podman/bubblewrap/dnf5
 make check         # pre-commit + lint every recipe
 make build         # build only packages whose content hash changed
+make test          # run runtime tests against existing RPMs
 make repo          # assemble site/rolling/<arch>/ with repodata
 make all           # check + build + repo
 ```
@@ -91,7 +92,7 @@ The bootstrap ladder is separate from the rolling build:
 ```console
 make bootstrap-plan                 # print stage order, roots, and seed replacements
 make bootstrap-build                # run the ladder for ARCH (default: x86_64)
-make bootstrap-build ARCH=aarch64   # cross-build the same ladder
+make bootstrap-build ARCH=aarch64   # run on native or emulated AArch64
 make bootstrap-clean                # remove root-owned bootstrap roots and locks
 ```
 
@@ -110,15 +111,21 @@ Build one package, or only the packages touched since a ref:
 ```
 
 Per-package artifacts land in `out/<package>/<arch>/`. Keeping package outputs
-separate matters: an installed-stage test root must not see RPMs from unrelated
+separate matters: a package acceptance root must not see RPMs from unrelated
 packages.
+
+See [the testing guide](docs/testing.md) for strict scripts, external fixtures,
+upstream suites, isolated runtime tests and package transaction tests.
+The guide also defines the coverage and verification required before release.
 
 ## Incremental builds
 
 Every package has a content hash over its tracked recipe, context, profiles,
-build scripts, the pinned rpmx revision, and its in-tree build dependencies
-transitively. `scripts/build-all.sh` records the hash in `out/.stamps/` and
-skips a package when the stamp matches and its RPMs are present.
+build scripts and the pinned rpmx revision. Published RPM dependencies do not
+create source rebuild edges. The Python bootstrap helper also hashes its actual
+local source dependencies, including test tools.
+`scripts/build-all.sh` records the hash and build/test policy in `out/.stamps/`.
+It skips a package when the stamp matches and its RPMs are present.
 
 `package.lock.json` files are local build metadata while the bootstrap root
 follows live Fedora. `make lock` writes them and `make lock-check` checks them,

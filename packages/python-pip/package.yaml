@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/py3-pip.yaml
-schema: 1
+schema: 2
 package:
   name: python-pip
   version: 26.2.2
@@ -127,11 +127,7 @@ outputs:
     license:
     - /usr/share/licenses/python-${matrix.python.version}-pip/**
   tests:
-  - name: functional
-    stage: installed
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - 'from pip._internal.cli.main import main; from pip._vendor import urllib3, msgpack, certifi; assert urllib3.__version__
-      == "2.8.0"; assert msgpack.version == (1, 2, 3); assert certifi.__version__ == "2026.10.23"; assert msgpack.unpackb(msgpack.packb({"answer":
-      42})) == {"answer": 42}; assert main(["--version"]) == 0'
+  - name: offline-behavior
+    files: tests
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/check.py" "${matrix.python.version}" "pip" "${package.version}"
