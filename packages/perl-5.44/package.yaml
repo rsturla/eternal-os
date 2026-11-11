@@ -155,21 +155,13 @@ outputs:
         # capability so the requirement resolves to the interpreter.
         - perl(:VERSION) = ${package.version}
     tests:
-      - name: installed
+      - name: core-and-compression
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, grep, bzip2-libs, zlib]
-        argv:
-          - sh
-          - -c
-          - |
-            perl5.44.0 -V:version | grep -q '5\.44\.0'
-            perl5.44.0 -e 'use strict; use warnings; print "ok\n"' | grep -qx ok
-            perl5.44.0 -MIO::Socket::INET -e 'print "core modules load\n"'
-            perl5.44.0 -MCompress::Raw::Zlib -e 'print "zlib module loads\n"'
-            perl5.44.0 -MCompress::Raw::Bzip2 -e 'print "bzip2 module loads\n"'
-            # pod2man has no --version; it prints its usage instead.
-            pod2man --help | grep -q 'pod2man \[--center'
-
+        packages:
+          - bash
+        files: tests
+        script: |
+          perl5.44.0 "$TEST_FILES/runtime.t"
   - name: perl-5.44-default
     summary: Unversioned Perl 5.44 command names
     files:
@@ -187,16 +179,15 @@ outputs:
         - perl = ${package.version}-${package.release}
         - perl-interpreter = ${package.version}-${package.release}
     tests:
-      - name: installed
+      - name: default-command
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, grep, bzip2-libs, zlib]
-        argv:
-          - sh
-          - -c
-          - |
-            perl --version | grep -q 'v5\.44'
-            perl -e 'print "ok\n"' | grep -qx ok
-
+        packages:
+          - bash
+          - coreutils
+        files: tests
+        script: |
+          perl "$TEST_FILES/runtime.t"
+          test "$(readlink /usr/bin/perl)" = perl5.44.0
   - name: perl-5.44-devel
     summary: Development files for Perl 5.44
     files:
@@ -215,27 +206,17 @@ outputs:
       run:
         - perl-5.44 = ${package.version}-${package.release}
     tests:
-      - name: installed
+      - name: embed
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, grep, bzip2-libs, zlib]
-        argv:
-          - sh
-          - -c
-          - |
-            for header in /usr/lib64/perl5/5.44/CORE/perl.h /usr/lib/perl5/5.44/CORE/perl.h; do
-              test -e "$header" && break
-            done
-            test -e "$header"
-            # libperl lives in the versioned CORE directory, which is not on the
-            # loader's default path; an embedder has to record the rpath.
-            cc -I"$(dirname "$header")" -L"$(dirname "$header")" \
-               -Wl,-rpath,"$(dirname "$header")" -x c - -o /tmp/ext -lperl <<'EOF'
-            #include <EXTERN.h>
-            #include <perl.h>
-            int main(void) { return 0; }
-            EOF
-            /tmp/ext
-
+        packages:
+          - bash
+          - gcc
+          - perl-5.44
+        files: tests
+        script: |
+          core=$(perl5.44.0 -MConfig -e 'print "$Config{archlib}/CORE"')
+          gcc -I"$core" -L"$core" -Wl,-rpath,"$core" "$TEST_FILES/embed.c" -o embed -lperl
+          ./embed
   - name: perl-5.44-utils
     summary: Utilities distributed with Perl 5.44
     # The bundled scripts use core modules only; the dependency on the
@@ -269,22 +250,16 @@ outputs:
       run:
         - perl-5.44 = ${package.version}-${package.release}
     tests:
-      - name: installed
+      - name: prove-and-shasum
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, grep, bzip2-libs, zlib]
-        argv:
-          - sh
-          - -c
-          - |
-            corelist --version | head -1 | grep -q '5\.44'
-            prove --version
-            shasum --version | head -1
-            cat > /tmp/t.pl <<'EOF'
-            use Test::More tests => 1;
-            ok(1, 'prove runs');
-            EOF
-            prove -v /tmp/t.pl
-
+        packages:
+          - bash
+          - coreutils
+        files: tests
+        script: |
+          prove -v "$TEST_FILES/runtime.t"
+          printf abc > input
+          test "$(shasum -a 256 input)" = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad  input'
   - name: perl-5.44-doc
     summary: Documentation for Perl 5.44
     files:
@@ -302,6 +277,16 @@ outputs:
         - perl-5.44 = ${package.version}-${package.release}
 
 tests:
+  - name: upstream
+    stage: build
+    # Real root/nobody account records activate the upstream NSS account tests.
+    packages: [gcc-c++, nss_wrapper-libs, setup]
+    files: tests
+    script: |
+      bash "$TEST_FILES/upstream.sh"
+    artifacts:
+      - perl-test.log
+      - upstream-hosts
   - name: hardening
     stage: build
     pipeline:
