@@ -14,7 +14,7 @@ schema: 1
 package:
   name: gcc-16
   version: "16.2.0"
-  release: 1
+  release: 2
   summary: The GNU Compiler Collection, version 16
   description: |
     GCC 16 provides the C and C++ compilers, the GNU runtime libraries and the
@@ -199,8 +199,6 @@ outputs:
         - /usr/share/licenses/libstdc++-16/COPYING3.LIB
         - /usr/share/licenses/libstdc++-16/COPYING.RUNTIME
     dependencies:
-      run:
-        - glibc >= 2.44
       provides:
         - libstdc++ = ${package.version}-${package.release}
         - libstdc++-16 = ${package.version}-${package.release}
@@ -260,8 +258,6 @@ outputs:
         - /usr/share/licenses/libatomic-16/COPYING3.LIB
         - /usr/share/licenses/libatomic-16/COPYING.RUNTIME
     dependencies:
-      run:
-        - glibc >= 2.44
       provides:
         - libatomic = ${package.version}-${package.release}
 
