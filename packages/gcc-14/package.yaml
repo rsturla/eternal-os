@@ -7,8 +7,8 @@
 #
 # The compiler is built without bootstrap (the seed compiler is the build
 # compiler) and without Fortran for the first import. The runtime libraries are
-# split the same way Wolfi splits them: libstdc++, libatomic and the compiler
-# proper are independent outputs.
+# split into independently useful libgcc, libstdc++ and libatomic outputs.
+# Compiler and link-time support stay in the main output.
 schema: 2
 
 package:
@@ -118,7 +118,7 @@ build:
     - uses: license/copy
       with:
         files: [COPYING3, COPYING3.LIB, COPYING.RUNTIME]
-        outputs: [gcc-14, gcc-14-default, libstdc++-14, libstdc++-14-devel, libstdc++-14-static, libatomic-14, gcc-14-doc]
+        outputs: [gcc-14, gcc-14-default, libgcc-14, libstdc++-14, libstdc++-14-devel, libstdc++-14-static, libatomic-14, gcc-14-doc]
     - runs: |
         # The default package owns the stable command names. The versioned
         # names stay with gcc-14.
@@ -163,10 +163,9 @@ build:
 
 outputs:
   - name: gcc-14
-    summary: GCC 14 compiler and runtime
-    # Main package: driver, cc1/cc1plus, runtime libraries, compiler
-    # static archives and the license. libgcc.a and friends stay here because
-    # GCC needs them at link time, even in the main package.
+    summary: GCC 14 compiler and link-time support
+    # Keep compiler archives, CRT objects and the unversioned linker stub here.
+    # The libgcc SONAME lives in its own runtime-only output below.
     files:
       license:
         - /usr/share/licenses/gcc-14/COPYING3
@@ -179,6 +178,7 @@ outputs:
       run:
         - binutils
         - glibc-devel
+        - libgcc-14 = ${package.version}-${package.release}
         - libstdc++-14 = ${package.version}-${package.release}
       provides:
         - gcc-14 = ${package.version}-${package.release}
@@ -241,7 +241,50 @@ outputs:
         pipeline:
           - uses: test/runtime-linkage
             with:
-              libraries: ["libgcc_s.so.*", "libgomp.so.*", "libitm.so.*"]
+              libraries: ["libgomp.so.*", "libitm.so.*"]
+  - name: libgcc-14
+    summary: GCC 14 shared compiler runtime
+    files:
+      include:
+        - /usr/lib*/libgcc_s.so.*
+        - /usr/share/licenses/libgcc-14/**
+      license:
+        - /usr/share/licenses/libgcc-14/COPYING3
+        - /usr/share/licenses/libgcc-14/COPYING3.LIB
+        - /usr/share/licenses/libgcc-14/COPYING.RUNTIME
+    dependencies:
+      provides:
+        - libgcc = ${package.version}-${package.release}
+    tests:
+      - name: runtime-only-payload-and-closure
+        files: tests
+        pipeline:
+          - runs: bash "$TEST_FILES/runtime-payload.sh"
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libgcc_s.so.*"]
+      - name: unwind-callbacks
+        files: tests
+        packages: [python-3.14]
+        script: /usr/bin/python3.14 -I "$TEST_FILES/unwind.py" "$LIBDIR/libgcc_s.so.1"
+        timeout: 1m
+      - name: certificate-and-find-runtime-consumers
+        packages: [ca-certificates, findutils]
+        script: |
+          # A fresh root must install these consumers without bringing the
+          # compiler/binutils/development closure into their RPM scriptlets.
+          for compiler in /usr/bin/gcc /usr/bin/gcc-* /usr/bin/g++; do
+            if [[ -e $compiler ]]; then
+              echo "certificate runtime unexpectedly installed $compiler" >&2
+              exit 1
+            fi
+          done
+          find /etc /usr/share -type f \
+            \( -path '*/ca-certificates/*' -o -path '*/pki/*' -o -path '*/ssl/*' \) \
+            \( -name '*.crt' -o -name '*.pem' -o -name '*.p11-kit' \) \
+            -print >certificate-files.txt
+          test -s certificate-files.txt
+        artifacts: [certificate-files.txt]
   - name: gcc-14-default
     summary: Stable command names for GCC 14
     files:
