@@ -14,7 +14,7 @@ schema: 1
 package:
   name: gcc-14
   version: "14.4.0"
-  release: 1
+  release: 2
   summary: The GNU Compiler Collection, version 14
   description: |
     GCC 14 provides the C and C++ compilers, the GNU runtime libraries and the
@@ -49,6 +49,7 @@ build:
     - coreutils
     - bison
     - flex
+    - file
     - gawk
     - sed
     - grep
@@ -61,6 +62,7 @@ build:
     - tar
     - gzip
   sysroot:
+    - libstdc++-devel
     - gmp-devel
     - mpfr-devel
     - libmpc-devel
@@ -178,6 +180,7 @@ outputs:
     dependencies:
       run:
         - gcc-14 = ${package.version}-${package.release}
+        - libstdc++-14-devel = ${package.version}-${package.release}
       conflicts:
         - gcc-13-default
         - gcc-15-default
@@ -187,6 +190,19 @@ outputs:
         - gcc-c++ = ${package.version}-${package.release}
         - cpp = ${package.version}-${package.release}
         - cc = ${package.version}-${package.release}
+
+    tests:
+      - name: cxx-link
+        stage: installed
+        packages: [bash-binsh, coreutils]
+        argv:
+          - sh
+          - -eu
+          - -c
+          - |
+            printf '#include <iostream>\nint main() { std::cout << "ok"; }\n' > /tmp/gcc-cxx-test.cc
+            c++ /tmp/gcc-cxx-test.cc -o /tmp/gcc-cxx-test
+            test "$(/tmp/gcc-cxx-test)" = ok
 
   - name: libstdc++-14
     summary: GNU Standard C++ Library
@@ -199,8 +215,6 @@ outputs:
         - /usr/share/licenses/libstdc++-14/COPYING3.LIB
         - /usr/share/licenses/libstdc++-14/COPYING.RUNTIME
     dependencies:
-      run:
-        - glibc >= 2.44
       provides:
         - libstdc++ = ${package.version}-${package.release}
         - libstdc++-14 = ${package.version}-${package.release}
@@ -260,8 +274,6 @@ outputs:
         - /usr/share/licenses/libatomic-14/COPYING3.LIB
         - /usr/share/licenses/libatomic-14/COPYING.RUNTIME
     dependencies:
-      run:
-        - glibc >= 2.44
       provides:
         - libatomic = ${package.version}-${package.release}
 
