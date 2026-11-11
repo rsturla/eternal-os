@@ -1,0 +1,1393 @@
+schema: 1
+package:
+  name: llvm-22
+  version: 22.1.8
+  release: 1
+  summary: LLVM 22 compiler infrastructure and toolchain
+  description: |
+    LLVM provides libraries and tools for optimisation, code generation,
+    bitcode processing and object-file inspection. This stream also builds
+    Clang, Clang tools, the static analyzer, LLD, MLIR, compiler-rt, libc++,
+    libc++abi and LLVM libunwind as separate component packages.
+  license: Apache-2.0 WITH LLVM-exception AND BSD-2-Clause AND BSD-3-Clause AND CC0-1.0 AND MIT AND Spencer-94 AND
+    Unicode-DFS-2015 AND Unicode-DFS-2016 AND LicenseRef-LLVM-MD5
+  upstream: https://llvm.org/
+  cpe:
+    vendor: llvm
+    product: llvm
+sources:
+  - name: llvm-project-22.1.8.src.tar.xz
+    kind: archive
+    digest: sha512:2615b20ba08534f83ab8ecc7b5ba43b5f1dfcf9cdb2534a32fcdbf0ccdd9a008b46276e45ef26ed9377f65b5e4ae89ea798f3863fd034484b5715140f3a7b35c
+    locators:
+      - kind: https
+        url: https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/llvm-project-22.1.8.src.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+patches:
+  - file: patches/separate-libclang-static-export.patch
+    strip: 1
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  packages:
+    - gcc
+    - gcc-c++
+    - cmake
+    - ninja-build
+    - python3
+    - bash
+    - coreutils
+    - findutils
+    - grep
+    - gawk
+    - sed
+    - binutils
+    - perl
+  sysroot:
+    - zlib-devel
+    - zstd-devel
+    - libffi-devel
+  pipeline:
+    - uses: cmake/configure
+      with:
+        args:
+          - -S llvm
+          - -G Ninja
+          - -DCMAKE_INSTALL_LIBDIR=lib
+          - -DCMAKE_BUILD_TYPE=Release
+          - -DCMAKE_SKIP_INSTALL_RPATH=ON
+          - -DLLVM_VERSION_SUFFIX=
+          - -DLLVM_APPEND_VC_REV=OFF
+          - -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld;mlir"
+          - -DLLVM_ENABLE_RUNTIMES=compiler-rt
+          - -DLLVM_TARGETS_TO_BUILD="AArch64;X86;BPF"
+          - -DLLVM_BUILD_LLVM_DYLIB=ON
+          - -DLLVM_LINK_LLVM_DYLIB=ON
+          - -DLLVM_ENABLE_RTTI=ON
+          - -DLLVM_ENABLE_FFI=ON
+          - -DLLVM_ENABLE_ZLIB=FORCE_ON
+          - -DLLVM_ENABLE_ZSTD=FORCE_ON
+          - -DLLVM_ENABLE_LIBXML2=OFF
+          - -DLLVM_ENABLE_LIBEDIT=OFF
+          - -DLLVM_ENABLE_CURL=OFF
+          - -DLLVM_ENABLE_HTTPLIB=OFF
+          - -DLLVM_ENABLE_Z3_SOLVER=OFF
+          - -DLLVM_ENABLE_BINDINGS=OFF
+          - -DLLVM_INCLUDE_TESTS=OFF
+          - -DLLVM_INCLUDE_BENCHMARKS=OFF
+          - -DLLVM_INCLUDE_EXAMPLES=OFF
+          - -DLLVM_INCLUDE_DOCS=OFF
+          - -DLLVM_INSTALL_UTILS=ON
+          - -DLLVM_TOOL_OPT_VIEWER_BUILD=OFF
+          - -DLLVM_DISTRIBUTIONS="Shared;Static"
+          - -DLLVM_Shared_DISTRIBUTION_COMPONENTS="LLVM;LTO;Remarks;llvm-config;llvm-headers;cmake-exports;clang-cpp;libclang;MLIR"
+          - -DLLVM_Static_DISTRIBUTION_COMPONENTS="llvm-libraries;clang-libraries;libclang_static;lld-libraries;mlir-libraries"
+          - -DLLVM_PARALLEL_LINK_JOBS=1
+          - -DCLANG_LINK_CLANG_DYLIB=ON
+          - -DCLANG_FORCE_MATCHING_LIBCLANG_SOVERSION=ON
+          - -DLIBCLANG_BUILD_STATIC=ON
+          - -DCLANG_VENDOR=Eternal
+          - -DCLANG_INCLUDE_TESTS=OFF
+          - -DMLIR_INCLUDE_TESTS=OFF
+          - -DMLIR_INCLUDE_INTEGRATION_TESTS=OFF
+          - -DMLIR_ENABLE_BINDINGS_PYTHON=OFF
+          - -DMLIR_INSTALL_AGGREGATE_OBJECTS=OFF
+          - -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=OFF
+          - -DCOMPILER_RT_INCLUDE_TESTS=OFF
+          - -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON
+          - -DCOMPILER_RT_BUILD_GWP_ASAN=OFF
+          - -DLLVM_BUILD_EXAMPLES=OFF
+          - -DCLANG_BUILD_EXAMPLES=OFF
+    - name: build-llvm
+      uses: cmake/build
+      timeout: 2h
+      with:
+        args:
+          - --target LLVM llvm-libraries
+    - name: build-clang
+      uses: cmake/build
+      timeout: 2h
+      with:
+        args:
+          - --target clang clang-cpp libclang
+    - name: build-toolchain
+      uses: cmake/build
+      timeout: 4h
+    - uses: cmake/install
+    - name: preserve-llvm-build
+      runs: |
+        mv build llvm-build
+    - name: configure-cxx-runtimes
+      uses: cmake/configure
+      with:
+        args:
+          - -DCMAKE_C_COMPILER=/usr/libexec/eternal/gcc/bin/gcc
+          - -DCMAKE_CXX_COMPILER=/usr/libexec/eternal/gcc/bin/g++
+          - -DCMAKE_ASM_COMPILER=/usr/libexec/eternal/gcc/bin/gcc
+          - -S runtimes
+          - -G Ninja
+          - -DCMAKE_INSTALL_LIBDIR=lib
+          - -DCMAKE_BUILD_TYPE=Release
+          - -DCMAKE_SKIP_INSTALL_RPATH=ON
+          - -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi;libunwind"
+          - -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=OFF
+          - -DLLVM_INCLUDE_TESTS=OFF
+          - -DLIBCXX_INCLUDE_TESTS=OFF
+          - -DLIBCXX_INCLUDE_BENCHMARKS=OFF
+          - -DLIBCXX_ENABLE_ABI_LINKER_SCRIPT=OFF
+          - -DLIBCXXABI_INCLUDE_TESTS=OFF
+          - -DLIBCXXABI_USE_LLVM_UNWINDER=ON
+          - -DLIBUNWIND_INCLUDE_TESTS=OFF
+          - '-DLIBUNWIND_ENABLE_CET=$(test "$RPMX_TARGET_ARCH" = x86_64 && echo ON || echo OFF)'
+          - -DCMAKE_CXX_FLAGS=-Wno-unknown-pragmas
+    - name: build-cxx-runtimes
+      uses: cmake/build
+    - name: install-cxx-runtimes
+      uses: cmake/install
+    - runs: |
+        # LLVM tools and CMake files support a relocatable installation prefix.
+        # Keep that tree private so major streams can coexist.
+        install -d "$STAGE/llvm-22"
+        for directory in bin include lib libexec share; do
+          if test -d "$STAGE/usr/$directory"; then
+            mv "$STAGE/usr/$directory" "$STAGE/llvm-22/"
+          fi
+        done
+        install -d "$STAGE/usr/lib"
+        mv "$STAGE/llvm-22" "$STAGE/usr/lib/llvm-22"
+        # Put versioned SONAMEs in the loader's library directory. Keep links
+        # in the private prefix for llvm-config and the CMake import targets.
+        install -d "$STAGE$LIBDIR" "$STAGE/usr/bin"
+        for library in "$STAGE/usr/lib/llvm-22/lib/"*.so.*; do
+          name=$(basename "$library")
+          mv "$library" "$STAGE$LIBDIR/$name"
+          ln -s "$LIBDIR/$name" "$library"
+        done
+        # Each implementation owns its versioned commands. The selector owns
+        # only the unversioned links in /usr/bin.
+        for tool in "$STAGE/usr/lib/llvm-22/bin/"*; do
+          name=$(basename "$tool")
+          case "$name" in
+            *-22) public="$name" ;;
+            *) public="$name-22" ;;
+          esac
+          ln -sf "../lib/llvm-22/bin/$name" "$STAGE/usr/bin/$public"
+          if test "$name" != "$public"; then
+            ln -s "$public" "$STAGE/usr/bin/$name"
+          fi
+        done
+        # Keep script interpreters independent of the build root's Python minor.
+        for file in "$STAGE/usr/lib/llvm-22/bin/"* "$STAGE/usr/lib/llvm-22/libexec/"*; do
+          test -f "$file" || continue
+          if test "$(head -c 2 "$file")" = '#!'; then
+            sed -i '1s|^#!.*python3[.0-9]*$|#!/usr/bin/python3|' "$file"
+          fi
+        done
+        # LLVM subprojects share these modules with external CMake consumers.
+        install -d "$STAGE/usr/lib/llvm-22/share/cmake/Modules"
+        cp -a cmake/Modules/. "$STAGE/usr/lib/llvm-22/share/cmake/Modules/"
+        # Link the C++ ABI by SONAME so the shared SDK needs no other SDK outputs.
+        printf 'INPUT( libc++.so.1 -l:libc++abi.so.1 -l:libunwind.so.1 )\n' > "$STAGE/cxx-linker-script"
+        mv "$STAGE/cxx-linker-script" "$STAGE/usr/lib/llvm-22/lib/libc++.so"
+    - runs: |
+        # Preserve the notices for support code and installed SDK headers.
+        cat llvm/lib/Support/COPYRIGHT.regex llvm/lib/Support/BLAKE3/LICENSE > THIRD-PARTY-NOTICES.txt
+        for file in llvm/lib/Support/xxhash.cpp llvm/lib/Support/ConvertUTF.cpp llvm/lib/Support/UnicodeNameToCodepointGenerated.cpp llvm/include/llvm/WindowsDriver/MSVCSetupApi.h; do
+          printf '\n%s\n' "$file" >> THIRD-PARTY-NOTICES.txt
+          awk '/^#/{exit} {print}' "$file" >> THIRD-PARTY-NOTICES.txt
+        done
+        awk '/^#/{exit} {print}' llvm/lib/Support/MD5.cpp > LICENSE.LLVM-MD5
+        for project in clang clang-tools-extra lld mlir compiler-rt libcxx libcxxabi libunwind; do
+          printf '\n%s/LICENSE.TXT\n' "$project" >> THIRD-PARTY-NOTICES.txt
+          cat "$project/LICENSE.TXT" >> THIRD-PARTY-NOTICES.txt
+        done
+    - uses: license/copy
+      with:
+        files:
+          - llvm/LICENSE.TXT
+          - THIRD-PARTY-NOTICES.txt
+          - LICENSE.LLVM-MD5
+        outputs:
+          - llvm-22
+          - llvm-22-libs
+          - llvm-22-devel
+          - llvm-22-static
+          - llvm-cmake-22
+          - llvm-22-default
+          - clang-22
+          - clang-22-libs
+          - clang-22-devel
+          - clang-22-static
+          - clang-22-default
+          - clang-tools-22
+          - clang-tools-22-default
+          - clang-analyzer-22
+          - clang-analyzer-22-default
+          - lld-22
+          - lld-22-devel
+          - lld-22-static
+          - lld-22-default
+          - mlir-22
+          - mlir-22-libs
+          - mlir-22-devel
+          - mlir-22-static
+          - mlir-22-default
+          - compiler-rt-22
+          - libcxx-22
+          - libcxx-22-devel
+          - libcxx-22-static
+          - libcxxabi-22
+          - libcxxabi-22-devel
+          - libcxxabi-22-static
+          - llvm-libunwind-22
+          - llvm-libunwind-22-devel
+          - llvm-libunwind-22-static
+    - uses: strip
+outputs:
+  - name: llvm-22
+    files:
+      license:
+        - /usr/share/licenses/llvm-22/**
+    dependencies:
+      run:
+        - llvm-22-libs = ${package.version}-${package.release}
+    tests:
+      - name: compile-ir
+        stage: installed
+        packages:
+          - gcc
+          - glibc-devel
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            cd "$work"
+            printf 'define i32 @main() { ret i32 0 }\n' > main.ll
+            llvm-as-22 main.ll -o main.bc
+            opt-22 -passes=default\<O2\> main.bc -o optimised.bc
+            lli-22 optimised.bc
+            llc-22 -filetype=obj -relocation-model=pic optimised.bc -o main.o
+            gcc main.o -o main
+            ./main
+            # All three backends must work on both supported host architectures.
+            llc-22 -mtriple=x86_64-unknown-linux-gnu -filetype=obj main.bc -o x86.o
+            llc-22 -mtriple=aarch64-unknown-linux-gnu -filetype=obj main.bc -o arm.o
+            printf 'define i64 @filter() { ret i64 0 }\n' > bpf.ll
+            llc-22 -mtriple=bpfel -filetype=obj bpf.ll -o bpf.o
+            test ! -e /usr/bin/llvm-as
+            test ! -e /usr/bin/llvm-config-22
+  - name: llvm-22-libs
+    summary: LLVM 22 shared runtime libraries
+    files:
+      include:
+        - /usr/lib*/libLLVM*.so.*
+        - /usr/lib*/libLTO*.so.*
+        - /usr/lib*/libRemarks*.so.*
+        - /usr/lib/llvm-22/lib/libLLVM*.so.*
+        - /usr/lib/llvm-22/lib/libLTO*.so.*
+        - /usr/lib/llvm-22/lib/libRemarks*.so.*
+        - /usr/share/licenses/llvm-22-libs/**
+      license:
+        - /usr/share/licenses/llvm-22-libs/**
+    tests:
+      - name: load-library
+        stage: installed
+        packages:
+          - python3
+        argv:
+          - python3
+          - -c
+          - |
+            import ctypes
+            llvm = ctypes.CDLL("libLLVM.so.22.1")
+            llvm.LLVMContextCreate.restype = ctypes.c_void_p
+            llvm.LLVMContextDispose.argtypes = [ctypes.c_void_p]
+            llvm.LLVMContextDispose.restype = None
+            context = llvm.LLVMContextCreate()
+            assert context
+            llvm.LLVMContextDispose(context)
+  - name: llvm-22-devel
+    summary: LLVM 22 headers and development tools
+    files:
+      include:
+        - /usr/lib/llvm-22/include/llvm/**
+        - /usr/lib/llvm-22/include/llvm-c/**
+        - /usr/lib/llvm-22/lib/cmake/llvm/**
+        - /usr/lib/llvm-22/lib/libLLVM*.so
+        - /usr/lib/llvm-22/lib/libLTO*.so
+        - /usr/lib/llvm-22/lib/libRemarks*.so
+        - /usr/lib/llvm-22/bin/llvm-config
+        - /usr/bin/llvm-config-22
+        - /usr/share/licenses/llvm-22-devel/**
+      exclude:
+        - /usr/lib/llvm-22/lib/cmake/llvm/LLVMStaticExports*.cmake
+      license:
+        - /usr/share/licenses/llvm-22-devel/**
+    dependencies:
+      run:
+        - llvm-22-libs = ${package.version}-${package.release}
+        - llvm-cmake-22 = ${package.version}-${package.release}
+    tests:
+      - name: link-shared
+        stage: installed
+        packages:
+          - gcc-c++
+          - cmake
+          - make
+          - glibc-devel
+          - zlib-devel
+          - zstd-devel
+          - libffi-devel
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            cd "$work"
+            test "$(llvm-config-22 --version)" = 22.1.8
+            printf '#include <llvm-c/Core.h>\nint main(void) { LLVMContextRef c = LLVMContextCreate(); LLVMContextDispose(c); return 0; }\n' > main.c
+            gcc $(llvm-config-22 --cflags) main.c $(llvm-config-22 --link-shared --ldflags --libs core) -o main
+            ./main
+            test ! -e /usr/bin/llvm-as-22
+            printf 'cmake_minimum_required(VERSION 3.20)\nproject(llvm_smoke C CXX)\nfind_package(LLVM 22.1.0 REQUIRED CONFIG)\nadd_executable(smoke main.c)\ntarget_include_directories(smoke PRIVATE $${LLVM_INCLUDE_DIRS})\ntarget_link_libraries(smoke PRIVATE LLVM)\n' > CMakeLists.txt
+            cmake -S . -B build -DLLVM_DIR="$(llvm-config-22 --cmakedir)"
+            cmake --build build
+            ./build/smoke
+  - name: llvm-22-static
+    summary: LLVM 22 static libraries
+    files:
+      include:
+        - /usr/lib/llvm-22/lib/libLLVM*.a
+        - /usr/lib/llvm-22/lib/cmake/llvm/LLVMStaticExports*.cmake
+        - /usr/share/licenses/llvm-22-static/**
+      license:
+        - /usr/share/licenses/llvm-22-static/**
+    dependencies:
+      run:
+        - llvm-22-devel = ${package.version}-${package.release}
+    tests:
+      - name: link-static
+        stage: installed
+        packages:
+          - gcc-c++
+          - libstdc++-devel
+          - glibc-devel
+          - zlib-devel
+          - zstd-devel
+          - libffi-devel
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            cd "$work"
+            printf '#include <llvm-c/Core.h>\nint main() { LLVMContextRef c = LLVMContextCreate(); LLVMContextDispose(c); }\n' > main.cc
+            g++ $(llvm-config-22 --cxxflags) main.cc $(llvm-config-22 --link-static --ldflags --libs core --system-libs) -o main
+            ./main
+  - name: llvm-cmake-22
+    summary: Shared CMake modules for LLVM 22
+    files:
+      include:
+        - /usr/lib/llvm-22/share/cmake/Modules/**
+        - /usr/share/licenses/llvm-cmake-22/**
+      license:
+        - /usr/share/licenses/llvm-cmake-22/**
+  - name: llvm-22-default
+    summary: Unversioned command names for LLVM 22
+    files:
+      include:
+        - /usr/bin/*
+        - /usr/share/licenses/llvm-22-default/**
+      exclude:
+        - /usr/bin/*-22
+        - /usr/bin/clang
+        - /usr/bin/clang++
+        - /usr/bin/clang-cl
+        - /usr/bin/clang-cpp
+        - /usr/bin/clang-22
+        - /usr/bin/scan-*
+        - /usr/bin/analyze-*
+        - /usr/bin/intercept-*
+        - /usr/bin/mlir-*
+        - /usr/bin/tblgen-lsp-server
+        - /usr/bin/tblgen-to-irdl
+        - /usr/bin/lld
+        - /usr/bin/lld-link
+        - /usr/bin/ld.lld
+        - /usr/bin/ld64.lld
+        - /usr/bin/wasm-ld
+        - /usr/bin/clang*
+        - /usr/bin/diagtool
+        - /usr/bin/find-all-symbols
+        - /usr/bin/git-clang-format
+        - /usr/bin/hmaptool
+        - /usr/bin/modularize
+        - /usr/bin/pp-trace
+        - /usr/bin/run-clang-tidy*
+        - /usr/bin/c-index-test
+        - /usr/bin/amdgpu-arch
+        - /usr/bin/nvptx-arch
+      license:
+        - /usr/share/licenses/llvm-22-default/**
+    dependencies:
+      run:
+        - llvm-22 = ${package.version}-${package.release}
+        - llvm-22-devel = ${package.version}-${package.release}
+      conflicts:
+        - llvm-23-default
+      provides:
+        - llvm = ${package.version}-${package.release}
+    tests:
+      - name: selected-commands
+        stage: installed
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            test "$(llvm-config --version)" = 22.1.8
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            printf 'define i32 @main() { ret i32 0 }\n' > "$work/main.ll"
+            llvm-as "$work/main.ll" -o "$work/main.bc"
+            lli "$work/main.bc"
+  - name: clang-22
+    summary: Clang 22 C and C++ compiler
+    files:
+      include:
+        - /usr/lib/llvm-22/bin/clang
+        - /usr/lib/llvm-22/bin/clang++
+        - /usr/lib/llvm-22/bin/clang-cl
+        - /usr/lib/llvm-22/bin/clang-cpp
+        - /usr/lib/llvm-22/bin/clang-22
+        - /usr/bin/clang-22
+        - /usr/bin/clang++-22
+        - /usr/bin/clang-cl-22
+        - /usr/bin/clang-cpp-22
+        - /usr/bin/clang-22-22
+        - /usr/lib/llvm-22/lib/clang/22/include/**
+        - /usr/lib/llvm-22/share/clang/**
+        - /usr/share/licenses/clang-22/**
+      license:
+        - /usr/share/licenses/clang-22/**
+      exclude:
+        - /usr/lib/llvm-22/lib/clang/22/include/sanitizer/**
+        - /usr/lib/llvm-22/lib/clang/22/include/fuzzer/**
+        - /usr/lib/llvm-22/lib/clang/22/include/orc/**
+        - /usr/lib/llvm-22/lib/clang/22/include/profile/**
+        - /usr/lib/llvm-22/lib/clang/22/include/xray/**
+    dependencies:
+      run:
+        - clang-22-libs = ${package.version}-${package.release}
+        - gcc
+        - binutils
+    tests:
+      - name: compile-c-and-cxx
+        stage: installed
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            cd "$work"
+            printf '#include <stdio.h>\nint main(void) { puts("clang"); }\n' > main.c
+            clang-22 main.c -o main
+            ./main
+            printf '#include <vector>\nint main() { std::vector<int> v{42}; return v[0] != 42; }\n' > main.cc
+            clang++-22 main.cc -o main-cxx
+            ./main-cxx
+            test ! -e /usr/bin/clang
+        packages:
+          - glibc-devel
+          - libstdc++-devel
+  - name: clang-22-libs
+    summary: Clang 22 shared libraries
+    files:
+      include:
+        - /usr/lib*/libclang*.so.*
+        - /usr/lib/llvm-22/lib/libclang*.so.*
+        - /usr/share/licenses/clang-22-libs/**
+      license:
+        - /usr/share/licenses/clang-22-libs/**
+    dependencies:
+      run:
+        - llvm-22-libs = ${package.version}-${package.release}
+    tests:
+      - name: load-c-api
+        stage: installed
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            python3 -c 'import ctypes; c = ctypes.CDLL("libclang.so.22.1"); c.clang_createIndex.restype = ctypes.c_void_p; c.clang_disposeIndex.argtypes = [ctypes.c_void_p]; i = c.clang_createIndex(0, 0); assert i; c.clang_disposeIndex(i)'
+        packages:
+          - python3
+  - name: clang-22-devel
+    summary: Clang 22 headers and shared development files
+    files:
+      include:
+        - /usr/lib/llvm-22/include/clang*/**
+        - /usr/lib/llvm-22/lib/libclang*.so
+        - /usr/lib/llvm-22/lib/cmake/clang/**
+        - /usr/share/licenses/clang-22-devel/**
+      license:
+        - /usr/share/licenses/clang-22-devel/**
+      exclude:
+        - /usr/lib/llvm-22/lib/cmake/clang/ClangStaticTargets*.cmake
+    dependencies:
+      run:
+        - clang-22-libs = ${package.version}-${package.release}
+        - llvm-22-devel = ${package.version}-${package.release}
+    tests:
+      - name: link-shared-and-cmake
+        stage: installed
+        packages:
+          - gcc-c++
+          - cmake
+          - make
+          - glibc-devel
+          - zlib-devel
+          - zstd-devel
+          - libffi-devel
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            cd "$work"
+            printf '#include <clang-c/Index.h>\nint main() { CXIndex c = clang_createIndex(0, 0); clang_disposeIndex(c); }\n' > main.cc
+            g++ -std=c++17 -I/usr/lib/llvm-22/include main.cc -L/usr/lib/llvm-22/lib -lclang -lLLVM -o main
+            ./main
+            printf 'cmake_minimum_required(VERSION 3.20)\nproject(sdk_smoke C CXX)\nfind_package(Clang 22.1.0 REQUIRED CONFIG)\nadd_executable(smoke main.cc)\ntarget_include_directories(smoke PRIVATE $${CLANG_INCLUDE_DIRS} $${LLVM_INCLUDE_DIRS})\ntarget_link_libraries(smoke PRIVATE libclang LLVM)\n' > CMakeLists.txt
+            cmake -S . -B build -DCMAKE_PREFIX_PATH=/usr/lib/llvm-22
+            cmake --build build
+            ./build/smoke
+  - name: clang-22-static
+    summary: Clang 22 static libraries
+    files:
+      include:
+        - /usr/lib/llvm-22/lib/libclang*.a
+        - /usr/lib/llvm-22/lib/cmake/clang/ClangStaticTargets*.cmake
+        - /usr/share/licenses/clang-22-static/**
+      license:
+        - /usr/share/licenses/clang-22-static/**
+    dependencies:
+      run:
+        - clang-22-devel = ${package.version}-${package.release}
+        - llvm-22-static = ${package.version}-${package.release}
+    tests:
+      - name: link-static-api
+        stage: installed
+        packages:
+          - gcc-c++
+          - glibc-devel
+          - libstdc++-devel
+          - zlib-devel
+          - zstd-devel
+          - libffi-devel
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            cd "$work"
+            printf '#include <clang-c/Index.h>\nint main() { CXIndex c = clang_createIndex(0, 0); clang_disposeIndex(c); }\n' > main.cc
+            g++ $(llvm-config-22 --cxxflags) -I/usr/lib/llvm-22/include -c main.cc -o main.o
+            g++ main.o -Wl,--start-group /usr/lib/llvm-22/lib/libclang*.a $(llvm-config-22 --link-static --ldflags --libs all) -Wl,--end-group $(llvm-config-22 --link-static --system-libs) -o main
+            ./main
+  - name: clang-22-default
+    summary: Unversioned command names for clang 22
+    files:
+      include:
+        - /usr/bin/clang
+        - /usr/bin/clang++
+        - /usr/bin/clang-cl
+        - /usr/bin/clang-cpp
+        - /usr/share/licenses/clang-22-default/**
+      license:
+        - /usr/share/licenses/clang-22-default/**
+      exclude:
+        - /usr/bin/*-22
+    dependencies:
+      run:
+        - clang-22 = ${package.version}-${package.release}
+      conflicts:
+        - clang-23-default
+      provides:
+        - clang = ${package.version}-${package.release}
+    tests:
+      - name: selected-command
+        stage: installed
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            clang --version
+  - name: clang-tools-22
+    summary: Clang 22 formatting and refactoring tools
+    files:
+      include:
+        - /usr/lib/llvm-22/bin/clang*
+        - /usr/lib/llvm-22/bin/diagtool
+        - /usr/lib/llvm-22/bin/find-all-symbols
+        - /usr/lib/llvm-22/bin/git-clang-format
+        - /usr/lib/llvm-22/bin/hmaptool
+        - /usr/lib/llvm-22/bin/modularize
+        - /usr/lib/llvm-22/bin/pp-trace
+        - /usr/lib/llvm-22/bin/run-clang-tidy*
+        - /usr/bin/clang*-22
+        - /usr/bin/diagtool-22
+        - /usr/bin/find-all-symbols-22
+        - /usr/bin/git-clang-format-22
+        - /usr/bin/hmaptool-22
+        - /usr/bin/modularize-22
+        - /usr/bin/pp-trace-22
+        - /usr/bin/run-clang-tidy*-22
+        - /usr/lib/llvm-22/share/clang-tools/**
+        - /usr/share/licenses/clang-tools-22/**
+        - /usr/lib/llvm-22/bin/c-index-test
+        - /usr/bin/c-index-test-22
+        - /usr/lib/llvm-22/bin/amdgpu-arch
+        - /usr/bin/amdgpu-arch-22
+        - /usr/lib/llvm-22/bin/nvptx-arch
+        - /usr/bin/nvptx-arch-22
+      license:
+        - /usr/share/licenses/clang-tools-22/**
+      exclude:
+        - /usr/lib/llvm-22/bin/clang
+        - /usr/lib/llvm-22/bin/clang++
+        - /usr/lib/llvm-22/bin/clang-cl
+        - /usr/lib/llvm-22/bin/clang-cpp
+        - /usr/lib/llvm-22/bin/clang-22
+        - /usr/bin/clang-22
+        - /usr/bin/clang++-22
+        - /usr/bin/clang-cl-22
+        - /usr/bin/clang-cpp-22
+        - /usr/bin/clang-22-22
+    dependencies:
+      run:
+        - clang-22 = ${package.version}-${package.release}
+    tests:
+      - name: format-and-tidy
+        stage: installed
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            cd "$work"
+            printf 'int main(){return 0;}\n' > main.c
+            clang-format-22 main.c > formatted.c
+            clang-tidy-22 formatted.c -- -std=c17
+  - name: clang-tools-22-default
+    summary: Unversioned command names for clang-tools 22
+    files:
+      include:
+        - /usr/bin/clang*
+        - /usr/bin/diagtool
+        - /usr/bin/find-all-symbols
+        - /usr/bin/git-clang-format
+        - /usr/bin/hmaptool
+        - /usr/bin/modularize
+        - /usr/bin/pp-trace
+        - /usr/bin/run-clang-tidy*
+        - /usr/share/licenses/clang-tools-22-default/**
+        - /usr/bin/c-index-test
+        - /usr/bin/amdgpu-arch
+        - /usr/bin/nvptx-arch
+      license:
+        - /usr/share/licenses/clang-tools-22-default/**
+      exclude:
+        - /usr/bin/*-22
+        - /usr/bin/clang
+        - /usr/bin/clang++
+        - /usr/bin/clang-cl
+        - /usr/bin/clang-cpp
+        - /usr/bin/clang-22
+    dependencies:
+      run:
+        - clang-tools-22 = ${package.version}-${package.release}
+      conflicts:
+        - clang-tools-23-default
+      provides:
+        - clang-format = ${package.version}-${package.release}
+        - clang-tidy = ${package.version}-${package.release}
+        - clang-tools = ${package.version}-${package.release}
+    tests:
+      - name: selected-command
+        stage: installed
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            clang-format --version
+  - name: clang-analyzer-22
+    summary: Clang 22 static analyzer tools
+    files:
+      include:
+        - /usr/lib/llvm-22/bin/scan-*
+        - /usr/lib/llvm-22/bin/analyze-*
+        - /usr/lib/llvm-22/bin/intercept-*
+        - /usr/bin/scan-*-22
+        - /usr/bin/analyze-*-22
+        - /usr/bin/intercept-*-22
+        - /usr/lib/llvm-22/libexec/**
+        - /usr/lib/llvm-22/lib/libear*
+        - /usr/lib/llvm-22/lib/libscanbuild/**
+        - /usr/lib/llvm-22/share/scan-*/**
+        - /usr/share/licenses/clang-analyzer-22/**
+      license:
+        - /usr/share/licenses/clang-analyzer-22/**
+    dependencies:
+      run:
+        - clang-22 = ${package.version}-${package.release}
+        - python3
+        - perl
+    tests:
+      - name: analyze-compile
+        stage: installed
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            cd "$work"
+            printf 'int main(void) { return 0; }\n' > main.c
+            scan-build-22 --status-bugs clang-22 -c main.c -o main.o
+            test -s main.o
+  - name: clang-analyzer-22-default
+    summary: Unversioned command names for clang-analyzer 22
+    files:
+      include:
+        - /usr/bin/scan-*
+        - /usr/bin/analyze-*
+        - /usr/bin/intercept-*
+        - /usr/share/licenses/clang-analyzer-22-default/**
+      license:
+        - /usr/share/licenses/clang-analyzer-22-default/**
+      exclude:
+        - /usr/bin/*-22
+    dependencies:
+      run:
+        - clang-analyzer-22 = ${package.version}-${package.release}
+      conflicts:
+        - clang-analyzer-23-default
+      provides:
+        - scan-build = ${package.version}-${package.release}
+        - clang-analyzer = ${package.version}-${package.release}
+    tests:
+      - name: selected-command
+        stage: installed
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            scan-build --help > /dev/null
+  - name: lld-22
+    summary: LLD 22 linker
+    files:
+      include:
+        - /usr/lib/llvm-22/bin/lld
+        - /usr/lib/llvm-22/bin/lld-link
+        - /usr/lib/llvm-22/bin/ld.lld
+        - /usr/lib/llvm-22/bin/ld64.lld
+        - /usr/lib/llvm-22/bin/wasm-ld
+        - /usr/bin/lld-22
+        - /usr/bin/lld-link-22
+        - /usr/bin/ld.lld-22
+        - /usr/bin/ld64.lld-22
+        - /usr/bin/wasm-ld-22
+        - /usr/share/licenses/lld-22/**
+      license:
+        - /usr/share/licenses/lld-22/**
+    dependencies:
+      run:
+        - llvm-22-libs = ${package.version}-${package.release}
+    tests:
+      - name: link-object
+        stage: installed
+        packages:
+          - binutils
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            cd "$work"
+            printf '.data\n.globl answer\nanswer: .long 42\n' > main.s
+            as main.s -o main.o
+            ld.lld-22 -r main.o -o combined.o
+            readelf --symbols combined.o | grep answer
+            test ! -e /usr/bin/ld.lld
+  - name: lld-22-devel
+    summary: LLD 22 development headers and CMake configuration
+    files:
+      include:
+        - /usr/lib/llvm-22/include/lld/**
+        - /usr/lib/llvm-22/lib/cmake/lld/**
+        - /usr/share/licenses/lld-22-devel/**
+      license:
+        - /usr/share/licenses/lld-22-devel/**
+      exclude:
+        - /usr/lib/llvm-22/lib/cmake/lld/LLDStaticTargets*.cmake
+    dependencies:
+      run:
+        - llvm-22-devel = ${package.version}-${package.release}
+  - name: lld-22-static
+    summary: LLD 22 static libraries
+    files:
+      include:
+        - /usr/lib/llvm-22/lib/liblld*.a
+        - /usr/lib/llvm-22/lib/cmake/lld/LLDStaticTargets*.cmake
+        - /usr/share/licenses/lld-22-static/**
+      license:
+        - /usr/share/licenses/lld-22-static/**
+    dependencies:
+      run:
+        - lld-22-devel = ${package.version}-${package.release}
+        - llvm-22-static = ${package.version}-${package.release}
+    tests:
+      - name: link-static-driver
+        stage: installed
+        packages:
+          - gcc-c++
+          - glibc-devel
+          - libstdc++-devel
+          - zlib-devel
+          - zstd-devel
+          - libffi-devel
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            cd "$work"
+            printf '#include <lld/Common/Driver.h>\nLLD_HAS_DRIVER(elf)\nint main() { const char *a[] = {"ld.lld", "--version"}; return lld::elf::link(a, llvm::outs(), llvm::errs(), false, false) ? 0 : 1; }\n' > main.cc
+            g++ $(llvm-config-22 --cxxflags) -I/usr/lib/llvm-22/include -c main.cc -o main.o
+            g++ main.o -Wl,--start-group /usr/lib/llvm-22/lib/liblld*.a $(llvm-config-22 --link-static --ldflags --libs all) -Wl,--end-group $(llvm-config-22 --link-static --system-libs) -o main
+            ./main
+  - name: lld-22-default
+    summary: Unversioned command names for lld 22
+    files:
+      include:
+        - /usr/bin/lld
+        - /usr/bin/lld-link
+        - /usr/bin/ld.lld
+        - /usr/bin/ld64.lld
+        - /usr/bin/wasm-ld
+        - /usr/share/licenses/lld-22-default/**
+      license:
+        - /usr/share/licenses/lld-22-default/**
+      exclude:
+        - /usr/bin/*-22
+    dependencies:
+      run:
+        - lld-22 = ${package.version}-${package.release}
+      conflicts:
+        - lld-23-default
+      provides:
+        - lld = ${package.version}-${package.release}
+    tests:
+      - name: selected-command
+        stage: installed
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            ld.lld --version
+  - name: mlir-22
+    summary: MLIR 22 optimisation and translation tools
+    files:
+      include:
+        - /usr/lib/llvm-22/bin/mlir-*
+        - /usr/lib/llvm-22/bin/tblgen-lsp-server
+        - /usr/lib/llvm-22/bin/tblgen-to-irdl
+        - /usr/bin/mlir-*-22
+        - /usr/bin/tblgen-lsp-server-22
+        - /usr/bin/tblgen-to-irdl-22
+        - /usr/share/licenses/mlir-22/**
+      license:
+        - /usr/share/licenses/mlir-22/**
+    dependencies:
+      run:
+        - mlir-22-libs = ${package.version}-${package.release}
+    tests:
+      - name: lower-to-llvm
+        stage: installed
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            cd "$work"
+            printf 'module { func.func @answer() -> i32 { %%c = arith.constant 42 : i32\n return %%c : i32 } }\n' > main.mlir
+            mlir-opt-22 --convert-arith-to-llvm --convert-func-to-llvm --reconcile-unrealized-casts main.mlir > lowered.mlir
+            mlir-translate-22 --mlir-to-llvmir lowered.mlir > main.ll
+  - name: mlir-22-libs
+    summary: MLIR 22 shared libraries
+    files:
+      include:
+        - /usr/lib*/libMLIR*.so.*
+        - /usr/lib*/libmlir*.so.*
+        - /usr/lib/llvm-22/lib/libMLIR*.so.*
+        - /usr/lib/llvm-22/lib/libmlir*.so.*
+        - /usr/share/licenses/mlir-22-libs/**
+      license:
+        - /usr/share/licenses/mlir-22-libs/**
+    dependencies:
+      run:
+        - llvm-22-libs = ${package.version}-${package.release}
+    tests:
+      - name: load-library
+        stage: installed
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            python3 -c 'import ctypes; ctypes.CDLL("libMLIR.so.22.1")'
+        packages:
+          - python3
+  - name: mlir-22-devel
+    summary: MLIR 22 headers and shared development files
+    files:
+      include:
+        - /usr/lib/llvm-22/include/mlir*/**
+        - /usr/lib/llvm-22/lib/libMLIR*.so
+        - /usr/lib/llvm-22/lib/libmlir*.so
+        - /usr/lib/llvm-22/lib/cmake/mlir/**
+        - /usr/share/licenses/mlir-22-devel/**
+      license:
+        - /usr/share/licenses/mlir-22-devel/**
+      exclude:
+        - /usr/lib/llvm-22/lib/cmake/mlir/MLIRStaticTargets*.cmake
+    dependencies:
+      run:
+        - mlir-22-libs = ${package.version}-${package.release}
+        - llvm-22-devel = ${package.version}-${package.release}
+    tests:
+      - name: link-shared-and-cmake
+        stage: installed
+        packages:
+          - gcc-c++
+          - cmake
+          - make
+          - glibc-devel
+          - zlib-devel
+          - zstd-devel
+          - libffi-devel
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            cd "$work"
+            printf '#include <mlir/IR/MLIRContext.h>\nint main() { mlir::MLIRContext c; }\n' > main.cc
+            g++ -std=c++17 -I/usr/lib/llvm-22/include main.cc -L/usr/lib/llvm-22/lib -lMLIR -lLLVM -o main
+            ./main
+            printf 'cmake_minimum_required(VERSION 3.20)\nproject(sdk_smoke C CXX)\nfind_package(MLIR 22.1.0 REQUIRED CONFIG)\nadd_executable(smoke main.cc)\ntarget_include_directories(smoke PRIVATE $${MLIR_INCLUDE_DIRS} $${LLVM_INCLUDE_DIRS})\ntarget_link_libraries(smoke PRIVATE MLIR LLVM)\n' > CMakeLists.txt
+            cmake -S . -B build -DCMAKE_PREFIX_PATH=/usr/lib/llvm-22
+            cmake --build build
+            ./build/smoke
+  - name: mlir-22-static
+    summary: MLIR 22 static libraries
+    files:
+      include:
+        - /usr/lib/llvm-22/lib/libMLIR*.a
+        - /usr/lib/llvm-22/lib/libmlir*.a
+        - /usr/lib/llvm-22/lib/cmake/mlir/MLIRStaticTargets*.cmake
+        - /usr/share/licenses/mlir-22-static/**
+      license:
+        - /usr/share/licenses/mlir-22-static/**
+    dependencies:
+      run:
+        - mlir-22-devel = ${package.version}-${package.release}
+        - llvm-22-static = ${package.version}-${package.release}
+    tests:
+      - name: link-static-api
+        stage: installed
+        packages:
+          - gcc-c++
+          - glibc-devel
+          - libstdc++-devel
+          - zlib-devel
+          - zstd-devel
+          - libffi-devel
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            cd "$work"
+            printf '#include <mlir/IR/MLIRContext.h>\nint main() { mlir::MLIRContext c; }\n' > main.cc
+            g++ $(llvm-config-22 --cxxflags) -I/usr/lib/llvm-22/include -c main.cc -o main.o
+            g++ main.o -Wl,--start-group /usr/lib/llvm-22/lib/libMLIR*.a $(llvm-config-22 --link-static --ldflags --libs all) -Wl,--end-group $(llvm-config-22 --link-static --system-libs) -o main
+            ./main
+  - name: mlir-22-default
+    summary: Unversioned command names for mlir 22
+    files:
+      include:
+        - /usr/bin/mlir-*
+        - /usr/bin/tblgen-lsp-server
+        - /usr/bin/tblgen-to-irdl
+        - /usr/share/licenses/mlir-22-default/**
+      license:
+        - /usr/share/licenses/mlir-22-default/**
+      exclude:
+        - /usr/bin/*-22
+    dependencies:
+      run:
+        - mlir-22 = ${package.version}-${package.release}
+      conflicts:
+        - mlir-23-default
+      provides:
+        - mlir-opt = ${package.version}-${package.release}
+        - mlir = ${package.version}-${package.release}
+    tests:
+      - name: selected-command
+        stage: installed
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            mlir-opt --version
+  - name: compiler-rt-22
+    summary: Clang 22 builtins and sanitizer runtimes
+    files:
+      include:
+        - /usr/lib/llvm-22/lib/clang/22/lib/**
+        - /usr/lib/llvm-22/lib/clang/22/bin/**
+        - /usr/lib/llvm-22/lib/clang/22/share/**
+        - /usr/lib/llvm-22/lib/clang/22/include/sanitizer/**
+        - /usr/lib/llvm-22/lib/clang/22/include/fuzzer/**
+        - /usr/lib/llvm-22/lib/clang/22/include/orc/**
+        - /usr/lib/llvm-22/lib/clang/22/include/profile/**
+        - /usr/lib/llvm-22/lib/clang/22/include/xray/**
+        - /usr/lib/llvm-22/share/*abilist*
+        - /usr/lib/llvm-22/share/*ignorelist*
+        - /usr/share/licenses/compiler-rt-22/**
+      license:
+        - /usr/share/licenses/compiler-rt-22/**
+    tests:
+      - name: address-sanitizer
+        stage: build
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            export LD_LIBRARY_PATH="$STAGE/usr/lib64:$STAGE/usr/lib"
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            cd "$work"
+            printf '#include <stdlib.h>\nint main(void) { char *p = malloc(16); p[0] = 42; free(p); return 0; }\n' > main.c
+            "$STAGE/usr/lib/llvm-22/bin/clang" -fsanitize=address main.c -o main
+            ./main
+    lint:
+      allow:
+        - static-archive
+  - name: libcxx-22
+    summary: LLVM 22 libcxx shared runtime
+    files:
+      include:
+        - /usr/lib*/libc++.so.*
+        - /usr/lib/llvm-22/lib/libc++.so.*
+        - /usr/share/licenses/libcxx-22/**
+      license:
+        - /usr/share/licenses/libcxx-22/**
+    dependencies:
+      run:
+        - libcxxabi-22 = ${package.version}-${package.release}
+      conflicts:
+        - libcxx-23
+    tests:
+      - name: load-library
+        stage: installed
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            python3 -c 'import ctypes; ctypes.CDLL("libc++.so.1")'
+        packages:
+          - python3
+  - name: libcxx-22-devel
+    summary: LLVM 22 libcxx development files
+    files:
+      include:
+        - /usr/lib/llvm-22/include/c++/v1/**
+        - /usr/lib/llvm-22/lib/libc++.so
+        - /usr/share/licenses/libcxx-22-devel/**
+        - /usr/lib/llvm-22/lib/libc++.modules.json
+        - /usr/lib/llvm-22/share/libc++/**
+      license:
+        - /usr/share/licenses/libcxx-22-devel/**
+    dependencies:
+      run:
+        - libcxx-22 = ${package.version}-${package.release}
+    tests:
+      - name: link-libcxx
+        stage: installed
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            cd "$work"
+            printf '#include <vector>\n#include <stdexcept>\nint main() { try { throw std::runtime_error("ok"); } catch (const std::exception &) { std::vector<int> v{42}; return v[0] != 42; } }\n' > main.cc
+            g++ -nostdinc++ -isystem /usr/lib/llvm-22/include/c++/v1 -L/usr/lib/llvm-22/lib main.cc -c -o main.o
+            gcc main.o -L/usr/lib/llvm-22/lib -lc++ -o main
+            ./main
+        packages:
+          - gcc-c++
+          - glibc-devel
+  - name: libcxx-22-static
+    summary: LLVM 22 libcxx static library
+    files:
+      include:
+        - /usr/lib/llvm-22/lib/libc++.a
+        - /usr/lib/llvm-22/lib/libc++experimental.a
+        - /usr/lib/llvm-22/lib/libc++_experimental.a
+        - /usr/share/licenses/libcxx-22-static/**
+      license:
+        - /usr/share/licenses/libcxx-22-static/**
+    dependencies:
+      run:
+        - libcxx-22-devel = ${package.version}-${package.release}
+        - libcxxabi-22-static = ${package.version}-${package.release}
+    tests:
+      - name: link-static-cxx
+        stage: installed
+        packages:
+          - gcc-c++
+          - glibc-devel
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            cd "$work"
+            printf '#include <stdexcept>\nint main() { try { throw std::runtime_error("ok"); } catch (const std::exception &) { return 0; } }\n' > main.cc
+            g++ -nostdinc++ -isystem /usr/lib/llvm-22/include/c++/v1 -c main.cc -o main.o
+            gcc main.o -L/usr/lib/llvm-22/lib -Wl,-Bstatic -lc++ -lc++abi -lunwind -Wl,-Bdynamic -lm -lpthread -ldl -o main
+            ./main
+  - name: libcxxabi-22
+    summary: LLVM 22 libcxxabi shared runtime
+    files:
+      include:
+        - /usr/lib*/libc++abi.so.*
+        - /usr/lib/llvm-22/lib/libc++abi.so.*
+        - /usr/share/licenses/libcxxabi-22/**
+      license:
+        - /usr/share/licenses/libcxxabi-22/**
+    dependencies:
+      run:
+        - llvm-libunwind-22 = ${package.version}-${package.release}
+      conflicts:
+        - libcxxabi-23
+    tests:
+      - name: load-library
+        stage: installed
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            python3 -c 'import ctypes; ctypes.CDLL("libc++abi.so.1")'
+        packages:
+          - python3
+  - name: libcxxabi-22-devel
+    summary: LLVM 22 libcxxabi development files
+    files:
+      include:
+        - /usr/lib/llvm-22/lib/libc++abi.so
+        - /usr/share/licenses/libcxxabi-22-devel/**
+      license:
+        - /usr/share/licenses/libcxxabi-22-devel/**
+    dependencies:
+      run:
+        - libcxxabi-22 = ${package.version}-${package.release}
+        - libcxx-22-devel = ${package.version}-${package.release}
+  - name: libcxxabi-22-static
+    summary: LLVM 22 libcxxabi static library
+    files:
+      include:
+        - /usr/lib/llvm-22/lib/libc++abi.a
+        - /usr/lib/llvm-22/lib/libc++abi_experimental.a
+        - /usr/share/licenses/libcxxabi-22-static/**
+      license:
+        - /usr/share/licenses/libcxxabi-22-static/**
+    dependencies:
+      run:
+        - libcxxabi-22-devel = ${package.version}-${package.release}
+        - llvm-libunwind-22-static = ${package.version}-${package.release}
+  - name: llvm-libunwind-22
+    summary: LLVM 22 libunwind shared runtime
+    files:
+      include:
+        - /usr/lib*/libunwind.so.*
+        - /usr/lib/llvm-22/lib/libunwind.so.*
+        - /usr/share/licenses/llvm-libunwind-22/**
+      license:
+        - /usr/share/licenses/llvm-libunwind-22/**
+    tests:
+      - name: load-library
+        stage: installed
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            python3 -c 'import ctypes; ctypes.CDLL("libunwind.so.1")'
+        packages:
+          - python3
+    dependencies:
+      conflicts:
+        - llvm-libunwind-23
+  - name: llvm-libunwind-22-devel
+    summary: LLVM 22 libunwind development files
+    files:
+      include:
+        - /usr/lib/llvm-22/include/*unwind*.h
+        - /usr/lib/llvm-22/include/mach-o/compact_unwind_encoding.h
+        - /usr/lib/llvm-22/lib/libunwind.so
+        - /usr/share/licenses/llvm-libunwind-22-devel/**
+      license:
+        - /usr/share/licenses/llvm-libunwind-22-devel/**
+    dependencies:
+      run:
+        - llvm-libunwind-22 = ${package.version}-${package.release}
+    tests:
+      - name: unwind-context
+        stage: installed
+        packages:
+          - gcc
+          - glibc-devel
+        argv:
+          - bash
+          - -eu
+          - -c
+          - |
+            work=$(mktemp -d)
+            trap 'rm -rf "$work"' EXIT
+            cd "$work"
+            printf '#include <libunwind.h>\nint main(void) { unw_context_t c; unw_cursor_t u; return unw_getcontext(&c) || unw_init_local(&u, &c); }\n' > main.c
+            gcc -I/usr/lib/llvm-22/include main.c -L/usr/lib/llvm-22/lib -lunwind -o main
+            ./main
+  - name: llvm-libunwind-22-static
+    summary: LLVM 22 libunwind static library
+    files:
+      include:
+        - /usr/lib/llvm-22/lib/libunwind.a
+        - /usr/lib/llvm-22/lib/libunwind_experimental.a
+        - /usr/share/licenses/llvm-libunwind-22-static/**
+      license:
+        - /usr/share/licenses/llvm-libunwind-22-static/**
+    dependencies:
+      run:
+        - llvm-libunwind-22-devel = ${package.version}-${package.release}
+tests:
+  - name: hardening
+    stage: build
+    pipeline:
+      - uses: test/hardening-check
+        with:
+          skip:
+            - stack-protector
+            - fortify
+          paths:
+            - /usr/lib/llvm-22/bin
+            - /usr/lib/llvm-22/libexec
+            - /usr/lib/llvm-22/lib/libear
+            - /usr/lib64/libLLVM.so.22.1
+            - /usr/lib64/libLTO.so.22.1
+            - /usr/lib64/libRemarks.so.22.1
+            - /usr/lib64/libclang-cpp.so.22.1
+            - /usr/lib64/libMLIR.so.22.1
+            - /usr/lib64/libMLIRExecutionEngineShared.so.22.1
+            - /usr/lib64/libmlir_float16_utils.so.22.1
+            - /usr/lib64/libmlir_apfloat_wrappers.so.22.1
+            - /usr/lib64/libmlir_c_runner_utils.so.22.1
+            - /usr/lib64/libmlir_runner_utils.so.22.1
+            - /usr/lib64/libmlir_async_runtime.so.22.1
+            - /usr/lib64/libmlir_arm_sme_abi_stubs.so.22.1
+            - /usr/lib64/libmlir_arm_runner_utils.so.22.1
+            - /usr/lib64/libclang.so.${package.version}
+            - /usr/lib64/libc++.so.1.0
+            - /usr/lib64/libc++abi.so.1.0
+            - /usr/lib64/libunwind.so.1.0
+            - /usr/lib/libLLVM.so.22.1
+            - /usr/lib/libLTO.so.22.1
+            - /usr/lib/libRemarks.so.22.1
+            - /usr/lib/libclang-cpp.so.22.1
+            - /usr/lib/libMLIR.so.22.1
+            - /usr/lib/libMLIRExecutionEngineShared.so.22.1
+            - /usr/lib/libmlir_float16_utils.so.22.1
+            - /usr/lib/libmlir_apfloat_wrappers.so.22.1
+            - /usr/lib/libmlir_c_runner_utils.so.22.1
+            - /usr/lib/libmlir_runner_utils.so.22.1
+            - /usr/lib/libmlir_async_runtime.so.22.1
+            - /usr/lib/libmlir_arm_sme_abi_stubs.so.22.1
+            - /usr/lib/libmlir_arm_runner_utils.so.22.1
+            - /usr/lib/libclang.so.${package.version}
+            - /usr/lib/libc++.so.1.0
+            - /usr/lib/libc++abi.so.1.0
+            - /usr/lib/libunwind.so.1.0
+      - uses: test/hardening-check
+        with:
+          paths:
+            - /usr/lib/llvm-22/bin/llc
+            - /usr/lib64/libLLVM.so.22.1
+            - /usr/lib/libLLVM.so.22.1
+  - name: clang-lld-lto
+    stage: build
+    argv:
+      - bash
+      - -eu
+      - -c
+      - |
+        export LD_LIBRARY_PATH="$STAGE/usr/lib64:$STAGE/usr/lib"
+        work=$(mktemp -d)
+        trap 'rm -rf "$work"' EXIT
+        printf 'int main(void) { return 0; }\n' > "$work/main.c"
+        "$STAGE/usr/lib/llvm-22/bin/clang" -flto -fuse-ld="$STAGE/usr/lib/llvm-22/bin/ld.lld" "$work/main.c" -o "$work/main"
+        "$work/main"
