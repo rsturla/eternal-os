@@ -98,26 +98,20 @@ outputs:
     license:
     - /usr/share/licenses/audit-libs/**
   tests:
-  - name: load
-    stage: installed
-    packages:
-      - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("libaudit.so.1")'
-  - name: load-auparse
-    stage: installed
-    packages:
-      - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("libauparse.so.0")'
+    - name: minimal-runtime-dependencies
+      stage: installed
+      pipeline:
+        - uses: test/runtime-linkage
+          with:
+            libraries: ["libaudit.so.[0-9]*", "libauparse.so.[0-9]*"]
+    - name: runtime
+      stage: installed
+      packages:
+        - python3
+      files: tests
+      script: |
+        python3 "$TEST_FILES/runtime.py"
+
 - name: audit-devel
   files:
     license:
@@ -131,24 +125,18 @@ outputs:
     provides:
     - audit-libs-devel = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
-    stage: installed
-    packages:
-      - gcc
-      - glibc-devel
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.c <<'EOF'
-      #include <libaudit.h>
-      int main(void) { return audit_name_to_msg_type("SYSCALL") != AUDIT_SYSCALL; }
-      EOF
-      gcc /tmp/test.c -laudit -o /tmp/test
-      /tmp/test
+    - name: audit-api
+      stage: installed
+      packages:
+        - gcc
+        - glibc-devel
+        - coreutils
+      files: tests
+      script: |
+        bash "$TEST_FILES/audit-api.sh"
+
 tests:
-- name: hardening
-  stage: build
-  pipeline:
-  - uses: test/hardening-check
+  - name: hardening
+    stage: build
+    pipeline:
+      - uses: test/hardening-check
