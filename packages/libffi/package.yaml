@@ -52,18 +52,12 @@ outputs:
       license:
         - /usr/share/licenses/libffi/LICENSE
     tests:
-      - name: installed
+      - name: runtime-linkage
         stage: installed
-        packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libffi.so.* /usr/lib/libffi.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libffi.so.*"]
   - name: libffi-devel
     summary: libffi development files
     files:
@@ -76,6 +70,18 @@ outputs:
       run:
         - libffi = ${package.version}-${package.release}
 
+    tests:
+      - name: api-behavior
+        stage: installed
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists libffi
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libffi) "$TEST_FILES/behavior.c" $(pkg-config --libs libffi) -o behavior
+          ./behavior
   - name: libffi-doc
     summary: libffi documentation
     files:
@@ -88,20 +94,19 @@ outputs:
         - /usr/share/licenses/libffi-doc/LICENSE
 
 tests:
-  - name: link
-    stage: installed
-    packages: [gcc, glibc-devel, bash-binsh]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #include <ffi.h>
-        int main(void) {
-          ffi_cif cif;
-          (void)cif;
-          return 0;
-        }
-        EOF
-        gcc /tmp/test.c -lffi -o /tmp/test
-        /tmp/test
+  - name: upstream
+    stage: build
+    # DejaGNU uses this label in reports; the sandbox UID need not be in passwd.
+    environment:
+      USER: rpmx-test
+      LOGNAME: rpmx-test
+    packages:
+      - dejagnu
+      - diffutils
+    artifacts:
+      - test/test-suite.log
+      - test-suite.log
+      - testsuite/libffi.log
+      - testsuite/libffi.sum
+    pipeline:
+      - uses: make/check
