@@ -31,7 +31,7 @@ sources:
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  packages: [gcc, make, bash, coreutils, pkgconf, autoconf, automake, libtool, gettext]
+  packages: [gcc, make, bash, coreutils, pkgconf, autoconf, automake, libtool, gettext, gettext-devel]
   pipeline:
     - runs: |
         autoreconf -fi
