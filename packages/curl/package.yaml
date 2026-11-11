@@ -14,170 +14,176 @@ package:
     vendor: haxx
     product: curl
 sources:
-- name: curl-8.23.0.tar.xz
-  kind: archive
-  digest: sha512:69cf0feafdc79fbad007cf2fc977b777ce6ccb05d01afd17b5a42f8bedbfcc342fc3a48193faa7f3eafe6800cd7d07948916e8733db1b9de60287ed06219b840
-  locators:
-  - kind: https
-    url: https://curl.se/download/curl-8.23.0.tar.xz
-  - kind: https
-    url: https://github.com/curl/curl/releases/download/curl-8_23_0/curl-8.23.0.tar.xz
-  extract:
-    format: tar.xz
-    strip-components: 1
+  - name: curl-8.23.0.tar.xz
+    kind: archive
+    digest: sha512:69cf0feafdc79fbad007cf2fc977b777ce6ccb05d01afd17b5a42f8bedbfcc342fc3a48193faa7f3eafe6800cd7d07948916e8733db1b9de60287ed06219b840
+    locators:
+      - kind: https
+        url: https://curl.se/download/curl-8.23.0.tar.xz
+      - kind: https
+        url: https://github.com/curl/curl/releases/download/curl-8_23_0/curl-8.23.0.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
   packages:
-  - gcc
-  - make
-  - bash
-  - coreutils
-  - pkgconf
+    - gcc
+    - make
+    - bash
+    - coreutils
+    - pkgconf
   sysroot:
-  - openssl-devel
-  - zlib-devel
-  - zstd-devel
-  - libpsl-devel
-  - libidn2-devel
-  - libnghttp2-devel
+    - openssl-devel
+    - zlib-devel
+    - zstd-devel
+    - libpsl-devel
+    - libidn2-devel
+    - libnghttp2-devel
   pipeline:
-  - uses: autotools/configure
-    with:
-      args:
-      - --disable-static
-      - --with-openssl
-      - --with-ca-bundle=/etc/pki/tls/certs/ca-bundle.crt
-      - --with-libpsl
-      - --with-libidn2
-      - --without-libssh2
-      - --without-libssh
-      - --without-gssapi
-      - --with-nghttp2
-      - --without-nghttp3
-      - --without-ngtcp2
-      - --without-brotli
-      - --enable-threaded-resolver
-      - --disable-ldap
-      - --disable-ldaps
-      - --disable-ntlm
-      - --enable-ipv6
-      - --enable-unix-sockets
-      - --enable-hsts
-  - uses: make/build
-  - uses: make/install
-  - runs: |
-      find "$STAGE" -name "*.la" -delete
-      rm -f "$STAGE/usr/share/info/dir"
-      rm -f "$STAGE/usr/bin/wcurl"
-  - uses: license/copy
-    with:
-      files:
-      - COPYING
-      outputs:
-      - curl
-      - curl-libs
-      - curl-devel
-      - curl-doc
-  - uses: strip
+    - uses: autotools/configure
+      with:
+        args:
+          - --disable-static
+          - --with-openssl
+          - --with-ca-bundle=/etc/pki/tls/certs/ca-bundle.crt
+          - --with-libpsl
+          - --with-libidn2
+          - --without-libssh2
+          - --without-libssh
+          - --without-gssapi
+          - --with-nghttp2
+          - --without-nghttp3
+          - --without-ngtcp2
+          - --without-brotli
+          - --enable-threaded-resolver
+          - --disable-ldap
+          - --disable-ldaps
+          - --disable-ntlm
+          - --enable-ipv6
+          - --enable-unix-sockets
+          - --enable-hsts
+    - uses: make/build
+    - uses: make/install
+    - runs: |
+        find "$STAGE" -name "*.la" -delete
+        rm -f "$STAGE/usr/share/info/dir"
+        rm -f "$STAGE/usr/bin/wcurl"
+    - uses: license/copy
+      with:
+        files:
+          - COPYING
+        outputs:
+          - curl
+          - curl-libs
+          - curl-devel
+          - curl-doc
+    - uses: strip
 outputs:
-- name: curl
-  files:
-    license:
-    - /usr/share/licenses/curl/**
-  dependencies:
-    run:
-    - curl-libs = ${package.version}-${package.release}
-    recommends:
-    - ca-certificates-bundle
-  tests:
-  - name: local-transfer
-    stage: installed
-    packages:
-      - diffutils
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      printf "payload\n" > /tmp/curl-input
-      curl --fail --silent file:///tmp/curl-input -o /tmp/curl-output
-      cmp /tmp/curl-input /tmp/curl-output
-- name: curl-libs
-  files:
-    license:
-    - /usr/share/licenses/curl-libs/**
-    include:
-    - /usr/lib*/libcurl.so.*
-    - /usr/share/licenses/curl-libs/**
-  dependencies:
-    run:
-    - libidn2
-    - libpsl
-    - libnghttp2
-    - openssl-libs
-    - zlib
-    - zstd-libs
-    provides:
-    - libcurl = ${package.version}-${package.release}
-  tests:
-  - name: load
-    stage: installed
-    packages:
-      - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("libcurl.so.4")'
-- name: curl-devel
-  files:
-    license:
-    - /usr/share/licenses/curl-devel/**
-    include:
-    - '@dev'
-    - /usr/bin/curl-config
-    - /usr/share/licenses/curl-devel/**
-  dependencies:
-    run:
-    - curl-libs = ${package.version}-${package.release}
-    provides:
-    - libcurl-devel = ${package.version}-${package.release}
-  tests:
-  - name: compile-and-run
-    stage: installed
-    packages:
-      - gcc
-      - glibc-devel
-      - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.c <<'EOF'
-      #include <curl/curl.h>
-      int main(void) { if (curl_global_init(CURL_GLOBAL_DEFAULT)) return 1; CURL *c = curl_easy_init(); if (!c) return 1; curl_easy_cleanup(c); curl_global_cleanup(); return 0; }
-      EOF
-      gcc /tmp/test.c $(pkg-config --cflags --libs libcurl) -o /tmp/test
-      /tmp/test
-- name: curl-doc
-  files:
-    license:
-    - /usr/share/licenses/curl-doc/**
-    include:
-    - '@doc'
-    - '@man'
-    - '@info'
-    - /usr/share/licenses/curl-doc/**
+  - name: curl
+    files:
+      license:
+        - /usr/share/licenses/curl/**
+    dependencies:
+      run:
+        - curl-libs = ${package.version}-${package.release}
+      recommends:
+        - ca-certificates-bundle
+    tests:
+      - name: http-tls-transfers-redirects-and-errors
+        stage: installed
+        packages:
+          - bash
+          - python3
+          - openssl
+          # The untrusted-certificate case needs a valid default trust store.
+          - ca-certificates-bundle
+        files: tests
+        script: |
+          python3 -I "$TEST_FILES/http.py"
+      - name: file-transfer
+        stage: installed
+        packages:
+          - bash
+          - diffutils
+        script: |
+          printf 'payload\n' > input
+          curl --fail --silent --show-error "file://$PWD/input" -o output
+          cmp input output
+          if curl --fail --silent "file://$PWD/missing" -o missing; then exit 1; fi
+  - name: curl-libs
+    files:
+      license:
+        - /usr/share/licenses/curl-libs/**
+      include:
+        - /usr/lib*/libcurl.so.*
+        - /usr/share/licenses/curl-libs/**
+    dependencies:
+      run:
+        - libidn2
+        - libpsl
+        - libnghttp2
+        - openssl-libs
+        - zlib
+        - zstd-libs
+      provides:
+        - libcurl = ${package.version}-${package.release}
+    tests:
+      - name: load-library-and-version
+        stage: installed
+        packages:
+          - bash
+          - python3
+        script: |
+          python3 -I -c 'import ctypes; lib=ctypes.CDLL("libcurl.so.4"); lib.curl_version.restype=ctypes.c_char_p; assert b"libcurl/" in lib.curl_version()'
+      - name: runtime-closure
+        stage: installed
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libcurl.so.*"]
+  - name: curl-devel
+    files:
+      license:
+        - /usr/share/licenses/curl-devel/**
+      include:
+        - '@dev'
+        - /usr/bin/curl-config
+        - /usr/share/licenses/curl-devel/**
+    dependencies:
+      run:
+        - curl-libs = ${package.version}-${package.release}
+      provides:
+        - libcurl-devel = ${package.version}-${package.release}
+    tests:
+      - name: transfer-api
+        stage: installed
+        packages:
+          - bash
+          - gcc
+          - pkgconf
+        files: tests
+        script: |
+          printf 'payload\n' > input
+          gcc "$TEST_FILES/transfer.c" $(pkg-config --cflags --libs libcurl) -o transfer
+          ./transfer "file://$PWD/input"
+          if ./transfer "file://$PWD/missing"; then exit 1; fi
+  - name: curl-doc
+    files:
+      license:
+        - /usr/share/licenses/curl-doc/**
+      include:
+        - '@doc'
+        - '@man'
+        - '@info'
+        - /usr/share/licenses/curl-doc/**
 tests:
-- name: hardening
-  stage: build
-  pipeline:
-  - uses: test/hardening-check
+  - name: hardening
+    stage: build
+    pipeline:
+      - uses: test/hardening-check
 patches:
-- file: patches/0003-conncache-poll-an-idle-connection-for-pending-input-.patch
-  strip: 1
-  reason: Upstream ef6b17cf12d4af4dfb2af4f9bc35861772be71c7, carried by Fedora; reject unsolicited input
-    before reusing an idle HTTP connection
+  - file: patches/0003-conncache-poll-an-idle-connection-for-pending-input-.patch
+    strip: 1
+    reason: Upstream ef6b17cf12d4af4dfb2af4f9bc35861772be71c7, carried by Fedora; reject unsolicited input before reusing an idle HTTP connection
