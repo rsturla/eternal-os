@@ -81,18 +81,12 @@ outputs:
       run:
         - ncurses-libs
     tests:
-      - name: installed
+      - name: runtime-linkage
         stage: installed
-        packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libreadline.so.* /usr/lib/libreadline.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libreadline.so.*", "libhistory.so.*"]
   - name: readline-devel
     summary: Development files for readline
     files:
@@ -106,29 +100,17 @@ outputs:
         - readline = ${package.version}-${package.release}
         - ncurses-devel
     tests:
-      - name: link
+      - name: api-behavior
         stage: installed
-        packages: [gcc, glibc-devel, pkgconf, grep, bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            test -f /usr/include/readline/readline.h
-            cat > /tmp/hist.c <<'EOF'
-            #include <stdio.h>
-            #include <readline/readline.h>
-            #include <readline/history.h>
-            int main(void) {
-              add_history("eternal");
-              printf("%d\n", history_length);
-              return 0;
-            }
-            EOF
-            # --no-as-needed proves libreadline itself records its terminfo
-            # dependency instead of relying on the program's link line.
-            gcc /tmp/hist.c -Wl,--no-as-needed -lreadline -o /tmp/hist
-            test "$(/tmp/hist)" = 1
-
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists readline
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags readline) "$TEST_FILES/behavior.c" -Wl,--no-as-needed $(pkg-config --libs readline) -o behavior
+          ./behavior
   - name: readline-doc
     summary: Documentation for readline
     files:
