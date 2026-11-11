@@ -66,25 +66,32 @@ outputs:
       license:
         - /usr/share/licenses/kernel-headers/COPYING
 
+    tests:
+      - name: userspace-abi-headers
+        stage: installed
+        packages:
+          - bash
+          - gcc
+        files: tests
+        script: |
+          gcc -std=c11 -Wall -Wextra -Werror "$TEST_FILES/uapi.c" -o uapi
+          ./uapi
 tests:
   - name: headers
     stage: installed
-    packages: [gcc, glibc-devel, bash-binsh, coreutils]
-    argv:
-      - sh
-      - -c
-      - |
-        for header in linux/types.h linux/ioctl.h linux/fs.h asm/types.h; do
-          test -f "/usr/include/$header"
-        done
-        cat > /tmp/uapi.c <<'EOF'
-        #include <linux/types.h>
-        #include <linux/ioctl.h>
-        #include <linux/fs.h>
-        int main(void) {
-          __u32 value = 0;
-          return (int)value;
-        }
-        EOF
-        gcc /tmp/uapi.c -o /tmp/uapi
-        /tmp/uapi
+    packages: [gcc, glibc-devel, bash-binsh, coreutils, bash]
+    script: |
+      for header in linux/types.h linux/ioctl.h linux/fs.h asm/types.h; do
+        test -f "/usr/include/$header"
+      done
+      cat > /tmp/uapi.c <<'EOF'
+      #include <linux/types.h>
+      #include <linux/ioctl.h>
+      #include <linux/fs.h>
+      int main(void) {
+        __u32 value = 0;
+        return (int)value;
+      }
+      EOF
+      gcc /tmp/uapi.c -o /tmp/uapi
+      /tmp/uapi
