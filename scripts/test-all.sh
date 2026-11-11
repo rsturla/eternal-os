@@ -114,6 +114,8 @@ for name in "${names[@]}"; do
   fi
   if [[ $status != passed ]]; then
     failed=1
+    # Preparation errors live in the JSON response before any test log exists.
+    jq -r '.diagnostics[]? | "\(.code): \(.message)"' "$reports/results.json" >&2 || :
     tail -n 15 "$reports/run.log" >&2
   fi
   printf '%s\t%s\t%s\t%s\n' "$name" "$arch" "$status" "$reports/results.json" >>"$summary"
