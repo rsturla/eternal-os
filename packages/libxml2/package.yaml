@@ -69,16 +69,22 @@ outputs:
         - xz-libs
         - zlib
     tests:
-      - name: installed
+      - name: runtime-linkage
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '<root><item>ok</item></root>\n' > /tmp/libxml2-test.xml
-            xmllint --xpath 'string(/root/item)' /tmp/libxml2-test.xml | grep -Fx ok
-
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libxml2.so.*"]
+      - name: xml-cli
+        stage: installed
+        files: tests
+        script: |
+          xmllint --nonet --noout "$TEST_FILES/valid.xml"
+          test "$(xmllint --nonet --xpath 'sum(/root/item)' "$TEST_FILES/valid.xml")" = 42
+          if xmllint --nonet --noout "$TEST_FILES/invalid.xml"; then
+            echo "accepted malformed XML" >&2
+            exit 1
+          fi
   - name: libxml2-devel
     summary: Development files for libxml2
     files:
@@ -91,17 +97,17 @@ outputs:
       run:
         - libxml2 = ${package.version}-${package.release}
     tests:
-      - name: link
+      - name: api-behavior
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '#include <libxml/parser.h>\nint main(void){return 0;}\n' > /tmp/xml.c
-            gcc /tmp/xml.c $(pkg-config --cflags --libs libxml-2.0) -o /tmp/xml-test
-            /tmp/xml-test
-
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists libxml-2.0
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libxml-2.0) "$TEST_FILES/behavior.c" $(pkg-config --libs libxml-2.0) -o behavior
+          ./behavior
   - name: libxml2-doc
     summary: Documentation for libxml2
     files:
