@@ -71,24 +71,15 @@ outputs:
       run:
         - m4
     tests:
-      - name: installed
+      - name: parser
         stage: installed
-        packages: [bash-binsh, coreutils, gcc, m4]
-        argv:
-          - sh
-          - -c
-          - |
-            bison --version | head -1 | grep -q '3\.8\.2'
-            cat > calc.y <<'EOF'
-            %token NUMBER
-            %%
-            exp: NUMBER;
-            %%
-            EOF
-            bison -o calc.c calc.y
-            test -s calc.c
-            yacc -o yacc.c calc.y
-            test -s yacc.c
+        packages:
+          - coreutils
+          - gcc
+          - glibc-devel
+        files: tests
+        script: |
+          bash "$TEST_FILES/parser.sh"
 
   - name: bison-doc
     summary: GNU Bison documentation
