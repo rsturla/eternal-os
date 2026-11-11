@@ -77,12 +77,8 @@ outputs:
     license:
     - /usr/share/licenses/python-${matrix.python.version}-pyproject-hooks/**
   tests:
-  - name: functional
+  - name: behavior
     stage: installed
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - 'from pyproject_hooks import BuildBackendHookCaller; import tempfile, pathlib; p = pathlib.Path(tempfile.mkdtemp());
-      (p / "backend.py").write_text("def get_requires_for_build_wheel(config_settings): return [\"demo>=1\"]\n");
-      c = BuildBackendHookCaller(str(p), "backend", backend_path=["."]); assert c.get_requires_for_build_wheel()
-      == ["demo>=1"]'
+    files: tests
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/test_behavior.py" "${matrix.python.version}" "pyproject-hooks" "${package.version}"
