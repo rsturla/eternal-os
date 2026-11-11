@@ -5,7 +5,7 @@ schema: 1
 package:
   name: curl
   version: 8.23.0
-  release: 1
+  release: 2
   summary: URL transfer tools and library
   description: URL transfer tools and library.
   license: curl
@@ -37,7 +37,7 @@ build:
   sysroot:
   - openssl-devel
   - zlib-devel
-  - libzstd-devel
+  - zstd-devel
   - libpsl-devel
   - libidn2-devel
   - libnghttp2-devel
@@ -117,7 +117,7 @@ outputs:
     - libnghttp2
     - openssl-libs
     - zlib
-    - libzstd
+    - zstd-libs
     provides:
     - libcurl = ${package.version}-${package.release}
   tests:
