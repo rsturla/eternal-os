@@ -120,8 +120,8 @@ materialization, artifact transfer between jobs and object-storage credentials.
 - an `rpmx` matrix builds the pinned revision once per architecture and uploads
   it; `prepare` and every build cell unpack that artifact instead of
   recompiling it;
-- `prepare` computes the affected package list and content hashes from the
-  recipe graph (`scripts/affected.sh`, `scripts/package-graph.sh`);
+- `prepare` selects changed packages and computes their content hashes
+  (`scripts/affected.sh`, `scripts/package-hash.sh`);
 - a matrix builds only the affected packages in parallel, which runs the
   recipe's tests by default, and uploads per-package artifacts.
 
@@ -142,9 +142,6 @@ repository; it is not a step in `release.yml`.
 ### Incremental model
 
 ```text
-rpmx plan --json  ->  graph (build + run edges)
-        |
-        v
 git diff  ->  affected.sh  ->  matrix JSON  ->  build-all.sh
                                                     |
                                 content hash  <-----+
@@ -154,8 +151,9 @@ git diff  ->  affected.sh  ->  matrix JSON  ->  build-all.sh
 ```
 
 The hash covers the recipe bundle, profiles, build scripts, pinned rpmx and
-the transitive hashes of in-tree build dependencies. Two builds with the same
-hash are interchangeable. A missing cache is safe: it only causes a rebuild.
+repository defaults. It does not yet include the resolved root, so a change in
+a published dependency can leave an otherwise unchanged cache entry stale.
+Pin the root or force a rebuild when repository inputs change.
 The `rolling` repository is the mutable latest view; `archive` is append-only
 and preserves historical EVRs. Each release is still reproducible from the
 artifacts and the `+build<timestamp>` release counter.
@@ -173,11 +171,10 @@ cannot slip into an image before the repository is published.
 
 ### Why not Buck2 yet?
 
-The package graph and content-addressed cache above are deliberately small:
-about 200 lines of shell around `rpmx plan --json` and `git ls-files`. They give
-the properties that matter today: affected-package selection, correct
-invalidation, local/CI parity and a safe fallback (a cache miss means a
-rebuild).
+The package selection and cache above are deliberately small. They provide
+direct change selection and local input hashing. They still need resolved-root
+tracking to invalidate entries when published dependencies change. A cache
+miss causes a rebuild.
 
 A general build system such as Buck2 or Bazel would replace them with a proper
 action graph, hermetic input declaration and a remote cache. The blocker is not

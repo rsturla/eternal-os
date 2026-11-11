@@ -217,9 +217,8 @@ exclusion retains the current Fedora seed. Relative file repositories resolve
 from the selected profile's directory.
 
 ```console
-./scripts/package-graph.sh > /tmp/python-bootstrap-graph.json
 ./scripts/build-python.py python-hatch-vcs --arch x86_64 \
-  --graph /tmp/python-bootstrap-graph.json --output out/python-hatch-vcs \
+  --output out/python-hatch-vcs \
   --profile profiles/bootstrap-python.profile.yaml
 ```
 
@@ -247,7 +246,8 @@ sources or tests.
 
 A package's output is `out/foo/<arch>/`. The content hash is recorded in
 `out/.stamps/`, so the next `make build` skips it until a recipe, profile,
-script, rpmx revision or in-tree build dependency changes. Use
+script or rpmx revision changes. Published dependency updates are not yet
+part of the hash; pin or refresh the root before relying on a cached build. Use
 `./scripts/build-all.sh --affected --since origin/main` to rebuild only what a
 branch touches, or `make build-all` to force everything.
 
@@ -258,17 +258,13 @@ recorded root closure moves whenever Fedora updates. Start committing locks
 only after the bootstrap repositories or root closure are pinned and CI builds
 with `--locked`.
 
-When `foo` gains users, `scripts/package-graph.sh` picks up build edges from
-`build.dependencies` and runtime edges from `outputs[].dependencies.run` via
-`rpmx plan --json`; no separate dependency file to maintain.
-
 ## Pull request checklist
 
 - [ ] The recipe changes are one commit, scoped `<name>:`, and touch no other
       `packages/` directory ([`git-workflow.md`](git-workflow.md)).
 - [ ] `rpmx lint` is clean (warnings explained).
 - [ ] The package builds with `./scripts/build-all.sh --package NAME`.
-- [ ] `make affected` includes the package and anything that builds against it.
+- [ ] `make affected` includes the changed package.
 - [ ] At least one test fails if the packaged files disappear.
 - [ ] No tracked `package.lock.json` is added while the bootstrap root floats.
 - [ ] No secrets, signing keys or local paths are in the recipe.

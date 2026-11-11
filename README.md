@@ -62,7 +62,6 @@ produced by [rpmx](https://github.com/rsturla/rpmx):
 │   └── eternal.profile.yaml       # the Eternal repository (for consumers)
 ├── scripts/                       # local and CI entry points
 │   ├── affected.sh                # package selection from a git diff
-│   ├── package-graph.sh           # in-tree build/run edges from rpmx plan
 │   ├── package-hash.sh            # content hashes and cache keys
 │   ├── build-all.sh               # incremental per-package builds
 │   └── ...
@@ -138,15 +137,11 @@ The package cache key includes `.cache-generation`; bump that file to force
 every package through a rebuild. This is how the whole repository is moved to
 a new release-counter format without touching individual recipes.
 
-`scripts/affected.sh` walks the package graph from `rpmx plan --json`: a
-recipe change rebuilds that package plus everything that builds against it;
-a profile, script or `rpmx-defaults.yaml` change rebuilds everything. A
-`.rpmx-revision` bump swaps the builder rather than a recipe, so it selects a
-single canary package (`eternal-release`) instead of the whole repository:
-one end-to-end build proves the new revision still assembles roots and emits
-RPMs, and the content hash rebuilds the rest on release. Runtime dependents
-are only followed with `--with-runtime-dependents`, because a version-only
-change does not alter their NEVRA.
+`scripts/affected.sh` selects directly changed packages. A profile, build
+script or `rpmx-defaults.yaml` change selects every package. A
+`.rpmx-revision` change selects the `eternal-release` canary. Regular builds
+consume published RPMs and do not build other changed recipes first; the
+bootstrap ladder and Python bootstrap helper manage their own build order.
 
 CI uses the same hash as a cache key. The release matrix still covers every
 package so the published repository is complete, but unchanged packages are
@@ -166,9 +161,9 @@ There is no CI-only build logic. Every workflow step calls a script in
 | — | `scripts/publish-bucket.sh` uploads `rolling` and `archive` |
 
 The plan comes from `scripts/list-packages.sh`, `scripts/affected.sh`,
-`scripts/package-graph.sh` and `scripts/package-hash.sh`; the rpmx revision
-from `.rpmx-revision`. A local build and a CI build therefore consume exactly
-the same inputs.
+and `scripts/package-hash.sh`; the rpmx revision comes from `.rpmx-revision`.
+Local builds and CI use the same entry points. Their resolved repository inputs
+can differ while the bootstrap repositories are mutable.
 
 The only difference is secret delivery. CI writes `RPMX_SIGNING_KEY` and
 `RPMX_PUBLIC_KEY` to temporary files, and reads the `PACKAGES_S3_*`

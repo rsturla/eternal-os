@@ -5,34 +5,27 @@
 #   - a file under packages/<name>/ changed, or
 #   - a profile, a build script or the repository defaults changed (all
 #     packages), or
-#   - one of its in-tree build dependencies is affected (transitively).
 #
 # A change to the pinned rpmx revision is not a recipe change: it swaps the
 # builder, so it selects one canary package instead of every package. One
 # end-to-end build proves the new revision still assembles roots and emits
 # RPMs; the content hash still invalidates everything else on release.
 #
-# Runtime dependents are not rebuilt by default: their NEVRA does not embed the
-# dependency. Use --with-runtime-dependents when a change also breaks the ABI
-# they consume.
+# Regular builds consume published RPMs, not other recipes in this checkout.
 set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 base=
 all=0
 json=0
-runtime=0
-graph_file=
 
 usage() {
   cat <<'EOF'
 usage: affected.sh [options]
 
   --base REF                   Compare against REF (default: origin/HEAD)
-  --graph FILE                 Reuse a graph produced by package-graph.sh
   --all                        Select every package
   --json                       Emit a JSON array
-  --with-runtime-dependents    Also follow runtime edges
   -h, --help                   Show this help
 EOF
 }
@@ -43,20 +36,12 @@ while (($# > 0)); do
       base=${2:?--base needs a ref}
       shift 2
       ;;
-    --graph)
-      graph_file=${2:?--graph needs a file}
-      shift 2
-      ;;
     --all)
       all=1
       shift
       ;;
     --json)
       json=1
-      shift
-      ;;
-    --with-runtime-dependents)
-      runtime=1
       shift
       ;;
     -h | --help)
@@ -122,15 +107,6 @@ if [[ -z $merge_base ]]; then
   exit 0
 fi
 
-# A package that did not exist in the base cannot have changed the build of an
-# existing package: the build root still resolves the seed provider. Propagate
-# to reverse build dependents only when the changed package already existed.
-declare -A base_package
-while IFS= read -r name; do
-  [[ -n $name ]] && base_package[$name]=1
-done < <(git -C "$root" ls-tree -d --name-only "$merge_base" packages/ \
-  | sed 's#^packages/##')
-
 changed=$(mktemp)
 trap 'rm -f "$changed"' EXIT
 
@@ -190,44 +166,4 @@ if ((changed_count == 0)); then
   exit 0
 fi
 
-graph=$(mktemp)
-trap 'rm -f "$changed" "$graph"' EXIT
-if [[ -n $graph_file ]]; then
-  cp "$graph_file" "$graph"
-else
-  "$root/scripts/package-graph.sh" >"$graph"
-fi
-
-edge=build
-((runtime)) && edge=both
-
-declare -A reverse
-while IFS=$'\t' read -r dependency dependent; do
-  reverse[$dependency]+=" $dependent"
-done < <(jq -r --arg edge "$edge" '
-  to_entries[]
-  | .key as $package
-  | ((if $edge == "both" then (.value.build + .value.run) else .value.build end) | unique)[]
-  | "\(.)\t\($package)"
-' "$graph")
-
-declare -A affected
-queue=()
-for name in "${!changed_package[@]}"; do
-  affected[$name]=1
-  [[ -n ${base_package[$name]:-} ]] && queue+=("$name")
-done
-
-i=0
-while ((i < ${#queue[@]})); do
-  name=${queue[$i]}
-  i=$((i + 1))
-  for dependent in ${reverse[$name]:-}; do
-    if [[ -z ${affected[$dependent]:-} ]]; then
-      affected[$dependent]=1
-      queue+=("$dependent")
-    fi
-  done
-done
-
-emit "${!affected[@]}"
+emit "${!changed_package[@]}"

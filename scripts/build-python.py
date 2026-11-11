@@ -63,12 +63,21 @@ def dependency_order(plans, name):
     return order
 
 
+def bootstrap_hashes(order, hashes):
+    """Invalidate a local bootstrap build when an earlier input changes."""
+    result = {}
+    inputs = []
+    for name in order:
+        inputs.append((name, hashes[name]))
+        result[name] = hashlib.sha256(json.dumps(inputs).encode()).hexdigest()
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("name")
     parser.add_argument("--output", required=True)
     parser.add_argument("--arch", default=os.uname().machine)
-    parser.add_argument("--graph", required=True)
     parser.add_argument("--profile", type=Path, help="Bootstrap profile for the new interpreter stream")
     args, build_args = parser.parse_known_args()
     root = Path(__file__).resolve().parent.parent
@@ -83,8 +92,9 @@ def main():
     }
     order = dependency_order(plans, args.name)
     hashes = dict(line.split() for line in capture(
-        str(root / "scripts/package-hash.sh"), "--graph", args.graph, *order
+        str(root / "scripts/package-hash.sh"), *order
     ).splitlines())
+    hashes = bootstrap_hashes(order, hashes)
     profile_path = (args.profile or root / "profiles/bootstrap-python.profile.yaml").resolve()
     profile = yaml.safe_load(profile_path.read_text())
     variant = hashlib.sha256(json.dumps([

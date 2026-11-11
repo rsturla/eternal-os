@@ -167,11 +167,8 @@ jobs:
           SELECTION: ${{ inputs.selection }}
           BASE_REF: ${{ inputs.base }}
         run: |
-          graph=$(mktemp)
-          ./scripts/package-graph.sh >"$graph"
-
           if [ "$SELECTION" = "affected" ]; then
-            args=(--json --graph "$graph")
+            args=(--json)
             if [ -n "$BASE_REF" ]; then
               args+=(--base "$BASE_REF")
             fi
@@ -190,7 +187,7 @@ jobs:
           else
             echo "skip=false" >>"$GITHUB_OUTPUT"
             mapfile -t names < <(jq -r '.[]' <<<"$packages")
-            hashes=$(./scripts/package-hash.sh --graph "$graph" "${names[@]}" \
+            hashes=$(./scripts/package-hash.sh "${names[@]}" \
               | jq -R -s -c '
                   split("\n")
                   | map(select(length > 0)

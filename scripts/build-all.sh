@@ -148,9 +148,6 @@ if [[ $package != openssf-compiler-options ]]; then
 fi
 
 recipes=()
-graph_file=$(mktemp)
-trap 'rm -f "$graph_file"' EXIT
-"$root/scripts/package-graph.sh" >"$graph_file"
 if [[ -n $package ]]; then
   recipe="$root/packages/$package/package.yaml"
   if [[ ! -f $recipe ]]; then
@@ -159,7 +156,7 @@ if [[ -n $package ]]; then
   fi
   recipes+=("$recipe")
 elif [[ $selection == affected ]]; then
-  affected_args=(--graph "$graph_file" --base "${since:-origin/HEAD}")
+  affected_args=(--base "${since:-origin/HEAD}")
   while IFS= read -r name; do
     [[ -n $name ]] || continue
     recipes+=("$root/packages/$name/package.yaml")
@@ -181,8 +178,8 @@ for recipe in "${recipes[@]}"; do
   names+=("$(basename "$(dirname "$recipe")")")
 done
 
-# One graph and one hashing pass for the whole selection.
-mapfile -t hashes < <("$root/scripts/package-hash.sh" --graph "$graph_file" "${names[@]}")
+# One hashing pass for the whole selection.
+mapfile -t hashes < <("$root/scripts/package-hash.sh" "${names[@]}")
 declare -A hash_of
 for line in "${hashes[@]}"; do
   hash_of[${line%% *}]=${line##* }
@@ -218,7 +215,7 @@ for recipe in "${recipes[@]}"; do
   if "$rpmx" plan "$recipe" --json | jq -e \
     'any(.plan.cells[]; .id | startswith("python="))' >/dev/null; then
     cmd=(/usr/bin/python3 "$root/scripts/build-python.py" "$name"
-      --output "$pkg_output" --graph "$graph_file")
+      --output "$pkg_output")
   fi
   [[ -n $arch ]] && cmd+=(--arch "$arch")
   [[ -n $signing_key ]] && cmd+=(--signing-key "$signing_key")
