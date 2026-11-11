@@ -11,7 +11,8 @@ Run rpmx as a regular user on Linux. Native bubblewrap builds and tests require:
 - `newuidmap` and `newgidmap`, supplied by `uidmap` or `shadow-utils`.
 - At least 65,536 subordinate user IDs allocated to your account in
   `/etc/subuid`, and at least 65,536 subordinate group IDs in `/etc/subgid`.
-- A host policy that permits unprivileged user namespaces.
+- A host policy that permits unprivileged user namespaces and namespace-scoped
+  `CAP_DAC_OVERRIDE` for private transaction roots.
 
 The shared scripts also use rootless Podman to resolve and assemble roots.
 After installing the pinned rpmx revision, check the host with:
@@ -19,6 +20,12 @@ After installing the pinned rpmx revision, check the host with:
 ```console
 rpmx doctor --strict
 ```
+
+Ubuntu's `bwrap-userns-restrict` AppArmor profile denies capabilities in child
+processes, even when user namespace creation is allowed. A host administrator
+must adjust that policy for private transactions. The ephemeral CI hosts unload
+that specific profile. `rpmx doctor --strict` checks protected-file access as
+well as ID mappings.
 
 Ordinary bubblewrap steps run as UID/GID 65534, mapped to your host account,
 without capabilities. Transaction tests map your host account to namespace
@@ -250,6 +257,21 @@ Keep a shebang executable in Git to satisfy the repository's file checks.
 
 Use pinned, checksummed source archives for large upstream test collections.
 Do not fetch test data or dependencies during test execution.
+
+## Debug a source-suite failure
+
+Use `rpmx build packages/NAME/package.yaml --keep-workdir` to retain the source
+workspace and stage. rpmx prints their paths. Open the recipe's build root with:
+
+```console
+rpmx shell packages/NAME/package.yaml --workspace /saved/build --stage /saved/stage
+```
+
+The shell uses the build sandbox's identity, ID mappings, environment policy and
+mounts. Its root and any target sysroot stay read-only. Workspace and stage
+writes remain owned by your host account. Terminal streams stay attached;
+debug sessions have no build-step deadline or captured test logs. The shell
+opens a build environment; installed and transaction tests have separate roots.
 
 ## Coverage expectations
 
