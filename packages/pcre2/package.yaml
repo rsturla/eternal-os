@@ -60,17 +60,24 @@ outputs:
       run:
         - pcre2-libs = ${package.version}-${package.release}
     tests:
-      - name: installed
+      - name: regex-cli
         stage: installed
-        packages: [bash-binsh]
+        script: |
+          test "$(printf '%s\n' 'abc123' 'nomatch' | pcre2grep '\d+')" = abc123
+          result=$(printf '%s\n' '/([a-z]+)-([0-9]+)/' 'hello-42' '' '/a+/' 'bbb' | pcre2test -q)
+          [[ $result == *'0: hello-42'* && $result == *'1: hello'* && $result == *'2: 42'* && $result == *'No match'* ]]
+          result=$(printf '%s\n' '/[/' | pcre2test -q)
+          [[ $result == *'Failed: error'* ]]
+      - name: no-match
+        stage: installed
         argv:
-          - sh
-          - -c
-          - |
-            pcre2grep --version
-            printf '%s\n' 'abc123' | pcre2grep '\d+'
-            printf '%s\n' '/a+/' 'aaa' | pcre2test
-
+          - pcre2grep
+          - missing
+          - /dev/null
+        expect:
+          exit-code: 1
+          stdout: ''
+          stderr: ''
   - name: pcre2-libs
     summary: PCRE2 runtime libraries
     files:
@@ -80,18 +87,12 @@ outputs:
       license:
         - /usr/share/licenses/pcre2-libs/COPYING
     tests:
-      - name: installed
+      - name: runtime-linkage
         stage: installed
-        packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libpcre2-*.so.* /usr/lib/libpcre2-*.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libpcre2-8.so.*", "libpcre2-16.so.*", "libpcre2-32.so.*", "libpcre2-posix.so.*"]
   - name: pcre2-devel
     summary: PCRE2 development files
     files:
@@ -105,6 +106,23 @@ outputs:
       run:
         - pcre2-libs = ${package.version}-${package.release}
 
+    tests:
+      - name: api-behavior
+        stage: installed
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists libpcre2-8
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libpcre2-8) "$TEST_FILES/behavior.c" $(pkg-config --libs libpcre2-8) -o behavior
+          ./behavior
+          for width in 16 32; do
+            pkg-config --exists libpcre2-$width
+            gcc -std=c17 -Wall -Wextra -Werror -DPCRE2_CODE_UNIT_WIDTH=$width "$TEST_FILES/wide.c" $(pkg-config --cflags --libs libpcre2-$width) -o wide
+            ./wide
+          done
   - name: pcre2-doc
     summary: PCRE2 documentation
     files:
@@ -116,24 +134,12 @@ outputs:
         - /usr/share/licenses/pcre2-doc/COPYING
 
 tests:
-  - name: link
-    stage: installed
-    packages: [gcc, glibc-devel, bash-binsh]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #define PCRE2_CODE_UNIT_WIDTH 8
-        #include <pcre2.h>
-        int main(void) {
-          int error;
-          PCRE2_SIZE offset;
-          pcre2_code *code = pcre2_compile((PCRE2_SPTR)"a+", 2, 0, &error, &offset, 0);
-          if (code == 0) return 1;
-          pcre2_code_free(code);
-          return 0;
-        }
-        EOF
-        gcc /tmp/test.c -lpcre2-8 -o /tmp/test
-        /tmp/test
+  - name: upstream
+    stage: build
+    packages:
+      - diffutils
+    artifacts:
+      - test-suite.log
+      - tests/test-suite.log
+    pipeline:
+      - uses: make/check
