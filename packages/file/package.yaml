@@ -66,15 +66,14 @@ outputs:
     run:
     - file-libs = ${package.version}-${package.release}
   tests:
-  - name: identify
-    stage: installed
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      printf "plain text\n" > /tmp/text
-      test "$(file --brief --mime-type /tmp/text)" = text/plain
+    - name: classification
+      stage: installed
+      packages:
+        - coreutils
+      files: tests
+      script: |
+        bash "$TEST_FILES/classification.sh"
+
 - name: file-libs
   files:
     license:
@@ -84,16 +83,20 @@ outputs:
     - /usr/share/misc/magic*
     - /usr/share/licenses/file-libs/**
   tests:
-  - name: load
-    stage: installed
-    packages:
-      - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("libmagic.so.1")'
+    - name: minimal-runtime-dependencies
+      stage: installed
+      pipeline:
+        - uses: test/runtime-linkage
+          with:
+            libraries: ["libmagic.so.[0-9]*"]
+    - name: runtime
+      stage: installed
+      packages:
+        - python3
+      files: tests
+      script: |
+        python3 "$TEST_FILES/runtime.py"
+
 - name: file-devel
   files:
     license:
@@ -105,22 +108,16 @@ outputs:
     run:
     - file-libs = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
-    stage: installed
-    packages:
-      - gcc
-      - glibc-devel
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.c <<'EOF'
-      #include <magic.h>
-      int main(void) { magic_t m = magic_open(MAGIC_NONE); if (!m) return 1; int r = magic_load(m, 0); magic_close(m); return r; }
-      EOF
-      gcc /tmp/test.c -lmagic -o /tmp/test
-      /tmp/test
+    - name: magic-api
+      stage: installed
+      packages:
+        - gcc
+        - glibc-devel
+        - coreutils
+      files: tests
+      script: |
+        bash "$TEST_FILES/magic-api.sh"
+
 - name: file-doc
   files:
     license:
@@ -130,8 +127,9 @@ outputs:
     - '@man'
     - '@info'
     - /usr/share/licenses/file-doc/**
+
 tests:
-- name: hardening
-  stage: build
-  pipeline:
-  - uses: test/hardening-check
+  - name: hardening
+    stage: build
+    pipeline:
+      - uses: test/hardening-check
