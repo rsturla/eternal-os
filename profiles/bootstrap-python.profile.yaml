@@ -27,7 +27,6 @@ repositories:
   - libatomic-*
   - nss-db-*
   - expat*
-  - zstd*
   - acl*
   - attr*
   - audit*
@@ -90,6 +89,8 @@ repositories:
 - id: fedora
   baseurl: https://dl.fedoraproject.org/pub/fedora/linux/releases/$releasever/Everything/$basearch/os/
   exclude:
+  - zstd*
+  - libzstd*
   - bash
   - bash-binsh
   - binutils
@@ -112,6 +113,8 @@ repositories:
 - id: updates
   metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch
   exclude:
+  - zstd*
+  - libzstd*
   - bash
   - bash-binsh
   - binutils
