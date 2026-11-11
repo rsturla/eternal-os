@@ -12,7 +12,7 @@ releasever: "rolling"
 dist-tag: .eternal
 archs: [x86_64, aarch64]
 builder:
-  image: registry.fedoraproject.org/fedora:44
+  image: registry.fedoraproject.org/fedora@sha256:f08613fffc95f5c85c019b2f4ac9e9fb9bb84b9cfd59275671b84169567b157e
 repositories:
   - id: eternal
     baseurl: https://packages.eternal.sturla.tech/$releasever/$basearch
