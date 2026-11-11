@@ -169,21 +169,13 @@ recipes use the versioned Eternal build frontend and pip.
 This bootstrap seed avoids self-dependencies while Eternal takes ownership of
 these tools. Each matrix cell runs its tests with its target interpreter.
 
-During the initial bootstrap, `scripts/build-all.sh` prepares unpublished
-Python matrix dependencies with `scripts/build-python.py`. The helper builds
-explicit interpreter-qualified package dependencies in dependency order
-and adds the RPMs to a private repository for each invocation. Tests can then
-use new interpreter-specific dependencies before they are published. The
-helper caches tested dependencies under `.work/python-deps/` by architecture,
-recipe hash and build options.
-
-The helper's normal-build integration is temporary.
-[Issue #41](https://github.com/rsturla/eternal-os/issues/41) tracks its retirement
-and the replacement path for new interpreter releases. Publication alone does
-not permit removal. First validate normal builds against published RPMs on
-both architectures. Then remove the automatic dispatch and its cache use from
-normal builds. Keep an explicit bootstrap path until rpmx can build unpublished
-source dependencies for a new interpreter stream.
+Normal builds install published interpreter-qualified dependencies from the
+Eternal repository. For a new stream whose dependencies are not yet published,
+`scripts/build-python.py` builds them in dependency order and adds the RPMs to
+a private repository. It caches tested dependencies under `.work/python-deps/`
+by architecture, recipe hash and build options.
+[Issue #41](https://github.com/rsturla/eternal-os/issues/41) tracks a replacement
+for this explicit bootstrap path.
 
 ### Bootstrap a new Python stream
 
