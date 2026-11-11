@@ -1,9 +1,12 @@
 # Go 1.27 packaging
 
-This stream builds from the upstream source archive with Fedora 44's `golang`
-compiler tools, requested explicitly as `golang-bin`. That package requires
-Fedora's exact `go` version and release, so an Eternal selector cannot replace
-the bootstrap compiler.
+This stream builds from the upstream source archive with Eternal `golang-1.26`.
+The build resolves `GOROOT_BOOTSTRAP` through `go-1.26`, without a default selector.
+The Fedora-seeded variant remains in `bootstrap/recipes/golang-1.27/`.
+`bootstrap/bootstrap.yaml` builds that seed before the production recipes.
+Production installed tests check co-installation with the other Eternal stream.
+The bootstrap variants retain the Fedora co-installation test. This keeps
+Fedora Go out of the production build and test dependencies.
 
 The implementation owns `go-1.27`, `gofmt-1.27` and its private tree at
 `/usr/lib64/golang-1.27`. The optional `golang-1.27-default` output owns
