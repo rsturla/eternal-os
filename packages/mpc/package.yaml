@@ -64,18 +64,12 @@ outputs:
       provides:
         - libmpc = ${package.version}-${package.release}
     tests:
-      - name: installed
+      - name: runtime-linkage
         stage: installed
-        packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libmpc.so.* /usr/lib/libmpc.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libmpc.so.*"]
   - name: mpc-devel
     summary: MPC development files
     files:
@@ -92,6 +86,18 @@ outputs:
       provides:
         - libmpc-devel = ${package.version}-${package.release}
 
+    tests:
+      - name: api-behavior
+        stage: installed
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists mpc mpfr
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags mpc mpfr) "$TEST_FILES/behavior.c" $(pkg-config --libs mpc mpfr) -o behavior
+          ./behavior
   - name: mpc-doc
     summary: MPC documentation
     files:
@@ -104,22 +110,12 @@ outputs:
         - /usr/share/licenses/mpc-doc/COPYING.LESSER
 
 tests:
-  - name: link
-    stage: installed
-    packages: [gcc, glibc-devel, bash-binsh]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #include <mpc.h>
-        int main(void) {
-          mpc_t value;
-          mpc_init2(value, 64);
-          mpc_set_ui_ui(value, 1, 2, MPC_RNDNN);
-          mpc_clear(value);
-          return 0;
-        }
-        EOF
-        gcc /tmp/test.c -lmpc -lmpfr -lgmp -o /tmp/test
-        /tmp/test
+  - name: upstream
+    stage: build
+    packages:
+      - diffutils
+    artifacts:
+      - test-suite.log
+      - tests/test-suite.log
+    pipeline:
+      - uses: make/check
