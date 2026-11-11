@@ -36,7 +36,6 @@ repositories:
     # require the matching libsmartcols/libuuid release. Mixing both providers
     # makes the offline root transaction fail with file and version conflicts.
     exclude:
-      - filesystem
       - basesystem
       - eternal-release
       - eternal-base
@@ -63,7 +62,9 @@ repositories:
       - curl*
       - dnf5*
       - docbook-style-xsl*
-      - file*
+      # Keep file out without also excluding filesystem.
+      - file
+      - file-*
       - flex*
       - fmt*
       - gettext*
@@ -112,10 +113,10 @@ repositories:
     # These package names are already produced by Eternal. Hiding the Fedora
     # copies is what makes the build root consume the published Eternal
     # repository instead of only using it for metadata.
-    exclude: [bash, bash-binsh, binutils, coreutils, coreutils-single, make, pkgconf, pkgconf-m4, pkgconf-pkg-config, libpkgconf, zlib, zlib-devel, zlib-static, zlib-ng-compat, zlib-ng-compat-devel, zlib-ng-compat-static]
+    exclude: [bash, bash-binsh, binutils, coreutils, coreutils-single, filesystem, make, pkgconf, pkgconf-m4, pkgconf-pkg-config, libpkgconf, zlib, zlib-devel, zlib-static, zlib-ng-compat, zlib-ng-compat-devel, zlib-ng-compat-static]
   - id: updates
     metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch
-    exclude: [bash, bash-binsh, binutils, coreutils, coreutils-single, make, pkgconf, pkgconf-m4, pkgconf-pkg-config, libpkgconf, zlib, zlib-devel, zlib-static, zlib-ng-compat, zlib-ng-compat-devel, zlib-ng-compat-static]
+    exclude: [bash, bash-binsh, binutils, coreutils, coreutils-single, filesystem, make, pkgconf, pkgconf-m4, pkgconf-pkg-config, libpkgconf, zlib, zlib-devel, zlib-static, zlib-ng-compat, zlib-ng-compat-devel, zlib-ng-compat-static]
   - id: eternal-toolchain
     baseurl: file://../.work/toolchain-repo
 packages:
