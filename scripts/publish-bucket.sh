@@ -193,10 +193,18 @@ sync_immutable() {
 
 sync_repodata() {
   local source=$1 destination=$2
+  # Keep metadata referenced by an index a client may already have read.
+  # Upload the immutable data before switching the index to the new snapshot.
   "${aws_cmd[@]}" s3 sync "$source" "$destination" \
-    --delete \
-    --cache-control 'no-cache' \
+    --exclude 'repomd.xml' --exclude 'repomd.xml.asc' \
+    --cache-control 'public, max-age=31536000, immutable' \
     --only-show-errors
+  if [[ -f "$source/repomd.xml.asc" ]]; then
+    "${aws_cmd[@]}" s3 cp "$source/repomd.xml.asc" "$destination/repomd.xml.asc" \
+      --cache-control 'no-cache' --only-show-errors
+  fi
+  "${aws_cmd[@]}" s3 cp "$source/repomd.xml" "$destination/repomd.xml" \
+    --cache-control 'no-cache' --only-show-errors
 }
 
 # Root metadata is small and changes every release.
