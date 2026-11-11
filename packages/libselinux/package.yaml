@@ -64,18 +64,12 @@ outputs:
       run:
         - libsepol
     tests:
-      - name: installed
+      - name: runtime-linkage
         stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libselinux.so.* /usr/lib/libselinux.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
-
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libselinux.so.*"]
   - name: libselinux-utils
     summary: SELinux command-line utilities
     files:
@@ -120,16 +114,25 @@ outputs:
     tests:
       - name: installed
         stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            getenforce || true
-            selinuxenabled || true
-            test -x /usr/bin/matchpathcon
-            test -x /usr/bin/setenforce
-
+        script: |
+          trap 'printf "line %s: %s\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
+          mode=$(getenforce)
+          case "$mode" in
+            Enforcing|Permissive) expected=0 ;;
+            Disabled) expected=1 ;;
+            *) echo "unexpected getenforce response: $mode" >&2; exit 1 ;;
+          esac
+          status=0
+          selinuxenabled || status=$?
+          test "$status" = "$expected"
+          printf '/fixture(/.*)? system_u:object_r:tmp_t:s0\n' > file_contexts
+          test "$(matchpathcon -N -n -f file_contexts /fixture/file)" = system_u:object_r:tmp_t:s0
+          test "$(matchpathcon -N -n -f file_contexts /unmatched)" = '<<none>>'
+          status=0
+          setenforce > diagnostic 2>&1 || status=$?
+          test "$status" = 1
+          diagnostic=$(<diagnostic)
+          [[ $diagnostic == *'setenforce'* ]]
   - name: libselinux-devel
     summary: Development files for libselinux
     files:
@@ -144,6 +147,18 @@ outputs:
         - libsepol-devel
         - pcre2-devel
 
+    tests:
+      - name: api-behavior
+        stage: installed
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
+        script: |
+          pkg-config --exists libselinux
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libselinux) "$TEST_FILES/behavior.c" $(pkg-config --libs libselinux) -o behavior
+          ./behavior
   - name: libselinux-static
     summary: Static library for libselinux
     files:
@@ -156,6 +171,29 @@ outputs:
       run:
         - libselinux-devel = ${package.version}-${package.release}
 
+    tests:
+      - name: static-api-behavior
+        stage: installed
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+          - binutils
+          - grep
+        files: tests
+        script: |
+          pkg-config --exists libselinux
+          private_libs=()
+          for flag in $(pkg-config --static --libs libselinux); do
+            if test "$flag" != -lselinux; then private_libs+=("$flag"); fi
+          done
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libselinux) "$TEST_FILES/behavior.c" "$(pkg-config --variable=libdir libselinux)/libselinux.a" "$${private_libs[@]}" -o behavior
+          ./behavior
+          readelf -d behavior > dynamic.txt
+          if grep -E 'NEEDED.*\[libselinux\.so' dynamic.txt; then
+            echo "static test linked the shared library" >&2
+            exit 1
+          fi
   - name: libselinux-doc
     summary: Documentation for libselinux
     files:
