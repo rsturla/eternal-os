@@ -73,11 +73,7 @@ outputs:
     stage: installed
     packages:
     - grep
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       printf abc > /tmp/input
       rhash --sha256 /tmp/input > /tmp/digest
       grep -q ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad /tmp/digest
@@ -92,16 +88,12 @@ outputs:
     run:
     - openssl-libs
   tests:
-  - name: load
+  - name: runtime-linkage
     stage: installed
-    packages:
-    - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      python3 -c 'import ctypes; ctypes.CDLL("librhash.so.1")'
+    pipeline:
+      - uses: test/runtime-linkage
+        with:
+          libraries: ["librhash.so.*"]
 - name: rhash-devel
   files:
     include:
@@ -113,23 +105,17 @@ outputs:
     run:
     - rhash-libs = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
+  - name: api-behavior
     stage: installed
     packages:
     - gcc
     - glibc-devel
     - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
-      cat > /tmp/test.c <<'EOF'
-      #include <rhash.h>
-      int main(void) { rhash_library_init(); return rhash_get_digest_size(RHASH_SHA256) != 32; }
-      EOF
-      gcc /tmp/test.c $(pkg-config --cflags --libs librhash) -o /tmp/test
-      /tmp/test
+    files: tests
+    script: |
+      pkg-config --exists librhash
+      gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags librhash) "$TEST_FILES/behavior.c" $(pkg-config --libs librhash) -o behavior
+      ./behavior
 - name: rhash-doc
   files:
     include:
