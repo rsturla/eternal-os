@@ -6,7 +6,7 @@ schema: 1
 package:
   name: zchunk
   version: "1.5.5"
-  release: 1
+  release: 2
   summary: Compressed file format with support for deltas
   description: |
     zchunk is a compressed file format that splits the file into independent
@@ -33,7 +33,7 @@ build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
   packages: [meson, ninja, gcc, bash, coreutils, pkgconf]
-  sysroot: [openssl-devel, libzstd-devel]
+  sysroot: [openssl-devel, zstd-devel]
   pipeline:
     - uses: meson/setup
       with:
@@ -91,7 +91,7 @@ outputs:
     dependencies:
       run:
         - openssl-libs
-        - libzstd
+        - zstd-libs
     tests:
       - name: installed
         stage: installed
@@ -116,7 +116,7 @@ outputs:
     dependencies:
       run:
         - zchunk-libs = ${package.version}-${package.release}
-        - libzstd-devel
+        - zstd-devel
         - openssl-devel
     tests:
       - name: link
