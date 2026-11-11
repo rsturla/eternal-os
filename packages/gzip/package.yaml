@@ -61,21 +61,14 @@ outputs:
       license:
         - /usr/share/licenses/gzip/COPYING
     tests:
-      - name: installed
+      - name: roundtrip
         stage: installed
-        packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            printf 'hello\n' > file
-            gzip file
-            test -f file.gz
-            gunzip file.gz
-            test "$(cat file)" = hello
-            gzip file
-            uncompress file.gz
-            test "$(cat file)" = hello
+        packages:
+          - coreutils
+          - diffutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/roundtrip.sh"
 
   - name: gzip-doc
     summary: GNU gzip compression utility documentation
@@ -87,3 +80,11 @@ outputs:
         - /usr/share/licenses/gzip-doc/COPYING
       license:
         - /usr/share/licenses/gzip-doc/COPYING
+
+tests:
+  - name: upstream
+    stage: build
+    packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+    artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+    pipeline:
+      - uses: make/check
