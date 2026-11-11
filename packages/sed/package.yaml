@@ -53,16 +53,22 @@ outputs:
       license:
         - /usr/share/licenses/sed/COPYING
     tests:
-      - name: installed
+      - name: editing
         stage: installed
-        packages: [bash-binsh, coreutils]
+        packages:
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/editing.sh"
+      - name: invalid-expression
+        stage: installed
         argv:
-          - sh
-          - -c
-          - |
-            test "$(printf 'hello\n' | sed 's/hello/world/')" = world
-            printf 'a\nb\nc\n' | sed '2d' > out
-            test "$(wc -l < out)" -eq 2
+          - sed
+          - '['
+          - /dev/null
+        expect:
+          exit-code: 1
+          stdout: ''
 
   - name: sed-doc
     summary: GNU stream editor documentation
@@ -74,3 +80,11 @@ outputs:
         - /usr/share/licenses/sed-doc/COPYING
       license:
         - /usr/share/licenses/sed-doc/COPYING
+
+tests:
+  - name: upstream
+    stage: build
+    packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+    artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+    pipeline:
+      - uses: make/check
