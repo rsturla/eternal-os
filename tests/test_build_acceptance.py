@@ -91,11 +91,11 @@ elif args[0] == 'repo':
                                "--output", str(self.root / "out"), *extra], env=env or self.env,
                               capture_output=True, text=True)
 
-    def test_build_accepts_main_package_but_never_the_private_policy_seed(self):
+    def test_build_accepts_package_against_published_compiler_policy(self):
         result = self.build()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual([(call["command"], call["name"]) for call in self.calls()],
-                         [("build", "openssf-compiler-options"), ("repo", None), ("build", "demo"), ("test", "demo")])
+                         [("build", "demo"), ("test", "demo")])
         self.assertTrue((self.root / "out/.stamps/x86_64/demo").exists())
         self.assertTrue((self.root / "out/demo/evidence/source.log").exists())
         self.assertTrue((self.root / "out/demo/acceptance/x86_64/run/consumer.log").exists())

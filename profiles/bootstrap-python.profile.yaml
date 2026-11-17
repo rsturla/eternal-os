@@ -145,8 +145,6 @@ repositories:
   - python3.13
   - python3.13-libs
   - python3.13-devel
-- id: eternal-toolchain
-  baseurl: file://../.work/toolchain-repo
 packages:
   install:
   - openssf-compiler-options

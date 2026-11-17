@@ -14,22 +14,22 @@ SPEC.loader.exec_module(POOL)
 
 
 class CandidatePool(unittest.TestCase):
-    def test_fixed_candidate_and_evidence_artifacts_can_be_replaced_on_job_retry(self):
-        workflow = yaml.safe_load((Path(__file__).resolve().parents[1] /
-                                  '.github/workflows/_build-packages.yml').read_text())
-        expected = {'candidate', 'build', 'rpm', 'acceptance'}
+    def test_workflows_keep_candidate_and_acceptance_evidence_separate(self):
+        root = Path(__file__).resolve().parents[1]
+        expected = {'binary', 'build', 'accepted', 'acceptance'}
         found = set()
-        for job in ('build', 'accept'):
-            for step in workflow['jobs'][job]['steps']:
-                if not step.get('uses', '').startswith('actions/upload-artifact@'):
-                    continue
-                options = step['with']
-                name = options['name']
-                prefix = name.split('-')[0]
-                if prefix in expected:
-                    self.assertEqual(name, prefix + '-${{ matrix.package }}-${{ matrix.arch }}')
-                    self.assertIs(options.get('overwrite'), True,
-                                  f'{name} must replace its prior attempt rather than fail with a name conflict')
+        for filename in ('_build-rpm.yml', '_accept-rpm.yml'):
+            workflow = yaml.safe_load((root / '.github/workflows' / filename).read_text())
+            for job in workflow['jobs'].values():
+                for step in job.get('steps', []):
+                    if not step.get('uses', '').startswith('actions/upload-artifact@'):
+                        continue
+                    options = step['with']
+                    prefix = options['name'].split('-')[0]
+                    self.assertIn(prefix, expected)
+                    self.assertIs(options.get('overwrite'), True)
+                    if 'evidence' in options['name']:
+                        self.assertEqual(step.get('if'), 'always()')
                     found.add(prefix)
         self.assertEqual(found, expected)
 

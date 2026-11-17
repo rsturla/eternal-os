@@ -1,11 +1,12 @@
 """Test the shell publisher with real RPM tools and a local S3 CLI substitute.
 
-Requires rpmx, rpmbuild, createrepo_c, mergerepo_c, modifyrepo_c, gpg and jq.
+Requires rpmx, createrepo_c, mergerepo_c, modifyrepo_c, gpg and jq.
 If dnf5 is available and the test runs as root, also test client transactions.
 """
 
 import gzip
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -17,7 +18,7 @@ import xml.etree.ElementTree as ET
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TOOLS = ('rpmx', 'rpmbuild', 'createrepo_c', 'mergerepo_c', 'modifyrepo_c', 'gpg', 'jq')
+TOOLS = ('rpmx', 'createrepo_c', 'mergerepo_c', 'modifyrepo_c', 'gpg', 'jq')
 FAKE_AWS = '''#!/usr/bin/env python3
 import fnmatch, json, os, pathlib, shutil, sys
 args = sys.argv[1:]
@@ -81,23 +82,39 @@ class PublishTest(unittest.TestCase):
             ('publish-fixture', '2', 'fixture', 'Requires: /opt/publish-test/kept'),
             ('publish-kept', '1', 'kept', ''),
         ):
-            spec = cls.fixture_root / f'{name}-{version}.spec'
-            spec.write_text(f'''Name: {name}
-Version: {version}
-Release: 1
-Summary: Repository publication fixture
-License: MIT
-BuildArch: noarch
-{requirement}
-%description
-Disposable publication test.
-%install
-mkdir -p %{{buildroot}}/opt/publish-test
-printf '%s\\n' '{version}' > %{{buildroot}}/opt/publish-test/{payload}
-%files
-/opt/publish-test/{payload}
-''')
-            command('rpmbuild', '-ba', '--define', f'_topdir {cls.fixture_root}', spec)
+            stage = cls.fixture_root / f'stage-{name}-{version}'
+            target = stage / 'opt/publish-test' / payload
+            target.parent.mkdir(parents=True)
+            target.write_text(version + '\n')
+            recipe = cls.fixture_root / f'{name}-{version}.yaml'
+            dependency = "[\"/opt/publish-test/kept\"]" if requirement else '[]'
+            recipe.write_text(f"""schema: 2
+package:
+  name: {name}
+  version: '{version}'
+  release: 1
+  summary: Repository publication fixture
+  license: MIT
+  source-date-epoch: 1704067200
+outputs:
+  - name: {name}
+    arch: noarch
+    dependencies:
+      run: {dependency}
+""")
+            if name == 'publish-fixture' and version == '1':
+                with recipe.open('a') as stream:
+                    stream.write('  - name: publish-fixture-legacy\n    arch: noarch\n    metapackage: true\n')
+            binaries = cls.fixture_root / f'binary-{name}-{version}'
+            command('rpmx', 'build', recipe, '--stage', stage, '--arch', 'x86_64',
+                    '--output', binaries, '--no-tests', '--no-lint', '--no-index')
+            (cls.fixture_root / 'RPMS/noarch').mkdir(parents=True, exist_ok=True)
+            for rpm in binaries.rglob('*.rpm'):
+                shutil.copy(rpm, cls.fixture_root / 'RPMS/noarch')
+            sources = cls.fixture_root / 'sources'
+            sources.mkdir(exist_ok=True)
+            command('rpmx', 'srpm', recipe, '--sources', sources,
+                    '--output', cls.fixture_root / 'SRPMS')
         cls.key = cls.fixture_root / 'signing.asc'
         command('rpmx', 'keygen', '--bits', '2048', '--output', cls.key)
 
@@ -130,9 +147,11 @@ printf '%s\\n' '{version}' > %{{buildroot}}/opt/publish-test/{payload}
             shutil.copy(self.fixture_root / f'RPMS/noarch/{name}.noarch.rpm', binary)
             shutil.copy(self.fixture_root / f'SRPMS/{name}.src.rpm', source)
 
-    def publish(self, signed=False, success=True):
+    def publish(self, signed=False, success=True, incremental=False):
         args = [ROOT / 'scripts/publish-bucket.sh', '--packages', self.packages,
                 '--output', self.site, '--bucket', 'packages', '--base-url', 'https://example.invalid']
+        if incremental:
+            args += ['--incremental']
         if signed:
             args += ['--signing-key', self.key, '--public-key', str(self.key) + '.pub']
         result = subprocess.run([str(arg) for arg in args], env=self.env, capture_output=True, text=True)
@@ -206,9 +225,43 @@ printf '%s\\n' '{version}' > %{{buildroot}}/opt/publish-test/{payload}
         self.log.write_text('')
         self.assertIn('without --signing-key', self.publish(success=False).stderr)
         self.assertFalse(any(op[:2] == ['s3', 'sync'] for op in self.operations()))
+
         index.write_bytes(index.read_bytes() + b'\n')
         self.log.write_text('')
         self.publish(signed=True, success=False)
+        self.assertFalse(any(op[:2] == ['s3', 'sync'] for op in self.operations()))
+
+    def test_incremental_rolling_retains_other_sources_and_removes_old_outputs(self):
+        self.inputs('1', kept=True)
+        shutil.copy(self.fixture_root / 'RPMS/noarch/publish-fixture-legacy-1-1.noarch.rpm',
+                    self.packages / 'x86_64')
+        self.publish(signed=True, incremental=True)
+        self.inputs('2')
+        self.publish(signed=True, incremental=True)
+        self.publish(signed=True, incremental=True)
+        self.assertEqual(self.records('rolling'), {('publish-fixture', '2'), ('publish-kept', '1')})
+        self.assertEqual(self.records('rolling', 'SRPMS'), {('publish-fixture', '2'), ('publish-kept', '1')})
+        self.assertIn(('publish-fixture-legacy', '1'), self.records('archive'))
+        self.assertIn(('publish-fixture', '1'), self.records('archive', 'SRPMS'))
+        self.assertTrue((self.bucket / 'rolling/x86_64/publish-fixture-1-1.noarch.rpm').exists())
+
+    def test_incremental_rolling_verifies_previous_signature(self):
+        self.inputs('1', kept=True)
+        self.publish(signed=True, incremental=True)
+        index = self.bucket / 'rolling/x86_64/repodata/repomd.xml'
+        index.write_bytes(index.read_bytes() + b'\n')
+        self.inputs('2')
+        self.log.write_text('')
+        self.publish(signed=True, incremental=True, success=False)
+        self.assertFalse(any(op[:2] == ['s3', 'sync'] for op in self.operations()))
+
+    def test_source_rpm_collision_aborts_before_upload(self):
+        self.inputs('1')
+        duplicate = self.packages / 'another/aarch64/src/publish-fixture-1-1.src.rpm'
+        duplicate.parent.mkdir(parents=True)
+        duplicate.write_bytes(b'different SRPM with the same filename')
+        result = self.publish(success=False)
+        self.assertIn('conflicting source RPM', result.stderr)
         self.assertFalse(any(op[:2] == ['s3', 'sync'] for op in self.operations()))
 
     def test_policy_metadata_and_source_only_history_survive(self):
@@ -265,6 +318,46 @@ printf '%s\\n' '{version}' > %{{buildroot}}/opt/publish-test/{payload}
         self.assertIn('unsupported metadata', self.publish(success=False).stderr)
         index.write_bytes(original.replace(b'repodata/', b'repodata/../', 1))
         self.assertIn('unsupported metadata location', self.publish(success=False).stderr)
+
+    def test_candidate_view_replaces_source_family_and_preserves_published_locations(self):
+        self.inputs('1', kept=True)
+        shutil.copy(self.fixture_root / 'RPMS/noarch/publish-fixture-legacy-1-1.noarch.rpm',
+                    self.packages / 'x86_64')
+        self.publish()
+        spec = importlib.util.spec_from_file_location('transaction', ROOT / 'scripts/build-transaction.py')
+        transaction = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(transaction)
+        state_dir = self.work / 'transaction'
+        artifacts = self.work / 'candidates'
+        candidate = self.fixture_root / 'RPMS/noarch/publish-fixture-2-1.noarch.rpm'
+        rpm = transaction.inspect_rpm(candidate)
+        state = {'builds': {'publish-fixture': {'wave': 0, 'targets': {}}}}
+        for arch in transaction.ARCHES:
+            baseline = state_dir / 'baseline' / arch
+            command('mergerepo_c', '--repo', self.bucket / 'rolling/x86_64',
+                    '--outputdir', baseline, '--no-database', '--compress-type=gz')
+            directory = transaction.binary_directory(artifacts, 'publish-fixture', arch, 0)
+            directory.mkdir(parents=True)
+            shutil.copy2(candidate, directory / candidate.name)
+            transaction.write(directory / 'source-manifest.json', {
+                'package': 'publish-fixture', 'arch': arch,
+                'binaries': {candidate.name: transaction.digest(candidate)}})
+            state['builds']['publish-fixture']['targets'][arch] = {'rpms': [rpm]}
+        transaction.write(state_dir / 'state.json', state)
+        output = self.work / 'view'
+        command('python3', ROOT / 'scripts/build-transaction.py', 'view', '--state', state_dir / 'state.json',
+                '--artifacts', artifacts, '--output', output)
+        for arch in transaction.ARCHES:
+            metadata = transaction.primary(output / arch)
+            self.assertEqual({entry.findtext('{*}name') for entry in metadata}, {'publish-fixture', 'publish-kept'})
+            for entry in metadata:
+                location = entry.find('{*}location')
+                if entry.findtext('{*}name') == 'publish-fixture':
+                    self.assertEqual(location.get('href'), candidate.name)
+                    self.assertNotIn('{http://www.w3.org/XML/1998/namespace}base', location.attrib)
+                    self.assertEqual((output / arch / candidate.name).read_bytes(), candidate.read_bytes())
+                else:
+                    self.assertIn('rolling/x86_64', location.get('{http://www.w3.org/XML/1998/namespace}base', '') + location.get('href'))
 
     def test_metadata_input_cannot_be_deleted_by_output_cleanup(self):
         self.inputs('1')

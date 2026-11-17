@@ -1,0 +1,78 @@
+name: Build one dependency wave
+
+on:
+  workflow_call:
+    inputs:
+      packages:
+        required: true
+        type: string
+      wave:
+        required: true
+        type: number
+      sign:
+        type: boolean
+        default: false
+      final:
+        type: boolean
+        default: false
+    outputs:
+      packages:
+        value: ${{ jobs.advance.outputs.packages }}
+    secrets:
+      RPMX_SIGNING_KEY:
+        required: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(inputs.packages) }}
+    uses: ./.github/workflows/_build-package.yml
+    with:
+      package: ${{ matrix.package }}
+      arches: '["x86_64","aarch64"]'
+      wave: ${{ inputs.wave }}
+      sign: ${{ inputs.sign }}
+    secrets: inherit
+
+  advance:
+    needs: build
+    runs-on: ubuntu-26.04
+    outputs:
+      packages: ${{ steps.advance.outputs.packages }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-rpmx
+        with:
+          artifact: rpmx-x86_64
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: transaction-w${{ inputs.wave }}
+          path: .work/transaction
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: binary-w*
+          path: .work/candidates
+      - name: Find consumers requiring another build
+        id: advance
+        env:
+          FINAL: ${{ inputs.final }}
+        run: |
+          args=(--state .work/transaction/state.json --artifacts .work/candidates)
+          if [ "$FINAL" = true ]; then args+=(--final); fi
+          python3 ./scripts/build-transaction.py advance "${args[@]}" >"$RUNNER_TEMP/next.json"
+          cat "$RUNNER_TEMP/next.json"
+          echo "packages=$(jq -c .packages "$RUNNER_TEMP/next.json")" >>"$GITHUB_OUTPUT"
+          echo "artifact=transaction-w$(jq -r .wave "$RUNNER_TEMP/next.json")" >>"$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.advance.outputs.artifact }}
+          path: .work/transaction/
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 1

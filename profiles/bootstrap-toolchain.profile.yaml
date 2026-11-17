@@ -1,7 +1,7 @@
 # The build root for the compiler-options package itself.
 #
 # This profile deliberately does not install `openssf-compiler-options` or use
-# its specs: the package is built before it exists in the toolchain repository.
+# its specs: the package must build before its own policy is available.
 # It uses the stable Fedora seed shell and coreutils, not the packages that
 # are about to be replaced during the self-hosting switch.
 document: rpmx-profile
