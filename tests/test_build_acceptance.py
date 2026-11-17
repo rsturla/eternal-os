@@ -20,6 +20,8 @@ class BuildAcceptance(unittest.TestCase):
         self.root = Path(self.temp.name)
         (self.root / "scripts").mkdir()
         (self.root / "bin").mkdir()
+        (self.root / "profiles").mkdir()
+        (self.root / "profiles/eternal.profile.yaml").write_text(yaml.safe_dump({"repositories": [{"id": "eternal", "baseurl": "https://example.invalid"}]}))
         for name in ("build-all.sh", "build-python.py", "accept-rpms.py"):
             shutil.copy2(ROOT / "scripts" / name, self.root / "scripts" / name)
         for name in ("demo", "openssf-compiler-options", "python-3.15", "python-tool", "python-demo"):
