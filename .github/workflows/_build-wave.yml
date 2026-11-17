@@ -9,18 +9,12 @@ on:
       wave:
         required: true
         type: number
-      sign:
-        type: boolean
-        default: false
       final:
         type: boolean
         default: false
     outputs:
       packages:
         value: ${{ jobs.advance.outputs.packages }}
-    secrets:
-      RPMX_SIGNING_KEY:
-        required: false
 
 permissions:
   contents: read
@@ -37,8 +31,6 @@ jobs:
       package: ${{ matrix.package }}
       arches: '["x86_64","aarch64"]'
       wave: ${{ inputs.wave }}
-      sign: ${{ inputs.sign }}
-    secrets: inherit
 
   advance:
     needs: build

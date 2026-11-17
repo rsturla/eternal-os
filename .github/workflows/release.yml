@@ -19,12 +19,74 @@ jobs:
     name: Lint
     uses: ./.github/workflows/_lint.yml
 
+  reuse:
+    name: Reuse the merged PR transaction
+    if: github.ref == 'refs/heads/main'
+    needs: lint
+    runs-on: ubuntu-26.04
+    outputs:
+      promoted: ${{ steps.publish.outputs.promoted }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Find a successful PR candidate
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          MERGED_COMMIT: ${{ github.sha }}
+        run: |
+          python3 ./scripts/promote-packages.py find --repository "$REPOSITORY" \
+            --commit "$MERGED_COMMIT" --output .work/attempt.json >"$RUNNER_TEMP/reuse.json"
+          cat "$RUNNER_TEMP/reuse.json"
+          echo "found=$(jq -r .found "$RUNNER_TEMP/reuse.json")" >>"$GITHUB_OUTPUT"
+      - uses: ./.github/actions/setup-rpmx
+        if: steps.find.outputs.found == 'true'
+      - name: Verify merged inputs and tested package identities
+        id: verify
+        if: steps.find.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MERGED_COMMIT: ${{ github.sha }}
+          BASE_URL: ${{ vars.PACKAGES_BASE_URL || 'https://packages.eternal.sturla.tech' }}
+        run: |
+          python3 ./scripts/promote-packages.py verify --attempt .work/attempt.json \
+            --commit "$MERGED_COMMIT" --base-url "$BASE_URL" --output .work/ready >"$RUNNER_TEMP/eligible.json"
+          cat "$RUNNER_TEMP/eligible.json"
+          echo "eligible=$(jq -r .eligible "$RUNNER_TEMP/eligible.json")" >>"$GITHUB_OUTPUT"
+      - name: Sign and publish the tested PR packages
+        id: publish
+        if: steps.verify.outputs.eligible == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.PACKAGES_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.PACKAGES_S3_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ vars.PACKAGES_S3_REGION || 'auto' }}
+          PACKAGES_S3_ENDPOINT: ${{ vars.PACKAGES_S3_ENDPOINT }}
+          PACKAGES_S3_BUCKET: ${{ vars.PACKAGES_S3_BUCKET }}
+          PACKAGES_BASE_URL: ${{ vars.PACKAGES_BASE_URL || 'https://packages.eternal.sturla.tech' }}
+          RPMX_SIGNING_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
+          RPMX_PUBLIC_KEY: ${{ secrets.RPMX_PUBLIC_KEY }}
+        run: |
+          ./scripts/publish-packages.sh .work/ready/packages
+          echo 'promoted=true' >>"$GITHUB_OUTPUT"
+      - name: Retain promotion and signing receipts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: publication-receipts
+          path: |
+            .work/ready/packages/promotion.json
+            .work/ready/packages/signing.json
+          overwrite: true
+          retention-days: 7
+
   packages:
     name: Packages
-    needs: lint
+    needs: [lint, reuse]
+    if: needs.reuse.outputs.promoted != 'true'
     uses: ./.github/workflows/_build-packages.yml
     with:
       selection: changed
-      sign: true
       publish: true
     secrets: inherit

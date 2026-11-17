@@ -126,6 +126,13 @@ class RebuildClosure(unittest.TestCase):
 
 
 class RepositoryMetadata(unittest.TestCase):
+    def test_repository_downloads_identify_the_builder_instead_of_the_blocked_python_agent(self):
+        with patch.object(TX.urllib.request, 'urlopen') as open_url:
+            TX.open_url('https://example.invalid/package.rpm')
+        request = open_url.call_args.args[0]
+        self.assertEqual(request.get_header('User-agent'), 'eternal-package-builder/1')
+        self.assertEqual(open_url.call_args.kwargs['timeout'], 120)
+
     def test_published_locations_and_source_families_survive_freezing(self):
         with tempfile.TemporaryDirectory() as temporary:
             repository = Path(temporary)

@@ -319,6 +319,25 @@ outputs:
         index.write_bytes(original.replace(b'repodata/', b'repodata/../', 1))
         self.assertIn('unsupported metadata location', self.publish(success=False).stderr)
 
+    def test_publication_signs_tested_content_and_writes_success_marker_last(self):
+        self.inputs('1', kept=True)
+        spec = importlib.util.spec_from_file_location('sign_packages', ROOT / 'scripts/sign-packages.py')
+        signing = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(signing)
+        before = {path.name: signing.content_digest(path) for path in self.packages.rglob('*.rpm')}
+        (self.packages / 'build-state.json').write_text('{"schema":1,"commit":"merged"}\n')
+        env = dict(self.env, PACKAGES_S3_BUCKET='packages', PACKAGES_BASE_URL='https://example.invalid',
+                   RPMX_SIGNING_KEY=self.key.read_text(), RPMX_PUBLIC_KEY=Path(str(self.key) + '.pub').read_text())
+        command(ROOT / 'scripts/publish-packages.sh', self.packages, env=env)
+        receipt = json.loads((self.packages / 'signing.json').read_text())
+        self.assertTrue(receipt['rpms'])
+        for path in self.packages.rglob('*.rpm'):
+            self.assertEqual(signing.content_digest(path), before[path.name])
+        self.assertEqual(json.loads((self.bucket / 'build-state.json').read_text())['commit'], 'merged')
+        last = self.operations()[-1]
+        self.assertEqual(last[:2], ['s3', 'cp'])
+        self.assertTrue(last[3].endswith('/build-state.json'))
+
     def test_candidate_view_replaces_source_family_and_preserves_published_locations(self):
         self.inputs('1', kept=True)
         shutil.copy(self.fixture_root / 'RPMS/noarch/publish-fixture-legacy-1-1.noarch.rpm',

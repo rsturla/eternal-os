@@ -12,12 +12,6 @@ on:
       arches:
         required: true
         type: string
-      sign:
-        type: boolean
-        default: false
-    secrets:
-      RPMX_SIGNING_KEY:
-        required: false
 
 permissions:
   contents: read
@@ -52,16 +46,9 @@ jobs:
       - name: Prepare shared source RPMs
         env:
           PACKAGE: ${{ inputs.package }}
-          SIGNING_KEY: ${{ inputs.sign && secrets.RPMX_SIGNING_KEY || '' }}
         run: |
           args=(--package "$PACKAGE" --output .work/prepared
             --transaction .work/transaction/state.json --candidates .work/candidates)
-          if [ -n "$SIGNING_KEY" ]; then
-            install -d -m 0700 "$RUNNER_TEMP/signing"
-            printf '%s' "$SIGNING_KEY" >"$RUNNER_TEMP/signing/key.asc"
-            chmod 0600 "$RUNNER_TEMP/signing/key.asc"
-            args+=(--signing-key "$RUNNER_TEMP/signing/key.asc")
-          fi
           python3 ./scripts/package-artifacts.py prepare "${args[@]}"
       - name: Upload shared source
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -120,5 +107,3 @@ jobs:
       wave: ${{ inputs.wave }}
       arch: ${{ matrix.arch }}
       runner: ${{ matrix.runner }}
-      sign: ${{ inputs.sign }}
-    secrets: inherit

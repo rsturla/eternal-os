@@ -64,6 +64,11 @@ def source_name(filename):
     return filename[:-8].rsplit('-', 2)[0]
 
 
+def open_url(url):
+    request = urllib.request.Request(url, headers={'User-Agent': 'eternal-package-builder/1'})
+    return urllib.request.urlopen(request, timeout=120)
+
+
 def baseline_packages(repository):
     records = []
     for package in primary(repository):
@@ -111,7 +116,7 @@ def initialise(args):
     previous = {'hashes': {}}
     if args.published:
         try:
-            with urllib.request.urlopen(args.published.rstrip('/') + '/build-state.json') as response:
+            with open_url(args.published.rstrip('/') + '/build-state.json') as response:
                 previous = json.load(response)
         except urllib.error.HTTPError as error:
             if error.code != 404:
@@ -133,7 +138,7 @@ def initialise(args):
     for provider, consumers in policy.items():
         if provider not in recipes or not isinstance(consumers, list) or set(consumers) - recipes.keys() - {'*'}:
             raise ValueError(f'invalid rebuild policy: {provider}')
-    state = {'schema': 1, 'commit': args.commit, 'catalog': recipes, 'baseline': baseline,
+    state = {'schema': 1, 'commit': args.commit, 'tree': capture('git', '-C', ROOT, 'rev-parse', 'HEAD^{tree}').strip(), 'catalog': recipes, 'baseline': baseline,
                        'published': previous, 'policy': policy, 'pending': selected, 'wave': 0,
                        'build_release': args.build_release, 'builds': {}, 'interfaces': {},
                        'baseline_interfaces': {}, 'requested': selected,
@@ -186,7 +191,7 @@ def baseline_interface(state, package, arch, directory):
         algorithm, expected = entry['checksum'].split(':', 1)
         path = directory / (expected + '.rpm')
         if not path.exists():
-            with urllib.request.urlopen(entry['url']) as response, path.open('wb') as output:
+            with open_url(entry['url']) as response, path.open('wb') as output:
                 shutil.copyfileobj(response, output)
         if digest(path, algorithm) != expected:
             raise ValueError(f'published package checksum mismatch: {entry["url"]}')

@@ -1,8 +1,10 @@
 # Package transactions
 
-A release builds from `main` against the published package set. It produces a
-complete candidate set, runs acceptance, then publishes those exact bytes.
-There is no second build during publication and no persistent side tag.
+A release publishes tested package bytes from a matching pull-request or merge-queue
+run. If no candidate matches, it builds on `main` against the published package
+set. Signing happens during publication. It changes the RPM envelope while
+verification preserves the exact tested main header and compressed payload.
+There are no persistent side tags.
 
 ## Scheduling
 
@@ -20,7 +22,8 @@ implement dependency discovery.
    Its native binary jobs start as soon as its source preparation completes.
    They run build tests before exporting candidates.
 4. Changed dependencies build before their consumers. Dependency cycles
-   bootstrap together against the published set. `advance` compares candidate public inputs with the published versions.
+   bootstrap together against the published set. `advance` compares candidate
+   public inputs with the published versions.
    It selects consumers that have not built against the changed inputs. A
    consumer built alongside its changed provider must build again in a later
    wave. Generated RPM requirements, declared build requirements, actual root
@@ -28,7 +31,9 @@ implement dependency discovery.
 5. `seal` creates the completed candidate repositories. Package acceptance runs
    on native workers against these fixed repositories and the distribution
    runtime profile. Every declared case must pass.
-6. Publication verifies source identities, binary checksums, architecture
+6. A successful non-publishing run exports a `release-candidate` artifact with
+   the accepted bytes, source manifests, repository identity and source tree.
+   Publication verifies source identities, binary checksums, architecture
    completeness and the acceptance repository identity. It publishes the tested
    bytes, retains unchanged published packages, and writes `build-state.json`
    after the repository indexes.
@@ -38,6 +43,59 @@ consumers still need builds. This is a limit on CI execution, not a successful
 partial release. A dependency cycle that keeps changing public inputs needs
 an explicit bootstrap policy. The local scheduler has no wave limit unless
 `advance --final` is requested.
+
+## Reuse after merge
+
+`scripts/promote-packages.py` first finds a successful `merge_group` run for the
+merged tree, then a successful PR run for the merged PR head. Manual builds,
+failed runs, incomplete acceptance, expired artifacts and other workflows are
+ineligible. Queue candidates bind to the exact queue head commit. PR candidates
+bind to the PR head or the tested merge commit and its base/head parents. GitHub
+commit trees must match the merged checkout, including rebase or squash merges
+that change commit IDs.
+
+The release verifies the archive digest supplied by GitHub before extraction.
+It then checks the complete artifact inventory, source manifests, target
+coverage and acceptance repository identities. Current build-input hashes must
+match the tested hashes. The published package baseline must also match, and
+the PR must cover every recipe required by current published hashes. That last
+check prevents reuse from overlooking changes from an earlier failed release.
+The candidate release counter must be newer than the published counter.
+
+A missing or mismatched candidate falls back to the normal main transaction.
+A failure during signing or publication fails the release instead of starting
+a second publisher. Only the gated main publication step receives signing and
+bucket credentials. PR and queue builds have neither credential.
+
+Both reused and freshly built packages use `publish-packages.sh`. It signs RPMs
+and rejects any change to their main headers or compressed payloads. The
+`signing.json` receipt maps original tested file digests to signed file digests.
+Source manifests retain their tested envelope identities. `promotion.json`
+records the source run and merged commit for reused packages. These receipts
+have seven-day artifact retention. Repository metadata uses the final signed
+file digests.
+
+### Merge queue checks
+
+CI handles `merge_group: checks_requested` and reports a stable `Required CI`
+check. A queue run builds all recipes changed since the last successful
+publication, including outstanding changes from failed releases. It runs the
+same dependency rebuilds and final acceptance as a PR transaction. Commit
+conventions run on PR commits; they do not inspect GitHub's generated queue
+commit messages. The aggregate check fails on any applicable failure or skipped
+package workflow.
+
+After this workflow lands on `main`, branch protection can require `Required CI`
+and enable the merge queue. Use rebase merges to retain linear history, one
+queue build at a time, and enough check timeout for native package builds.
+Existing protection rules must be reconciled when enabling the queue. This
+changeset does not enable a queue before its workflow exists on the base branch.
+
+A queue avoids rebuilding after merge solely because the integrated source tree
+changed. A repository publication that changes dependencies during queue testing
+still invalidates the candidate. That release takes the safe rebuild path.
+PR and queue checks both build packages; a queue run can build again for its
+integrated tree. Promotion avoids a further compilation after merge.
 
 ## What counts as an interface change
 
@@ -83,9 +141,9 @@ payloads. The shared SRPM does not promise to retain an old build environment.
 Candidate RPMs, dependency archives, repository metadata and state use
 run-scoped GitHub artifacts with one-day retention. Logs and structured evidence
 have seven-day retention. Hosted worker files disappear with their runners.
-No temporary repositories or candidate objects are uploaded to R2. Later runs
-build their own candidate sets. Run the whole workflow again after temporary
-artifacts expire.
+No temporary repositories or candidate objects are uploaded to R2. A merged
+release can reuse a matching unexpired candidate. Other runs build their own
+sets. Run the whole workflow again after temporary artifacts expire.
 
 R2 receives packages only during final publication. Published objects remain
 available to repository clients and the existing archive. Removing published

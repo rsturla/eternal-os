@@ -15,12 +15,6 @@ on:
       runner:
         type: string
         required: true
-      sign:
-        type: boolean
-        default: false
-    secrets:
-      RPMX_SIGNING_KEY:
-        required: false
 
 permissions:
   contents: read
@@ -57,16 +51,9 @@ jobs:
       - name: Rebuild with source tests
         env:
           TARGET_ARCH: ${{ inputs.arch }}
-          SIGNING_KEY: ${{ inputs.sign && secrets.RPMX_SIGNING_KEY || '' }}
         run: |
           args=(--bundle .work/bundle --inputs .work/inputs --arch "$TARGET_ARCH" --output out
             --transaction .work/transaction/state.json --candidates .work/candidates)
-          if [ -n "$SIGNING_KEY" ]; then
-            install -d -m 0700 "$RUNNER_TEMP/signing"
-            printf '%s' "$SIGNING_KEY" >"$RUNNER_TEMP/signing/key.asc"
-            chmod 0600 "$RUNNER_TEMP/signing/key.asc"
-            args+=(--signing-key "$RUNNER_TEMP/signing/key.asc")
-          fi
           python3 ./scripts/package-artifacts.py rebuild "${args[@]}"
       - name: Upload candidates
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

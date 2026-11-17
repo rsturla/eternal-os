@@ -201,15 +201,17 @@ When run as root with `dnf5`, they also test package upgrades and metadata signa
 
 ## How a release works
 
-Pull requests build affected recipes. Releases build changed recipes on `main`
-and schedule consumer rebuilds when public library payloads, headers, static
+Pull requests build affected recipes. Merge queues build the integrated tree.
+After merge, releases reuse matching tested artifacts or build changed recipes
+on `main`. Transactions schedule consumer rebuilds when public library payloads, headers, static
 archives or explicit tool relationships change.
 
 Each package prepares one shared SRPM, then starts native x86_64 and aarch64
 builds. Other packages can prepare sources concurrently. Follow-on builds use a
 fixed repository view of completed candidates. Once that set settles, package
 acceptance runs against the complete candidate repositories. The publisher
-verifies the artifacts and publishes those tested bytes. Unchanged packages
+verifies the artifacts, signs their envelopes without changing tested headers
+or payloads, and publishes them. Unchanged packages
 stay in `rolling`; `archive` retains historical published versions.
 
 Temporary inputs and candidates use run-scoped artifacts with one-day retention.

@@ -15,9 +15,6 @@ on:
       publish:
         type: boolean
         default: false
-      sign:
-        type: boolean
-        default: false
     secrets:
       RPMX_SIGNING_KEY:
         required: false
@@ -36,9 +33,6 @@ on:
       base:
         type: string
         default: ""
-      sign:
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -152,9 +146,7 @@ jobs:
     with:
       packages: ${{ needs.prepare.outputs.packages }}
       waves: '[0,1,2,3]'
-      sign: ${{ inputs.sign }}
       final: false
-    secrets: inherit
 
   wave_1:
     needs: wave_0
@@ -163,9 +155,7 @@ jobs:
     with:
       packages: ${{ needs.wave_0.outputs.packages }}
       waves: '[4,5,6,7]'
-      sign: ${{ inputs.sign }}
       final: false
-    secrets: inherit
 
   wave_2:
     needs: wave_1
@@ -174,9 +164,7 @@ jobs:
     with:
       packages: ${{ needs.wave_1.outputs.packages }}
       waves: '[8,9,10,11]'
-      sign: ${{ inputs.sign }}
       final: false
-    secrets: inherit
 
   wave_3:
     needs: wave_2
@@ -185,9 +173,7 @@ jobs:
     with:
       packages: ${{ needs.wave_2.outputs.packages }}
       waves: '[12,13,14,15]'
-      sign: ${{ inputs.sign }}
       final: false
-    secrets: inherit
 
   wave_4:
     needs: wave_3
@@ -196,9 +182,7 @@ jobs:
     with:
       packages: ${{ needs.wave_3.outputs.packages }}
       waves: '[16,17,18,19]'
-      sign: ${{ inputs.sign }}
       final: false
-    secrets: inherit
 
   wave_5:
     needs: wave_4
@@ -207,9 +191,7 @@ jobs:
     with:
       packages: ${{ needs.wave_4.outputs.packages }}
       waves: '[20,21,22,23]'
-      sign: ${{ inputs.sign }}
       final: false
-    secrets: inherit
 
   wave_6:
     needs: wave_5
@@ -218,9 +200,7 @@ jobs:
     with:
       packages: ${{ needs.wave_5.outputs.packages }}
       waves: '[24,25,26,27]'
-      sign: ${{ inputs.sign }}
       final: false
-    secrets: inherit
 
   wave_7:
     needs: wave_6
@@ -229,9 +209,7 @@ jobs:
     with:
       packages: ${{ needs.wave_6.outputs.packages }}
       waves: '[28,29,30,31]'
-      sign: ${{ inputs.sign }}
       final: true
-    secrets: inherit
 
   repository:
     name: Assemble the completed candidate repository
@@ -304,6 +282,38 @@ jobs:
       runner: ${{ matrix.runner }}
       wave: ${{ matrix.wave }}
 
+  candidate:
+    name: Export the accepted package transaction
+    needs: [repository, accept]
+    if: ${{ always() && !inputs.publish && needs.repository.result == 'success' && needs.accept.result == 'success' }}
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: transaction-final
+          path: .work/final
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: source-w*
+          path: .work/artifacts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: accepted-*
+          path: .work/artifacts
+      - name: Verify and pack the final tested bytes
+        run: |
+          python3 ./scripts/transaction-artifacts.py pack --state .work/final/state.json \
+            --artifacts .work/artifacts --output .work/candidate
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-candidate
+          path: .work/candidate/
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 1
+
+
   publish:
     needs: [repository, accept]
     if: ${{ always() && inputs.publish && needs.repository.result == 'success' && needs.accept.result == 'success' }}
@@ -336,3 +346,11 @@ jobs:
           path: .work/artifacts
       - name: Publish the tested repository
         run: ./scripts/publish-transaction.sh .work/final/state.json .work/artifacts .work/published
+      - name: Retain signing receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: publication-signing-receipt
+          path: .work/published/signing.json
+          overwrite: true
+          retention-days: 7

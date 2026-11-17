@@ -61,6 +61,27 @@ def stage(args):
     })
 
 
+def pack(args):
+    """Export only the final, accepted package bytes and their source records."""
+    packages = args.output / 'packages'
+    stage(argparse.Namespace(state=args.state, artifacts=args.artifacts, output=packages))
+    state = json.loads(args.state.read_text())
+    if not state['builds'] or not state.get('tree'):
+        raise ValueError('candidate has no completed builds or source tree identity')
+    for package, build in state['builds'].items():
+        source = args.artifacts / f'source-w{build["wave"]}-{package}'
+        for name in ('manifest.json', 'test-profile.yaml'):
+            shutil.copy2(source / name, packages / package / name)
+    shutil.copy2(args.state, args.output / 'state.json')
+    artifacts = load('package-artifacts')
+    artifacts.write_json(args.output / 'candidate.json', {
+        'schema': 1, 'commit': state['commit'], 'tree': state['tree'],
+        'rpmx': (ROOT / '.rpmx-revision').read_text().strip(),
+        'files': {path.relative_to(args.output).as_posix(): artifacts.digest(path)
+                  for path in sorted(args.output.rglob('*')) if path.is_file()},
+    })
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(required=True)
@@ -71,7 +92,11 @@ def main():
     stage_parser.add_argument('--state', type=Path, required=True)
     stage_parser.add_argument('--artifacts', type=Path, required=True)
     stage_parser.set_defaults(function=stage)
-    for command in (collect_parser, stage_parser):
+    pack_parser = commands.add_parser('pack')
+    pack_parser.add_argument('--state', type=Path, required=True)
+    pack_parser.add_argument('--artifacts', type=Path, required=True)
+    pack_parser.set_defaults(function=pack)
+    for command in (collect_parser, stage_parser, pack_parser):
         command.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     args.function(args)

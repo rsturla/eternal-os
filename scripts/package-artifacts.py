@@ -13,8 +13,6 @@ import subprocess
 import tarfile
 import tempfile
 
-import yaml
-
 
 ROOT = Path(__file__).resolve().parents[1]
 CAS_NAME = re.compile(r'(sha256/[0-9a-f]{64}|sha512/[0-9a-f]{128})')
@@ -39,6 +37,8 @@ def write_json(path, value):
 
 
 def prepare(args):
+    import yaml
+
     recipe = ROOT / 'packages' / args.package / 'package.yaml'
     if not recipe.is_file():
         raise ValueError(f'unknown package: {args.package}')
@@ -224,6 +224,8 @@ def rebuild(args):
 
 
 def accept(args):
+    import yaml
+
     data = load_bundle(args.bundle)
     source = args.binaries / data['package'] / args.arch
     record = json.loads((source / 'source-manifest.json').read_text())
@@ -278,7 +280,10 @@ def verify(args):
     sources = args.output / data['package'] / 'src'
     sources.mkdir(exist_ok=True)
     for source in data['sources']:
-        shutil.copy2(args.bundle / 'src' / source['file'], sources / source['file'])
+        original = args.bundle / 'src' / source['file']
+        destination = sources / source['file']
+        if original.resolve() != destination.resolve():
+            shutil.copy2(original, destination)
 
 
 def main():

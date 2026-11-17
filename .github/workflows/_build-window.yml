@@ -12,18 +12,12 @@ on:
         description: JSON array of four consecutive wave numbers.
         required: true
         type: string
-      sign:
-        type: boolean
-        default: false
       final:
         type: boolean
         default: false
     outputs:
       packages:
         value: ${{ jobs.four.outputs.packages || jobs.three.outputs.packages || jobs.two.outputs.packages || jobs.one.outputs.packages }}
-    secrets:
-      RPMX_SIGNING_KEY:
-        required: false
 
 permissions:
   contents: read
@@ -35,8 +29,6 @@ jobs:
     with:
       packages: ${{ inputs.packages }}
       wave: ${{ fromJSON(inputs.waves)[0] }}
-      sign: ${{ inputs.sign }}
-    secrets: inherit
 
   two:
     needs: one
@@ -45,8 +37,6 @@ jobs:
     with:
       packages: ${{ needs.one.outputs.packages }}
       wave: ${{ fromJSON(inputs.waves)[1] }}
-      sign: ${{ inputs.sign }}
-    secrets: inherit
 
   three:
     needs: two
@@ -55,8 +45,6 @@ jobs:
     with:
       packages: ${{ needs.two.outputs.packages }}
       wave: ${{ fromJSON(inputs.waves)[2] }}
-      sign: ${{ inputs.sign }}
-    secrets: inherit
 
   four:
     needs: three
@@ -65,6 +53,4 @@ jobs:
     with:
       packages: ${{ needs.three.outputs.packages }}
       wave: ${{ fromJSON(inputs.waves)[3] }}
-      sign: ${{ inputs.sign }}
       final: ${{ inputs.final }}
-    secrets: inherit
