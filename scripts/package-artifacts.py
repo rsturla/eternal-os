@@ -36,6 +36,14 @@ def write_json(path, value):
     path.write_text(json.dumps(value, sort_keys=True, indent=2) + '\n')
 
 
+def verify_candidate(path, candidate):
+    # Repository primary metadata uses SHA-256. Transaction receipts also keep
+    # SHA-512. Compare the same bytes with the receipt's algorithm, rather than
+    # comparing digest strings produced with different algorithms.
+    if digest(path, 'sha512') != candidate['sha512']:
+        raise ValueError(f'resolver selected an obsolete candidate: {candidate["name"]}')
+
+
 def prepare(args):
     import yaml
 
@@ -117,8 +125,7 @@ def prepare(args):
                         for provider, build in transaction['builds'].items():
                             for candidate in build['targets'][arch]['rpms']:
                                 if candidate['name'] == package['name']:
-                                    if package['checksum'] != 'sha512:' + candidate['sha512']:
-                                        raise ValueError(f'resolver selected an obsolete candidate: {package["name"]}')
+                                    verify_candidate(path, candidate)
                                     consumed.add(provider)
         archive = inputs / f'{arch}.tar.gz'
         with tarfile.open(archive, 'w:gz') as tar:
