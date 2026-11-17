@@ -625,6 +625,13 @@ rpmx test packages/NAME/package.yaml --install-dir out/NAME/ARCH --arch ARCH \
 `--no-tests` explicitly disables both phases. Private OpenSSF seed preparation
 runs source builds only; its RPM is a build prerequisite, not an accepted release.
 
+For a batch, `build-all.sh --defer-acceptance` runs source tests and leaves
+acceptance to a separate invocation. It cannot be combined with `--no-tests`.
+The workflow builds every selected package in parallel, collects the binary
+RPMs for each architecture, then accepts every package in parallel against that
+candidate pool. Each case still installs only its own declared dependencies.
+A package enters the release artifacts only after acceptance passes.
+
 Add an output-level test when the output has a user-facing command or runtime
 behavior. A `-doc`, `-locales` or empty metapackage output does not need an
 artificial test of its own; a package-level integration test can cover it.
