@@ -20,7 +20,7 @@ schema: 2
 package:
   name: python-3.14
   version: "3.14.10"
-  release: 4
+  release: 5
   summary: The Python programming language (version 3.14)
   description: |
     Python is an interpreted, interactive, object-oriented programming
@@ -166,6 +166,8 @@ outputs:
         - /usr/share/licenses/python-3.14-devel/LICENSE
     dependencies:
       run:
+        # Embedded interpreters need this stream's standard library too.
+        - python-3.14 = ${package.version}-${package.release}
         - python-3.14-libs = ${package.version}-${package.release}
     tests:
       - name: embed
