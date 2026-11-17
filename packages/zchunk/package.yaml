@@ -68,13 +68,13 @@ outputs:
       run:
         - zchunk-libs = ${package.version}-${package.release}
     tests:
-      - name: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
+      - name: roundtrip
+        packages:
+          - coreutils
+          - diffutils
+        files: tests
         script: |
-          printf 'zchunk test data\n' > /tmp/zchunk-test
-          zck -o /tmp/zchunk-test.zck /tmp/zchunk-test
-          test -s /tmp/zchunk-test.zck
-          zck_read_header /tmp/zchunk-test.zck >/dev/null
+          bash "$TEST_FILES/roundtrip.sh"
 
   - name: zchunk-libs
     summary: Libraries for zchunk
@@ -89,13 +89,17 @@ outputs:
         - openssl-libs
         - zstd-libs
     tests:
-      - name: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
+      - name: minimal-runtime-dependencies
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libzck.so.[0-9]*"]
+      - name: runtime
+        packages:
+          - python3
+        files: tests
         script: |
-          for lib in /usr/lib64/libzck.so.* /usr/lib/libzck.so.*; do
-            test -e "$lib" && exit 0
-          done
-          exit 1
+          python3 "$TEST_FILES/runtime.py"
 
   - name: zchunk-devel
     summary: Development files for zchunk
@@ -111,9 +115,12 @@ outputs:
         - zstd-devel
         - openssl-devel
     tests:
-      - name: link
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
+      - name: zchunk-api
+        packages:
+          - gcc
+          - glibc-devel
+          - coreutils
+          - pkgconf
+        files: tests
         script: |
-          printf '#include <zck.h>\nint main(void){return 0;}\n' > /tmp/zck.c
-          gcc /tmp/zck.c $(pkg-config --cflags --libs zck) -o /tmp/zck-test
-          /tmp/zck-test
+          bash "$TEST_FILES/zchunk-api.sh"
