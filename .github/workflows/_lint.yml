@@ -26,6 +26,3 @@ jobs:
 
       - name: Lint recipes
         run: ./scripts/lint-all.sh
-
-      - name: Test repository publication
-        run: python3 -m unittest discover -s tests -p test_publish.py -v

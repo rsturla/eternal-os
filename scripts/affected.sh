@@ -127,18 +127,13 @@ while IFS= read -r -d '' path; do
       # This file only decides which packages to select; changing it does not
       # change package output. The commit and lint checks still run.
       ;;
-    profiles/* | scripts/* | rpmx-defaults.yaml)
+    profiles/* | scripts/* | rpmx-defaults.yaml | rebuild-policy.yaml)
       global=1
       break
       ;;
     .rpmx-revision)
       # The builder changed, not a recipe: a canary build is enough.
       builder=1
-      ;;
-    packages/openssf-compiler-options/*)
-      # Every C/C++ build installs this package through the bootstrap profile.
-      global=1
-      break
       ;;
     packages/*/*)
       rest=${path#packages/}

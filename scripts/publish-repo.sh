@@ -28,6 +28,7 @@ rpmx=${RPMX:-rpmx}
 packages=
 archive_packages=
 archive_metadata=
+rolling_metadata=
 output=site
 release=rolling
 archive_release=
@@ -42,6 +43,7 @@ usage: publish-repo.sh --packages DIR [options]
   --packages DIR           Current artifacts root produced by build-all.sh
   --archive-packages DIR   Historical artifacts root; adds the archive repository
   --archive-metadata DIR   Previous <arch>/repodata trees; merge with current RPMs
+  --rolling-metadata DIR   Previous rolling metadata; retain unchanged source packages
   --output DIR             Repository mirror to write (default: site)
   --release VER            Current release directory (default: rolling)
   --archive-release VER    Historical release directory (default: archive)
@@ -60,6 +62,10 @@ while (($# > 0)); do
       ;;
     --archive-packages)
       archive_packages=${2:?--archive-packages needs a directory}
+      shift 2
+      ;;
+    --rolling-metadata)
+      rolling_metadata=${2:?--rolling-metadata needs a directory}
       shift 2
       ;;
     --archive-metadata)
@@ -136,8 +142,10 @@ if [[ -n $archive_packages && ! -d $archive_packages ]]; then
   echo "archive artifacts directory not found: $archive_packages" >&2
   exit 1
 fi
-if [[ -n $archive_metadata ]]; then
-  metadata_input=$(realpath "$archive_metadata")
+for metadata in "$archive_metadata" "$rolling_metadata"; do
+  [[ -n $metadata ]] || continue
+  [[ -d $metadata ]] || { echo "metadata directory not found: $metadata" >&2; exit 1; }
+  metadata_input=$(realpath "$metadata")
   for channel in "$release" "$archive_release"; do
     destination=$(realpath -m "$output/$channel")
     if [[ $metadata_input == "$destination" || $metadata_input == "$destination/"* ||
@@ -146,14 +154,15 @@ if [[ -n $archive_metadata ]]; then
       exit 2
     fi
   done
-fi
+done
 
 stage_root=$(mktemp -d)
 trap 'rm -rf "$stage_root"' EXIT
 mkdir -p "$output"
 
-merge_archive() {
-  local repo arch dest previous signature kind href
+merge_metadata() {
+  local channel=$1 metadata=$2 replace=${3:-0}
+  local repo arch dest previous signature kind href filtered
   local signing_home="$stage_root/gnupg"
   local -A seen=()
   local -a cmd
@@ -165,14 +174,14 @@ merge_archive() {
       gpg --homedir "$signing_home" --batch --import "$public_key"
     fi
   fi
-  rm -rf "${output:?}/${archive_release:?}"
-  for repo in "$archive_metadata"/* "$output/$release"/*; do
+  rm -rf "${output:?}/${channel:?}"
+  for repo in "$metadata"/* "$new_repositories"/*; do
     [[ -d $repo ]] || continue
     arch=$(basename "$repo")
     [[ -z ${seen[$arch]:-} ]] || continue
     seen[$arch]=1
-    dest="$output/$archive_release/$arch"
-    previous="$archive_metadata/$arch"
+    dest="$output/$channel/$arch"
+    previous="$metadata/$arch"
     cmd=(mergerepo_c --all --omit-baseurl --no-database --unique-md-filenames --nogroups --noupdateinfo
       --compress-type=gz --outputdir "$dest")
     if [[ -d "$previous" ]]; then
@@ -185,13 +194,18 @@ merge_archive() {
         fi
         gpg --homedir "$signing_home" --batch --verify "$signature" "$previous/repodata/repomd.xml"
       fi
+      if ((replace)); then
+        filtered="$stage_root/filtered-$arch"
+        python3 "$root/scripts/filter-rolling.py" --packages "$packages" "$previous" "$filtered"
+        previous=$filtered
+      fi
       # Keep the historical record if an immutable NEVRA occurs in both inputs.
       cmd+=(--repo "$(realpath "$previous")")
     fi
-    if [[ -f "$output/$release/$arch/repodata/repomd.xml" ]]; then
-      cmd+=(--repo "$(realpath "$output/$release/$arch")")
+    if [[ -f "$new_repositories/$arch/repodata/repomd.xml" ]]; then
+      cmd+=(--repo "$(realpath "$new_repositories/$arch")")
     fi
-    echo "==> merge $archive_release/$arch metadata"
+    echo "==> merge $channel/$arch metadata"
     "${cmd[@]}"
     if [[ -d "$previous" ]]; then
       # mergerepo_c writes an empty updateinfo file. Retain the archive's
@@ -203,6 +217,9 @@ merge_archive() {
           --compress --compress-type=gz --unique-md-filenames \
           "$previous/$href" "$dest/repodata"
       done <"$stage_root/additional-metadata"
+    fi
+    if ((replace)) && [[ -d "$new_repositories/$arch" ]]; then
+      find "$new_repositories/$arch" -maxdepth 1 -type f -name '*.rpm' -exec cp -t "$dest" {} +
     fi
     if [[ -n $signing_key ]]; then
       gpg --homedir "$signing_home" --batch --yes --pinentry-mode error \
@@ -217,7 +234,7 @@ assemble_repo() {
   local stage="$stage_root/$repo_release"
   local source_stage="$stage/SRPMS"
   local found=0 source_found=0
-  local rpm arch
+  local rpm arch destination
   local -A seen=()
   local -a cmd
 
@@ -241,10 +258,14 @@ assemble_repo() {
     exit 1
   fi
 
-  # Source RPMs are architecture-independent, so the same filename from two
-  # arches collapses to one copy in the source repository.
+  # Duplicate source RPMs must contain exactly the same bytes.
   while IFS= read -r -d '' rpm; do
     mkdir -p "$source_stage"
+    destination="$source_stage/$(basename "$rpm")"
+    if [[ -f $destination ]] && ! cmp -s "$rpm" "$destination"; then
+      echo "conflicting source RPM: $(basename "$rpm")" >&2
+      exit 1
+    fi
     cp -f "$rpm" "$source_stage/"
     source_found=$((source_found + 1))
   done < <(find "$packages_root" -type f -name '*.src.rpm' -print0)
@@ -273,8 +294,14 @@ assemble_repo() {
 }
 
 assemble_repo "$packages" "$release"
+new_repositories="$output/$release"
+if [[ -n $rolling_metadata ]]; then
+  new_repositories="$stage_root/new-repositories"
+  mv "$output/$release" "$new_repositories"
+  merge_metadata "$release" "$rolling_metadata" 1
+fi
 if [[ -n $archive_metadata ]]; then
-  merge_archive
+  merge_metadata "$archive_release" "$archive_metadata"
 elif [[ -n $archive_release ]]; then
   assemble_repo "$archive_packages" "$archive_release"
 fi

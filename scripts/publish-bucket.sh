@@ -23,12 +23,14 @@ region=${AWS_DEFAULT_REGION:-auto}
 base_url=
 signing_key=
 public_key=
+incremental=0
 
 usage() {
   cat <<'EOF'
 usage: publish-bucket.sh --packages DIR --bucket NAME --base-url URL [options]
 
   --packages DIR       Current artifacts root produced by build-all.sh
+  --incremental        Replace only incoming source packages in rolling
   --output DIR         Local repository tree to write (default: site)
   --release VER        Current release directory (default: rolling)
   --archive VER        Historical release directory (default: archive)
@@ -44,6 +46,10 @@ EOF
 
 while (($# > 0)); do
   case "$1" in
+    --incremental)
+      incremental=1
+      shift
+      ;;
     --packages)
       packages=${2:?--packages needs a directory}
       shift 2
@@ -144,32 +150,39 @@ mapfile -t arches < <("$root/scripts/list-arches.sh" | jq -r '.[]')
 
 # Fetch only the current snapshot. Retained snapshots and RPMs stay in S3.
 # Listing errors must fail the run, rather than look like an empty repository.
+fetch_metadata() {
+  local channel=$1 metadata=$2
+  mkdir -p "$metadata"
+  for arch in "${arches[@]}" SRPMS; do
+    prefix="$channel/$arch/"
+    objects=$("${aws_cmd[@]}" s3api list-objects-v2 --bucket "$bucket" \
+      --prefix "$prefix" --max-keys 1 --no-paginate)
+    if [[ $(jq '.Contents | length' <<<"$objects") == 0 ]]; then
+      continue
+    fi
+    dest="$metadata/$arch"
+    mkdir -p "$dest/repodata"
+    echo "==> fetch $channel/$arch metadata"
+    # An existing prefix without an index is an error, not a first publication.
+    "${aws_cmd[@]}" s3 cp "$bucket_uri/${prefix}repodata/repomd.xml" \
+      "$dest/repodata/repomd.xml" --only-show-errors
+    python3 "$root/scripts/repodata-files.py" "$dest/repodata/repomd.xml" >"$work/metadata-files"
+    while IFS= read -r href; do
+      "${aws_cmd[@]}" s3 cp "$bucket_uri/$prefix$href" "$dest/$href" --only-show-errors
+    done <"$work/metadata-files"
+    signature="${prefix}repodata/repomd.xml.asc"
+    objects=$("${aws_cmd[@]}" s3api list-objects-v2 --bucket "$bucket" \
+      --prefix "$signature" --max-keys 1 --no-paginate)
+    if jq -e --arg key "$signature" 'any(.Contents[]?; .Key == $key)' <<<"$objects" >/dev/null; then
+      "${aws_cmd[@]}" s3 cp "$bucket_uri/$signature" "$dest/repodata/repomd.xml.asc" --only-show-errors
+    fi
+  done
+}
 archive_metadata="$work/archive"
-mkdir -p "$archive_metadata"
-for arch in "${arches[@]}" SRPMS; do
-  prefix="$archive/$arch/"
-  objects=$("${aws_cmd[@]}" s3api list-objects-v2 --bucket "$bucket" \
-    --prefix "$prefix" --max-keys 1 --no-paginate)
-  if [[ $(jq '.Contents | length' <<<"$objects") == 0 ]]; then
-    continue
-  fi
-  dest="$archive_metadata/$arch"
-  mkdir -p "$dest/repodata"
-  echo "==> fetch $archive/$arch metadata"
-  # An existing prefix without an index is an error, not a first publication.
-  "${aws_cmd[@]}" s3 cp "$bucket_uri/${prefix}repodata/repomd.xml" \
-    "$dest/repodata/repomd.xml" --only-show-errors
-  python3 "$root/scripts/repodata-files.py" "$dest/repodata/repomd.xml" >"$work/metadata-files"
-  while IFS= read -r href; do
-    "${aws_cmd[@]}" s3 cp "$bucket_uri/$prefix$href" "$dest/$href" --only-show-errors
-  done <"$work/metadata-files"
-  signature="${prefix}repodata/repomd.xml.asc"
-  objects=$("${aws_cmd[@]}" s3api list-objects-v2 --bucket "$bucket" \
-    --prefix "$signature" --max-keys 1 --no-paginate)
-  if jq -e --arg key "$signature" 'any(.Contents[]?; .Key == $key)' <<<"$objects" >/dev/null; then
-    "${aws_cmd[@]}" s3 cp "$bucket_uri/$signature" "$dest/repodata/repomd.xml.asc" --only-show-errors
-  fi
-done
+fetch_metadata "$archive" "$archive_metadata"
+if ((incremental)); then
+  fetch_metadata "$release" "$work/rolling"
+fi
 
 repo_args=(
   --packages "$packages"
@@ -179,6 +192,7 @@ repo_args=(
   --archive-release "$archive"
   --base-url "$base_url"
 )
+((incremental)) && repo_args+=(--rolling-metadata "$work/rolling")
 [[ -n $signing_key ]] && repo_args+=(--signing-key "$signing_key")
 [[ -n $public_key ]] && repo_args+=(--public-key "$public_key")
 
@@ -259,6 +273,11 @@ fi
 if [[ -d "$output/$archive/SRPMS/repodata" ]]; then
   sync_repodata "$output/$archive/SRPMS/repodata" \
     "$bucket_uri/$archive/SRPMS/repodata"
+fi
+
+# Advance recipe selection only after all architecture and source indexes exist.
+if [[ -f "$packages/build-state.json" ]]; then
+  upload_file "$packages/build-state.json" build-state.json 'no-cache'
 fi
 
 echo "published $release and $archive to $bucket_uri"

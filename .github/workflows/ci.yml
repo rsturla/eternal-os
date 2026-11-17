@@ -2,10 +2,14 @@ name: CI
 
 on:
   pull_request:
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -14,6 +18,7 @@ concurrency:
 jobs:
   commits:
     name: Commits
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-26.04
     steps:
       - name: Checkout
@@ -34,7 +39,36 @@ jobs:
   packages:
     name: Packages
     needs: [lint, commits]
+    if: ${{ always() && github.event_name != 'merge_group' && needs.lint.result == 'success' && needs.commits.result == 'success' }}
     uses: ./.github/workflows/_build-packages.yml
     with:
       selection: affected
       base: ${{ github.event.pull_request.base.sha }}
+
+  queue:
+    name: Check PR artifacts against main
+    needs: lint
+    if: github.event_name == 'merge_group'
+    uses: ./.github/workflows/_check-queue.yml
+
+  required:
+    name: Required CI
+    needs: [commits, lint, packages, queue]
+    if: always()
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Require every applicable check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          COMMITS: ${{ needs.commits.result }}
+          LINT: ${{ needs.lint.result }}
+          PACKAGES: ${{ needs.packages.result }}
+          QUEUE: ${{ needs.queue.result }}
+        run: |
+          test "$LINT" = success
+          if [ "$EVENT_NAME" = merge_group ]; then
+            test "$QUEUE" = success
+          else
+            test "$COMMITS" = success
+            test "$PACKAGES" = success
+          fi

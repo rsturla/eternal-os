@@ -235,8 +235,6 @@ repositories:
       - zlib-ng-compat
       - zlib-ng-compat-devel
       - zlib-ng-compat-static
-  - id: eternal-toolchain
-    baseurl: file://../.work/toolchain-repo
 packages:
   install:
     - openssf-compiler-options

@@ -1,0 +1,56 @@
+name: Run up to four dependency waves
+
+# Workflow calls form a DAG. This wrapper shares the four-wave wiring so the
+# caller can allow 32 waves without copying each worker definition.
+on:
+  workflow_call:
+    inputs:
+      packages:
+        required: true
+        type: string
+      waves:
+        description: JSON array of four consecutive wave numbers.
+        required: true
+        type: string
+      final:
+        type: boolean
+        default: false
+    outputs:
+      packages:
+        value: ${{ jobs.four.outputs.packages || jobs.three.outputs.packages || jobs.two.outputs.packages || jobs.one.outputs.packages }}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  one:
+    uses: ./.github/workflows/_build-wave.yml
+    with:
+      packages: ${{ inputs.packages }}
+      wave: ${{ fromJSON(inputs.waves)[0] }}
+
+  two:
+    needs: one
+    if: needs.one.outputs.packages != '[]'
+    uses: ./.github/workflows/_build-wave.yml
+    with:
+      packages: ${{ needs.one.outputs.packages }}
+      wave: ${{ fromJSON(inputs.waves)[1] }}
+
+  three:
+    needs: two
+    if: needs.two.outputs.packages != '[]'
+    uses: ./.github/workflows/_build-wave.yml
+    with:
+      packages: ${{ needs.two.outputs.packages }}
+      wave: ${{ fromJSON(inputs.waves)[2] }}
+
+  four:
+    needs: three
+    if: needs.three.outputs.packages != '[]'
+    uses: ./.github/workflows/_build-wave.yml
+    with:
+      packages: ${{ needs.three.outputs.packages }}
+      wave: ${{ fromJSON(inputs.waves)[3] }}
+      final: ${{ inputs.final }}

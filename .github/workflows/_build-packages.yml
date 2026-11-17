@@ -1,85 +1,42 @@
-name: Build packages
+name: Build a package transaction
 
-# Fan-out workflow. The configure job reads the target architectures without
-# rpmx; the rpmx matrix builds the pinned revision once per architecture and
-# uploads it; prepare uses the x86_64 build to compute the package plan and
-# content hashes; and the package matrix downloads the matching rpmx build
-# before building each selected package in parallel. A second parallel matrix
-# accepts those RPMs against the complete same-architecture candidate pool. Only
-# passing acceptance jobs export rpm-* artifacts for the caller's repository.
-#
-# Sharing one rpmx build per architecture keeps the plan and build stages from
-# compiling the same revision independently, including every aarch64 matrix
-# cell.
-#
-# GitHub's matrix job outputs merge cells into a map, but only for statically
-# declared output names. A dynamic package matrix cannot name one output per
-# package, so the plan and hashes are produced once by `prepare` and exposed as
-# workflow outputs. The RPM binaries travel as artifacts; job outputs carry
-# strings only.
+# Source preparation starts native binary jobs independently for each package.
+# Each following wave consumes a fixed view of the completed candidates.
 on:
   workflow_call:
     inputs:
       selection:
-        description: 'Either "affected" or "all".'
-        required: false
+        description: changed compares published hashes; affected compares Git refs.
         type: string
         default: affected
       base:
-        description: Base ref for --affected (empty uses origin/HEAD).
-        required: false
         type: string
         default: ""
-      sign:
-        description: Sign packages when RPMX_SIGNING_KEY is available.
-        required: false
+      publish:
         type: boolean
         default: false
-    outputs:
-      packages:
-        description: JSON array of package names in this build.
-        value: ${{ jobs.prepare.outputs.packages }}
-      arches:
-        description: JSON array of target architectures.
-        value: ${{ jobs.configure.outputs.arches }}
-      hashes:
-        description: JSON object mapping package name to content hash.
-        value: ${{ jobs.prepare.outputs.hashes }}
-      skip:
-        description: "true when no package is selected."
-        value: ${{ jobs.prepare.outputs.skip }}
-      signed:
-        description: "1 when a signing key is available, otherwise 0."
-        value: ${{ jobs.configure.outputs.signed }}
-      build_release:
-        description: UTC Unix timestamp used as the rolling release counter.
-        value: ${{ jobs.configure.outputs.build_release }}
     secrets:
       RPMX_SIGNING_KEY:
         required: false
-  # Run the matrix directly from the Actions tab, without a pull request.
-  # This only builds and uploads artifacts; publishing stays in release.yml.
+      RPMX_PUBLIC_KEY:
+        required: false
+      PACKAGES_S3_ACCESS_KEY_ID:
+        required: false
+      PACKAGES_S3_SECRET_ACCESS_KEY:
+        required: false
   workflow_dispatch:
     inputs:
       selection:
-        description: Build all packages or only those affected by a diff.
-        required: false
         type: choice
         options: [all, affected]
         default: all
       base:
-        description: Base ref for --affected (empty uses origin/HEAD).
-        required: false
         type: string
         default: ""
-      sign:
-        description: Sign packages when RPMX_SIGNING_KEY is available.
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   configure:
@@ -87,10 +44,7 @@ jobs:
     runs-on: ubuntu-26.04
     outputs:
       arches: ${{ steps.configure.outputs.arches }}
-      signed: ${{ steps.configure.outputs.signed }}
       build_release: ${{ steps.configure.outputs.build_release }}
-    env:
-      RPMX_SIGNING_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -104,12 +58,6 @@ jobs:
           echo "build_release=$build_release" >>"$GITHUB_OUTPUT"
           echo "arches: $arches"
           echo "build release: $build_release"
-
-          if [ -n "${RPMX_SIGNING_KEY:-}" ]; then
-            echo "signed=1" >>"$GITHUB_OUTPUT"
-          else
-            echo "signed=0" >>"$GITHUB_OUTPUT"
-          fi
 
   rpmx:
     name: rpmx (${{ matrix.arch }})
@@ -144,249 +92,265 @@ jobs:
           if-no-files-found: error
 
   prepare:
-    name: Plan
     needs: [configure, rpmx]
     runs-on: ubuntu-26.04
     outputs:
       packages: ${{ steps.plan.outputs.packages }}
-      hashes: ${{ steps.plan.outputs.hashes }}
-      skip: ${{ steps.plan.outputs.skip }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-
-      - name: Setup rpmx
-        uses: ./.github/actions/setup-rpmx
+      - uses: ./.github/actions/setup-rpmx
         with:
           artifact: rpmx-x86_64
-
-      - name: Plan
+      - name: Start transaction against the published repository
         id: plan
         env:
           SELECTION: ${{ inputs.selection }}
           BASE_REF: ${{ inputs.base }}
+          BUILD_RELEASE: ${{ needs.configure.outputs.build_release }}
+          BASE_URL: ${{ vars.PACKAGES_BASE_URL || 'https://packages.eternal.sturla.tech' }}
+          PUBLISH: ${{ inputs.publish }}
         run: |
-          if [ "$SELECTION" = "affected" ]; then
-            args=(--json)
-            if [ -n "$BASE_REF" ]; then
-              args+=(--base "$BASE_REF")
-            fi
-            packages=$(./scripts/affected.sh "${args[@]}")
-          else
-            packages=$(./scripts/list-packages.sh \
-              | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          args=(--state .work/transaction/state.json --base-url "$BASE_URL" --build-release "$BUILD_RELEASE")
+          case "$SELECTION" in
+            changed)
+              args+=(--packages changed --published "$BASE_URL") ;;
+            affected)
+              selection=(--json)
+              if [ -n "$BASE_REF" ]; then selection+=(--base "$BASE_REF"); fi
+              args+=(--packages "$(./scripts/affected.sh "${selection[@]}")") ;;
+            all)
+              args+=(--packages "$(./scripts/affected.sh --all --json)") ;;
+            *) echo "unknown selection: $SELECTION" >&2; exit 2 ;;
+          esac
+          if [ "$PUBLISH" = true ] && [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo 'publication requires main' >&2
+            exit 1
           fi
-
-          echo "packages=$packages" >>"$GITHUB_OUTPUT"
-          echo "plan: $packages"
-
-          if [ "$packages" = "[]" ]; then
-            echo "skip=true" >>"$GITHUB_OUTPUT"
-            echo "hashes={}" >>"$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >>"$GITHUB_OUTPUT"
-            mapfile -t names < <(jq -r '.[]' <<<"$packages")
-            hashes=$(./scripts/package-hash.sh "${names[@]}" \
-              | jq -R -s -c '
-                  split("\n")
-                  | map(select(length > 0)
-                        | split(" ")
-                        | {key: .[0], value: .[1]})
-                  | from_entries')
-            echo "hashes=$hashes" >>"$GITHUB_OUTPUT"
-            echo "hashes: $hashes"
-          fi
-
-  build:
-    name: Build ${{ matrix.package }} (${{ matrix.arch }})
-    needs: [configure, rpmx, prepare]
-    if: needs.prepare.outputs.skip != 'true'
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: ${{ fromJSON(needs.configure.outputs.arches) }}
-        package: ${{ fromJSON(needs.prepare.outputs.packages) }}
-        include:
-          - arch: x86_64
-            runner: ubuntu-26.04
-          - arch: aarch64
-            runner: ubuntu-26.04-arm
-    env:
-      RPMX_SIGNING_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup rpmx
-        uses: ./.github/actions/setup-rpmx
+          python3 ./scripts/build-transaction.py init "${args[@]}" >"$RUNNER_TEMP/plan.json"
+          cat "$RUNNER_TEMP/plan.json"
+          echo "packages=$(jq -c .packages "$RUNNER_TEMP/plan.json")" >>"$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          artifact: rpmx-${{ matrix.arch }}
-
-      - name: Package hash
-        id: hash
-        env:
-          HASHES: ${{ needs.prepare.outputs.hashes }}
-        run: |
-          hash=$(jq -r --arg package '${{ matrix.package }}' '.[$package]' <<<"$HASHES")
-          echo "hash=$hash" >>"$GITHUB_OUTPUT"
-          echo "${{ matrix.package }}: $hash"
-
-      - name: Restore source cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/rpmx/cas
-          key: rpmx-sources-${{ runner.os }}-${{ matrix.package }}-${{ steps.hash.outputs.hash }}
-          restore-keys: |
-            rpmx-sources-${{ runner.os }}-${{ matrix.package }}-
-
-      - name: Restore package cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: out/
-          key: rpm-${{ runner.os }}-${{ matrix.arch }}-${{ matrix.package }}-${{ steps.hash.outputs.hash }}-signed${{ needs.configure.outputs.signed }}-${{ inputs.sign && 'release' || 'pr' }}-${{ hashFiles('.cache-generation') }}
-
-      - name: Restore build root cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          # Cache an archive, not the tree: assembled roots contain mode-000
-          # files such as /etc/shadow, which actions/cache cannot tar as the
-          # unprivileged runner. podman unshare packs and unpacks them with the
-          # right ownership.
-          path: ${{ runner.temp }}/rpmx-cache.tar.gz
-          key: rpmx-root-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('profiles/**', 'packages/openssf-compiler-options/**') }}
-          restore-keys: |
-            rpmx-root-${{ runner.os }}-${{ matrix.arch }}-
-
-      - name: Unpack build root cache
-        run: |
-          archive="$RUNNER_TEMP/rpmx-cache.tar.gz"
-          if [ ! -f "$archive" ]; then
-            echo "no cached build root"
-            exit 0
-          fi
-          mkdir -p "$HOME/.cache/rpmx"
-          podman unshare tar --numeric-owner --acls --xattrs -xzf "$archive" \
-            -C "$HOME/.cache/rpmx"
-
-      - name: Write signing key
-        if: ${{ inputs.sign && env.RPMX_SIGNING_KEY != '' }}
-        env:
-          KEY: ${{ secrets.RPMX_SIGNING_KEY }}
-        run: |
-          install -d -m 0700 "$RUNNER_TEMP/signing"
-          printf '%s' "$KEY" >"$RUNNER_TEMP/signing/rpmx.asc"
-          chmod 0600 "$RUNNER_TEMP/signing/rpmx.asc"
-
-      - name: Build
-        env:
-          BUILD_RELEASE: ${{ inputs.sign && needs.configure.outputs.build_release || '' }}
-        run: |
-          args=(--package "${{ matrix.package }}" --arch "${{ matrix.arch }}" --output out --defer-acceptance)
-          if [ -f "$RUNNER_TEMP/signing/rpmx.asc" ]; then
-            args+=(--signing-key "$RUNNER_TEMP/signing/rpmx.asc")
-          fi
-          if [ -n "${BUILD_RELEASE:-}" ]; then
-            args+=(--build-release "$BUILD_RELEASE")
-          fi
-          ./scripts/build-all.sh "${args[@]}"
-
-      - name: Export candidates
-        run: |
-          python3 scripts/candidate-pool.py export --arch '${{ matrix.arch }}' \
-            --source 'out/${{ matrix.package }}/${{ matrix.arch }}' \
-            --output "$RUNNER_TEMP/candidates"
-
-      - name: Upload candidates
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: candidate-${{ matrix.package }}-${{ matrix.arch }}
-          overwrite: true
-          path: ${{ runner.temp }}/candidates/
+          name: transaction-w0
+          path: .work/transaction/
           if-no-files-found: error
-
-      - name: Upload build evidence
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: build-${{ matrix.package }}-${{ matrix.arch }}
           overwrite: true
-          path: out/
-          if-no-files-found: ignore
+          retention-days: 1
 
-      - name: Pack build root cache
+  wave_0:
+    needs: prepare
+    if: needs.prepare.outputs.packages != '[]'
+    uses: ./.github/workflows/_build-window.yml
+    with:
+      packages: ${{ needs.prepare.outputs.packages }}
+      waves: '[0,1,2,3]'
+      final: false
+
+  wave_1:
+    needs: wave_0
+    if: needs.wave_0.outputs.packages != '[]'
+    uses: ./.github/workflows/_build-window.yml
+    with:
+      packages: ${{ needs.wave_0.outputs.packages }}
+      waves: '[4,5,6,7]'
+      final: false
+
+  wave_2:
+    needs: wave_1
+    if: needs.wave_1.outputs.packages != '[]'
+    uses: ./.github/workflows/_build-window.yml
+    with:
+      packages: ${{ needs.wave_1.outputs.packages }}
+      waves: '[8,9,10,11]'
+      final: false
+
+  wave_3:
+    needs: wave_2
+    if: needs.wave_2.outputs.packages != '[]'
+    uses: ./.github/workflows/_build-window.yml
+    with:
+      packages: ${{ needs.wave_2.outputs.packages }}
+      waves: '[12,13,14,15]'
+      final: false
+
+  wave_4:
+    needs: wave_3
+    if: needs.wave_3.outputs.packages != '[]'
+    uses: ./.github/workflows/_build-window.yml
+    with:
+      packages: ${{ needs.wave_3.outputs.packages }}
+      waves: '[16,17,18,19]'
+      final: false
+
+  wave_5:
+    needs: wave_4
+    if: needs.wave_4.outputs.packages != '[]'
+    uses: ./.github/workflows/_build-window.yml
+    with:
+      packages: ${{ needs.wave_4.outputs.packages }}
+      waves: '[20,21,22,23]'
+      final: false
+
+  wave_6:
+    needs: wave_5
+    if: needs.wave_5.outputs.packages != '[]'
+    uses: ./.github/workflows/_build-window.yml
+    with:
+      packages: ${{ needs.wave_5.outputs.packages }}
+      waves: '[24,25,26,27]'
+      final: false
+
+  wave_7:
+    needs: wave_6
+    if: needs.wave_6.outputs.packages != '[]'
+    uses: ./.github/workflows/_build-window.yml
+    with:
+      packages: ${{ needs.wave_6.outputs.packages }}
+      waves: '[28,29,30,31]'
+      final: true
+
+  repository:
+    name: Assemble the completed candidate repository
+    needs: [prepare, wave_0, wave_1, wave_2, wave_3, wave_4, wave_5, wave_6, wave_7]
+    if: ${{ always() && !failure() && !cancelled() }}
+    runs-on: ubuntu-26.04
+    outputs:
+      matrix: ${{ steps.collect.outputs.matrix }}
+      packages: ${{ steps.collect.outputs.packages }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-rpmx
+        with:
+          artifact: rpmx-x86_64
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: transaction-w*
+          path: .work/states
+      - name: Select the finished transaction
+        id: collect
         run: |
-          if [ ! -d "$HOME/.cache/rpmx" ]; then
-            echo "no build root cache to pack"
-            exit 0
-          fi
-          podman unshare tar --numeric-owner --acls --xattrs -czf \
-            "$RUNNER_TEMP/rpmx-cache.tar.gz" -C "$HOME/.cache/rpmx" .
+          python3 ./scripts/transaction-artifacts.py collect --states .work/states \
+            --output .work/final >"$RUNNER_TEMP/complete.json"
+          cat "$RUNNER_TEMP/complete.json"
+          echo "matrix=$(jq -c .matrix "$RUNNER_TEMP/complete.json")" >>"$GITHUB_OUTPUT"
+          echo "packages=$(jq -c .packages "$RUNNER_TEMP/complete.json")" >>"$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: steps.collect.outputs.packages != '[]'
+        with:
+          pattern: binary-w*
+          path: .work/candidates
+      - name: Seal the acceptance repository
+        if: steps.collect.outputs.packages != '[]'
+        run: |
+          python3 ./scripts/build-transaction.py seal --state .work/final/state.json \
+            --artifacts .work/candidates --output .work/repository
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.collect.outputs.packages != '[]'
+        with:
+          name: transaction-final
+          path: .work/final/
+          overwrite: true
+          retention-days: 1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.collect.outputs.packages != '[]'
+        with:
+          name: acceptance-repository-x86_64
+          path: .work/repository/x86_64/
+          overwrite: true
+          retention-days: 1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.collect.outputs.packages != '[]'
+        with:
+          name: acceptance-repository-aarch64
+          path: .work/repository/aarch64/
+          overwrite: true
+          retention-days: 1
 
   accept:
-    name: Accept ${{ matrix.package }} (${{ matrix.arch }})
-    needs: [configure, rpmx, prepare, build]
-    if: needs.prepare.outputs.skip != 'true'
-    runs-on: ${{ matrix.runner }}
+    needs: repository
+    if: ${{ always() && needs.repository.result == 'success' && needs.repository.outputs.packages != '[]' }}
     strategy:
       fail-fast: false
       matrix:
-        arch: ${{ fromJSON(needs.configure.outputs.arches) }}
-        package: ${{ fromJSON(needs.prepare.outputs.packages) }}
-        include:
-          - arch: x86_64
-            runner: ubuntu-26.04
-          - arch: aarch64
-            runner: ubuntu-26.04-arm
+        include: ${{ fromJSON(needs.repository.outputs.matrix) }}
+    uses: ./.github/workflows/_accept-rpm.yml
+    with:
+      package: ${{ matrix.package }}
+      arch: ${{ matrix.arch }}
+      runner: ${{ matrix.runner }}
+      wave: ${{ matrix.wave }}
+
+  candidate:
+    name: Export the accepted package transaction
+    needs: [repository, accept]
+    if: ${{ always() && !inputs.publish && needs.repository.result == 'success' && needs.accept.result == 'success' }}
+    runs-on: ubuntu-26.04
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Setup rpmx
-        uses: ./.github/actions/setup-rpmx
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          artifact: rpmx-${{ matrix.arch }}
-
-      - name: Download architecture candidates
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+          name: transaction-final
+          path: .work/final
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: candidate-*-${{ matrix.arch }}
-          path: ${{ runner.temp }}/candidates
-
-      - name: Download package output
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+          pattern: source-w*
+          path: .work/artifacts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: build-${{ matrix.package }}-${{ matrix.arch }}
-          path: out/
-
-      - name: Accept
+          pattern: accepted-*
+          path: .work/artifacts
+      - name: Verify and pack the final tested bytes
         run: |
-          python3 scripts/candidate-pool.py assemble --arch '${{ matrix.arch }}' \
-            --source "$RUNNER_TEMP/candidates" --output "$RUNNER_TEMP/pool"
-          policy="$RUNNER_TEMP/candidates/candidate-${{ matrix.package }}-${{ matrix.arch }}/build-policy.json"
-          release=$(jq -r '.build_release // empty' "$policy")
-          args=(packages/${{ matrix.package }}/package.yaml --arch '${{ matrix.arch }}'
-            --install-dir "$RUNNER_TEMP/pool" --output out/${{ matrix.package }}/acceptance/${{ matrix.arch }})
-          if [ -n "$release" ]; then
-            args+=(--build-release "$release")
-          fi
-          python3 scripts/accept-rpms.py "${args[@]}"
-
-      - name: Upload accepted packages
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+          python3 ./scripts/transaction-artifacts.py pack --state .work/final/state.json \
+            --artifacts .work/artifacts --output .work/candidate
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: rpm-${{ matrix.package }}-${{ matrix.arch }}
-          overwrite: true
-          path: out/
+          name: release-candidate
+          path: .work/candidate/
           if-no-files-found: error
+          overwrite: true
+          retention-days: 1
 
-      - name: Upload acceptance evidence
+
+  publish:
+    needs: [repository, accept]
+    if: ${{ always() && inputs.publish && needs.repository.result == 'success' && needs.accept.result == 'success' }}
+    runs-on: ubuntu-26.04
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.PACKAGES_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.PACKAGES_S3_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ vars.PACKAGES_S3_REGION || 'auto' }}
+      PACKAGES_S3_ENDPOINT: ${{ vars.PACKAGES_S3_ENDPOINT }}
+      PACKAGES_S3_BUCKET: ${{ vars.PACKAGES_S3_BUCKET }}
+      PACKAGES_BASE_URL: ${{ vars.PACKAGES_BASE_URL || 'https://packages.eternal.sturla.tech' }}
+      RPMX_SIGNING_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
+      RPMX_PUBLIC_KEY: ${{ secrets.RPMX_PUBLIC_KEY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-rpmx
+        with:
+          artifact: rpmx-x86_64
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: transaction-final
+          path: .work/final
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: source-w*
+          path: .work/artifacts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: accepted-*
+          path: .work/artifacts
+      - name: Publish the tested repository
+        run: ./scripts/publish-transaction.sh .work/final/state.json .work/artifacts .work/published
+      - name: Retain signing receipt
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: acceptance-${{ matrix.package }}-${{ matrix.arch }}
+          name: publication-signing-receipt
+          path: .work/published/signing.json
           overwrite: true
-          path: out/${{ matrix.package }}/acceptance/
-          if-no-files-found: ignore
+          retention-days: 7

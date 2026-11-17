@@ -196,47 +196,31 @@ The detached signature and index are separate uploads, so clients can observe
 a brief signature mismatch during publication and must retry.
 
 Run the publication tests with `python3 -m unittest discover -s tests -p test_publish.py -v`.
-They require `rpmx`, `rpmbuild`, the `createrepo-c` tools, GnuPG, and `jq`.
+They require `rpmx`, the `createrepo-c` tools, GnuPG, and `jq`.
 When run as root with `dnf5`, they also test package upgrades and metadata signature checks.
 
 ## How a release works
 
-`ci.yml` runs on pull requests and on demand. A `configure` job reads the
-target architectures, an `rpmx` job builds the pinned revision once per
-architecture, and `prepare` uses that binary to compute the package plan and
-hashes. A matrix then builds only the affected packages in parallel and
-uploads each package's artifacts; every cell unpacks the same rpmx artifact
-instead of compiling it. Lint runs first as a reusable workflow, and the
-commits are checked against the [git workflow](docs/git-workflow.md) before
-anything is built.
+Pull requests build affected recipes. Merge queues check those existing RPMs
+against the latest published `main` packages, then rerun acceptance without compilation.
+After merge, releases reuse matching tested artifacts or build changed recipes
+on `main`. Transactions schedule consumer rebuilds when public library payloads, headers, static
+archives or explicit tool relationships change.
 
-`release.yml` runs on `main`, on `v*` tags and on demand:
+Each package prepares one shared SRPM, then starts native x86_64 and aarch64
+builds. Other packages can prepare sources concurrently. Follow-on builds use a
+fixed repository view of completed candidates. Once that set settles, package
+acceptance runs against the complete candidate repositories. The publisher
+verifies the artifacts, signs their envelopes without changing tested headers
+or payloads, and publishes them. Unchanged packages
+stay in `rolling`; `archive` retains historical published versions.
 
-1. lint, then build rpmx once per architecture, then build **every** package in
-   a matrix. Each build cell reuses the rpmx artifact, and content-addressed
-   caches mean only changed packages execute `rpmx build`.
-2. A fan-in job downloads the per-package artifacts, verifies that the plan is
-   complete, and rebuilds `repodata` into `site/rolling/<arch>/` plus
-   `site/rolling/SRPMS/`. When a key is configured it signs the RPMs and
-   `repomd.xml`, and writes `eternal.repo`, `RPM-GPG-KEY-eternal` and
-   `.nojekyll` beside it.
-3. uploads the result to S3-compatible object storage. `rolling` is replaced;
-   `archive` is append-only and keeps every historical EVR.
+Temporary inputs and candidates use run-scoped artifacts with one-day retention.
+There are no persistent side tags or temporary R2 repositories. Failed builds
+leave the published repository unchanged, and later runs build their own inputs.
 
-Eternal is a rolling distribution: every push to `main` republishes the
-`rolling` channel and appends to the disabled-by-default `archive` channel.
-Packages that actually rebuild get a `+build<Unix timestamp>` release suffix so
-`dnf upgrade` always sees a newer NEVRA; unchanged packages are restored from
-cache. Image composition is a separate pipeline and is not part of
-`release.yml`.
-
-GitHub's matrix job outputs merge cells into a map, but only for statically
-declared output names. A dynamic package matrix cannot name one output per
-package, so the plan and hashes are produced once by `prepare` and the RPMs
-travel as artifacts. The fan-in uses the plan as its completeness check.
-
-Packages are always built from source; the repository is the only artifact
-consumers see.
+See [package transactions](docs/package-transactions.md) for the scheduler,
+rebuild policy, local commands, publication behavior and cleanup.
 
 ## Packages and profiles
 

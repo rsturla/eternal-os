@@ -55,6 +55,12 @@ class BuildSelectionTest(unittest.TestCase):
         (self.root / 'profiles/bootstrap.yaml').write_text('changed\n')
         self.assertEqual(self.selected(), ['consumer', 'eternal-release', 'glibc-2.44'])
 
+    def test_rebuild_policy_changes_invalidate_selection_and_shared_hashes(self):
+        before = self.hashes()
+        (self.root / 'rebuild-policy.yaml').write_text("compiler: ['*']\n")
+        self.assertEqual(self.selected(), ['consumer', 'eternal-release', 'glibc-2.44'])
+        self.assertNotEqual(before['consumer'], self.hashes()['consumer'])
+
     def test_builder_change_selects_canary(self):
         (self.root / '.rpmx-revision').write_text('second\n')
         self.assertEqual(self.selected(), ['eternal-release'])
