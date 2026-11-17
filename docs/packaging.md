@@ -612,6 +612,16 @@ were missing or broken.
 Builds run source suites only. `scripts/build-all.sh` then invokes standalone
 `rpmx test` before writing a success stamp. The Python bootstrap helper uses the
 same acceptance gate before adding a dependency to its private repository.
+The gate explicitly selects `profiles/eternal.profile.yaml` for runtime repository
+policy, so bootstrap build exclusions do not hide runtime dependencies. The
+Python helper explicitly supplies its private profile instead. A direct invocation
+must likewise select runtime policy:
+
+```sh
+rpmx test packages/NAME/package.yaml --install-dir out/NAME/ARCH --arch ARCH \
+  --test-profile profiles/eternal.profile.yaml
+```
+
 `--no-tests` explicitly disables both phases. Private OpenSSF seed preparation
 runs source builds only; its RPM is a build prerequisite, not an accepted release.
 

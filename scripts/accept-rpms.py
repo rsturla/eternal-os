@@ -16,7 +16,9 @@ def main():
     parser.add_argument("--install-dir", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--arch", required=True)
-    parser.add_argument("--test-profile", type=Path)
+    parser.add_argument("--test-profile", type=Path,
+                        default=Path(__file__).resolve().parents[1] / "profiles/eternal.profile.yaml",
+                        help="Runtime repository policy (default: profiles/eternal.profile.yaml)")
     parser.add_argument("--runner", default="auto")
     parser.add_argument("--build-release")
     args = parser.parse_args()
