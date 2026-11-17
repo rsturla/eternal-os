@@ -87,11 +87,11 @@ outputs:
     run:
     - openssl-libs
   tests:
-  - name: load
-    packages:
-    - python3
-    script: |
-      python3 -c 'import ctypes; ctypes.CDLL("librhash.so.1")'
+  - name: runtime-linkage
+    pipeline:
+      - uses: test/runtime-linkage
+        with:
+          libraries: ["librhash.so.*"]
 - name: rhash-devel
   files:
     include:
@@ -103,18 +103,16 @@ outputs:
     run:
     - rhash-libs = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
+  - name: api-behavior
     packages:
     - gcc
     - glibc-devel
     - pkgconf
+    files: tests
     script: |
-      cat > /tmp/test.c <<'EOF'
-      #include <rhash.h>
-      int main(void) { rhash_library_init(); return rhash_get_digest_size(RHASH_SHA256) != 32; }
-      EOF
-      gcc /tmp/test.c $(pkg-config --cflags --libs librhash) -o /tmp/test
-      /tmp/test
+      pkg-config --exists librhash
+      gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags librhash) "$TEST_FILES/behavior.c" $(pkg-config --libs librhash) -o behavior
+      ./behavior
 - name: rhash-doc
   files:
     include:
