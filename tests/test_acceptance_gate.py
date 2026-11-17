@@ -11,6 +11,28 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class AcceptanceGate(unittest.TestCase):
+    def test_no_declared_acceptance_retains_plan_without_claiming_a_pass(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rpmx = root / "rpmx"
+            rpmx.write_text('''#!/usr/bin/env python3
+import json, sys
+assert sys.argv[1] == 'plan', 'a source-only recipe must not invoke standalone tests'
+print(json.dumps({'plan': {'cells': [{'tests': []}]}}))
+''')
+            rpmx.chmod(0o755)
+            output = root / "reports"
+            output.mkdir()
+            (output / "results.json").write_text('{"outcome": "passed"}')
+            result = subprocess.run([
+                str(ROOT / "scripts/accept-rpms.py"), "recipe.yaml",
+                "--install-dir", "rpms", "--output", str(output), "--arch", "x86_64",
+            ], env=dict(os.environ, RPMX=str(rpmx)), capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("acceptance not requested", result.stderr)
+            self.assertTrue((output / "plan.json").is_file())
+            self.assertFalse((output / "results.json").exists())
+
     def test_complete_report_required_even_when_process_succeeds(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
