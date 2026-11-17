@@ -1,0 +1,1 @@
+<schemalist><schema id="org.eternal.fixture" path="/org/eternal/fixture/"><key name="answer" type="i"><default>42</default></key></schema></schemalist>
