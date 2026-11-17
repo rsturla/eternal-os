@@ -76,9 +76,7 @@ outputs:
     license:
     - /usr/share/licenses/python-${matrix.python.version}-pathspec/**
   tests:
-  - name: functional
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - from pathspec import PathSpec; p = PathSpec.from_lines("gitwildmatch", ["*.py"]); assert p.match_file("demo.py");
-      assert not p.match_file("demo.c")
+  - name: offline-behavior
+    files: tests
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/check.py" "${matrix.python.version}" "pathspec" "${package.version}"
