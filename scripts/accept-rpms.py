@@ -31,8 +31,13 @@ def main():
     plan_command = [rpmx, "plan", str(args.recipe), "--arch", args.arch, "--json"]
     if args.build_release:
         plan_command.extend(["--build-release", args.build_release])
-    plan = json.loads(subprocess.check_output(plan_command, text=True))["plan"]
+    planned = subprocess.check_output(plan_command, text=True)
+    (args.output / "plan.json").write_text(planned)
+    plan = json.loads(planned)["plan"]
     expected = sum(len(cell["tests"]) for cell in plan["cells"])
+    if expected == 0:
+        print(f"acceptance not requested: {args.recipe} declares no package tests", file=sys.stderr)
+        return
     command = [rpmx, "test", str(args.recipe), "--install-dir", str(args.install_dir),
                "--arch", args.arch, "--runner", args.runner,
                "--test-output", str(evidence),
