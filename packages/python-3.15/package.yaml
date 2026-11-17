@@ -4,7 +4,7 @@ schema: 2
 package:
   name: python-3.15
   version: "3.15.2"
-  release: 2
+  release: 3
   summary: The Python programming language (version 3.15)
   description: |
     Python is an interpreted, interactive, object-oriented programming
@@ -156,6 +156,8 @@ outputs:
         - /usr/share/licenses/python-3.15-devel/LICENSE
     dependencies:
       run:
+        # Embedded interpreters need this stream's standard library too.
+        - python-3.15 = ${package.version}-${package.release}
         - python-3.15-libs = ${package.version}-${package.release}
     tests:
       - name: embed
