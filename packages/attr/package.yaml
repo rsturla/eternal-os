@@ -2,7 +2,7 @@
 #
 # Extended attribute utilities and the libattr runtime. Coreutils and tar use
 # libattr when copying extended attributes.
-schema: 1
+schema: 2
 
 package:
   name: attr
@@ -60,16 +60,12 @@ outputs:
         - libattr = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            echo test > /tmp/attr-test
-            setfattr -n user.eternal -v test /tmp/attr-test
-            test "$(getfattr -n user.eternal --only-values /tmp/attr-test)" = test
-            setfattr -x user.eternal /tmp/attr-test
+        script: |
+          echo test > /tmp/attr-test
+          setfattr -n user.eternal -v test /tmp/attr-test
+          test "$(getfattr -n user.eternal --only-values /tmp/attr-test)" = test
+          setfattr -x user.eternal /tmp/attr-test
 
   - name: libattr
     summary: Extended attribute runtime library
@@ -81,16 +77,12 @@ outputs:
         - /usr/share/licenses/libattr/**
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libattr.so.* /usr/lib/libattr.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libattr.so.* /usr/lib/libattr.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: libattr-devel
     summary: Development files for libattr
@@ -116,17 +108,13 @@ outputs:
 
 tests:
   - name: link
-    stage: installed
     packages: [gcc, glibc-devel, bash-binsh, coreutils]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/attr-link.c <<'EOF'
-        #include <sys/xattr.h>
-        int main(void) {
-          return setxattr("/tmp/attr-link", "user.eternal", "1", 1, 0) != 0;
-        }
-        EOF
-        gcc /tmp/attr-link.c -lattr -o /tmp/attr-link
-        /tmp/attr-link
+    script: |
+      cat > /tmp/attr-link.c <<'EOF'
+      #include <sys/xattr.h>
+      int main(void) {
+        return setxattr("/tmp/attr-link", "user.eternal", "1", 1, 0) != 0;
+      }
+      EOF
+      gcc /tmp/attr-link.c -lattr -o /tmp/attr-link
+      /tmp/attr-link

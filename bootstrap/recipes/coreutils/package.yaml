@@ -4,7 +4,7 @@
 # bootstrap variant exists because the ladder hides the seed provider while a
 # stage builds this package, so the EVR does not need to outrank Fedora's copy.
 # The production recipe is in packages/coreutils/package.yaml.
-schema: 1
+schema: 2
 
 package:
   name: coreutils
@@ -81,12 +81,8 @@ outputs:
 
 tests:
   - name: build
-    stage: build
-    argv:
-      - sh
-      - -c
-      - test -x "$STAGE/usr/bin/ls" && test -x "$STAGE/usr/bin/cat"
+    script: |
+      test -x "$TEST_PACKAGE_ROOT/usr/bin/ls" && test -x "$TEST_PACKAGE_ROOT/usr/bin/cat"
 
   - name: installed
-    stage: installed
     argv: [ls, --version]

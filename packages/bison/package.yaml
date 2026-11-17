@@ -7,7 +7,7 @@
 # The release tarball ships the pre-generated parser and the info page, so the
 # build does not need flex, texinfo or help2man. Those belong to a git
 # checkout, not to the artifact upstream publishes.
-schema: 1
+schema: 2
 
 package:
   name: bison
@@ -72,24 +72,19 @@ outputs:
         - m4
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, grep, m4]
-        argv:
-          - sh
-          - -eu
-          - -c
-          - |
-            bison --version | head -1 | grep -q '3\.8\.2'
-            cat > calc.y <<'EOF'
-            %token NUMBER
-            %%
-            exp: NUMBER;
-            %%
-            EOF
-            bison -o calc.c calc.y
-            test -s calc.c
-            yacc -o yacc.c calc.y
-            test -s yacc.c
+        script: |
+          bison --version | head -1 | grep -q '3\.8\.2'
+          cat > calc.y <<'EOF'
+          %token NUMBER
+          %%
+          exp: NUMBER;
+          %%
+          EOF
+          bison -o calc.c calc.y
+          test -s calc.c
+          yacc -o yacc.c calc.y
+          test -s yacc.c
 
   - name: bison-doc
     summary: GNU Bison documentation
@@ -104,6 +99,5 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check

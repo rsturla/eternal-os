@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Build only the policy library. Container library consumers do not need the policy tools.
-schema: 1
+schema: 2
 package:
   name: libsepol
   version: '3.11'
@@ -79,14 +79,9 @@ outputs:
     - /usr/share/licenses/libsepol/**
   tests:
   - name: load
-    stage: installed
     packages:
       - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       python3 -c 'import ctypes; ctypes.CDLL("libsepol.so.2")'
 - name: libsepol-devel
   files:
@@ -100,15 +95,10 @@ outputs:
     - libsepol = ${package.version}-${package.release}
   tests:
   - name: compile-and-run
-    stage: installed
     packages:
       - gcc
       - glibc-devel
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       cat > /tmp/test.c <<'EOF'
       #include <sepol/handle.h>
       int main(void) { sepol_handle_t *h = sepol_handle_create(); if (!h) return 1; sepol_handle_destroy(h); return 0; }
@@ -134,7 +124,6 @@ outputs:
     - /usr/share/licenses/libsepol-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check
     with:

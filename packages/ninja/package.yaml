@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Upstream publishes source tags but no separate release tarball.
-schema: 1
+schema: 2
 package:
   name: ninja
   version: 1.13.2
@@ -61,12 +61,7 @@ outputs:
     - ninja-build = ${package.version}-${package.release}
   tests:
   - name: build-rule
-    stage: installed
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       mkdir /tmp/ninja-test
       cd /tmp/ninja-test
       printf 'rule write\n  command = printf ninja > $out\nbuild result: write\n' > build.ninja
@@ -74,6 +69,5 @@ outputs:
       test "$(cat result)" = ninja
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check

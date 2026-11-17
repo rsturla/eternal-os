@@ -15,7 +15,7 @@
 # reader back ends and without static libraries: all three would drag in build
 # tools this distribution does not carry yet. `autopoint` still needs `xz` to
 # unpack the infrastructure archive it installs, so that is a run dependency.
-schema: 1
+schema: 2
 
 package:
   name: gettext
@@ -85,26 +85,22 @@ outputs:
         - xz
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            msgfmt --version | head -1 | grep -q '0\.26\|1\.0'
-            cat > hello.po <<'EOF'
-            msgid ""
-            msgstr ""
-            "Content-Type: text/plain; charset=UTF-8\n"
+        script: |
+          msgfmt --version | head -1 | grep -q '0\.26\|1\.0'
+          cat > hello.po <<'EOF'
+          msgid ""
+          msgstr ""
+          "Content-Type: text/plain; charset=UTF-8\n"
 
-            msgid "hello"
-            msgstr "hallo"
-            EOF
-            msgfmt --check -o hello.mo hello.po
-            msgunfmt hello.mo | grep -qx 'msgstr "hallo"'
-            xgettext --version | head -1
-            echo 'hello world' | envsubst | grep -qx 'hello world'
-            N=eternal sh -c 'echo "hello $N"' | envsubst | grep -qx 'hello eternal'
+          msgid "hello"
+          msgstr "hallo"
+          EOF
+          msgfmt --check -o hello.mo hello.po
+          msgunfmt hello.mo | grep -qx 'msgstr "hallo"'
+          xgettext --version | head -1
+          echo 'hello world' | envsubst | grep -qx 'hello world'
+          N=eternal sh -c 'echo "hello $N"' | envsubst | grep -qx 'hello eternal'
 
   - name: gettext-libs
     summary: Runtime libraries for gettext
@@ -146,28 +142,24 @@ outputs:
         - gettext-libs = ${package.version}-${package.release}
     tests:
       - name: link
-        stage: installed
         packages: [gcc, glibc-devel, pkgconf, grep, bash-binsh, coreutils, perl]
-        argv:
-          - sh
-          - -c
-          - |
-            test -f /usr/include/gettext-po.h
-            test -f /usr/share/aclocal/gettext.m4
-            test -f /usr/share/aclocal/nls.m4
-            cat > /tmp/po.c <<'EOF'
-            #include <gettext-po.h>
-            #include <libintl.h>
-            /* Take the address of a gettext-po entry point so the link proves
-               the library is present, without opening a catalogue first. */
-            int main(void) {
-              po_message_iterator_t (*iterator)(po_file_t, const char *) =
-                po_message_iterator;
-              return iterator == 0 || gettext("eternal") == 0;
-            }
-            EOF
-            gcc /tmp/po.c -lgettextpo -o /tmp/po
-            /tmp/po
+        script: |
+          test -f /usr/include/gettext-po.h
+          test -f /usr/share/aclocal/gettext.m4
+          test -f /usr/share/aclocal/nls.m4
+          cat > /tmp/po.c <<'EOF'
+          #include <gettext-po.h>
+          #include <libintl.h>
+          /* Take the address of a gettext-po entry point so the link proves
+             the library is present, without opening a catalogue first. */
+          int main(void) {
+            po_message_iterator_t (*iterator)(po_file_t, const char *) =
+              po_message_iterator;
+            return iterator == 0 || gettext("eternal") == 0;
+          }
+          EOF
+          gcc /tmp/po.c -lgettextpo -o /tmp/po
+          /tmp/po
 
   - name: gettext-doc
     summary: Documentation for gettext
@@ -182,6 +174,5 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check

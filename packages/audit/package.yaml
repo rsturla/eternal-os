@@ -2,7 +2,7 @@
 # Upstream publishes source tags but no separate release tarball.
 # Build the client libraries only; containers do not need the audit daemon.
 # audit-devel provides the Fedora audit-libs-devel capability.
-schema: 1
+schema: 2
 package:
   name: audit
   version: 4.2.1
@@ -99,24 +99,14 @@ outputs:
     - /usr/share/licenses/audit-libs/**
   tests:
   - name: load
-    stage: installed
     packages:
       - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       python3 -c 'import ctypes; ctypes.CDLL("libaudit.so.1")'
   - name: load-auparse
-    stage: installed
     packages:
       - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       python3 -c 'import ctypes; ctypes.CDLL("libauparse.so.0")'
 - name: audit-devel
   files:
@@ -132,15 +122,10 @@ outputs:
     - audit-libs-devel = ${package.version}-${package.release}
   tests:
   - name: compile-and-run
-    stage: installed
     packages:
       - gcc
       - glibc-devel
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       cat > /tmp/test.c <<'EOF'
       #include <libaudit.h>
       int main(void) { return audit_name_to_msg_type("SYSCALL") != AUDIT_SYSCALL; }
@@ -149,6 +134,5 @@ outputs:
       /tmp/test
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check

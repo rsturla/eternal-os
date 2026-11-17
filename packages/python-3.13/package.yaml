@@ -17,7 +17,7 @@
 # library (expat, libffi, readline, sqlite, OpenSSL, zlib, bzip2, xz) so
 # that a rebuild never links a vendored copy, and without the static library
 # and the test modules, which a container distribution does not ship.
-schema: 1
+schema: 2
 
 package:
   name: python-3.13
@@ -102,27 +102,18 @@ outputs:
         - python3.13 = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bzip2-libs, expat, libffi, zstd-libs, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            python3.13 -c 'import sys; print("%d.%d" % sys.version_info[:2])' | grep -qx 3.13
-            python3.13 -c 'import bz2, ctypes, decimal, hashlib, json, lzma, sqlite3, unicodedata, zlib; print("modules ok")'
-            python3.13 -c 'import ssl; print(ssl.OPENSSL_VERSION)'
-            python3.13 -c 'import readline; print("readline ok")'
-            python3.13 -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])' | grep -qx /usr/lib/python3.13
+        script: |
+          python3.13 -c 'import sys; print("%d.%d" % sys.version_info[:2])' | grep -qx 3.13
+          python3.13 -c 'import bz2, ctypes, decimal, hashlib, json, lzma, sqlite3, unicodedata, zlib; print("modules ok")'
+          python3.13 -c 'import ssl; print(ssl.OPENSSL_VERSION)'
+          python3.13 -c 'import readline; print("readline ok")'
+          python3.13 -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])' | grep -qx /usr/lib/python3.13
       - name: coinstall-default
-        stage: installed
         packages: [python3]
-        argv:
-          - bash
-          - -eu
-          - -c
-          - |
-            python3.13 -c 'import sys; assert sys.version_info[:2] == (3, 13)'
-            python3 -c 'import sys; assert sys.version_info[:2] == (3, 14)'
+        script: |
+          python3.13 -c 'import sys; assert sys.version_info[:2] == (3, 13)'
+          python3 -c 'import sys; assert sys.version_info[:2] == (3, 14)'
 
   - name: python-3.13-libs
     summary: Python 3.13 runtime library
@@ -134,16 +125,12 @@ outputs:
         - /usr/share/licenses/python-3.13-libs/LICENSE
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libpython3.13.so.* /usr/lib/libpython3.13.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libpython3.13.so.* /usr/lib/libpython3.13.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: python-3.13-default
     summary: Unversioned Python 3.13 command names
@@ -167,14 +154,10 @@ outputs:
         - python-3.15-default
     tests:
       - name: installed
-        stage: installed
         packages: [bzip2-libs, expat, libffi, zstd-libs, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])' | grep -qx 3.13
-            pydoc3 -h >/dev/null
+        script: |
+          python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])' | grep -qx 3.13
+          pydoc3 -h >/dev/null
 
   - name: python-3.13-devel
     summary: Development files for Python 3.13
@@ -192,22 +175,18 @@ outputs:
         - python-3.13-libs = ${package.version}-${package.release}
     tests:
       - name: embed
-        stage: installed
         packages: [gcc, glibc-devel, grep, sed, bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            cat > /tmp/embed.c <<'EOF'
-            #include <Python.h>
-            int main(void) {
-              Py_Initialize();
-              PyRun_SimpleString("print('embedded')");
-              return Py_FinalizeEx() == 0 ? 0 : 1;
-            }
-            EOF
-            gcc /tmp/embed.c $(python3.13-config --embed --cflags --ldflags) -o /tmp/embed
-            /tmp/embed | grep -qx embedded
+        script: |
+          cat > /tmp/embed.c <<'EOF'
+          #include <Python.h>
+          int main(void) {
+            Py_Initialize();
+            PyRun_SimpleString("print('embedded')");
+            return Py_FinalizeEx() == 0 ? 0 : 1;
+          }
+          EOF
+          gcc /tmp/embed.c $(python3.13-config --embed --cflags --ldflags) -o /tmp/embed
+          /tmp/embed | grep -qx embedded
 
   - name: python-3.13-doc
     summary: Documentation for Python 3.13
@@ -221,7 +200,6 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       # The launcher only forwards to Py_BytesMain: it has no stack buffer and
       # no libc call to fortify, so those two properties cannot appear in it.

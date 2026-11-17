@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # bzip2 compression library and tools.
-schema: 1
+schema: 2
 
 package:
   name: bzip2
@@ -74,19 +74,15 @@ outputs:
         - bzip2-libs = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            printf 'eternal bzip2 test\n' > /tmp/bzip2-test
-            bzip2 -k /tmp/bzip2-test
-            test -f /tmp/bzip2-test.bz2
-            rm /tmp/bzip2-test
-            bunzip2 /tmp/bzip2-test.bz2
-            test "$(cat /tmp/bzip2-test)" = "eternal bzip2 test"
-            bzip2 -c /tmp/bzip2-test | bzcat | grep -F 'eternal bzip2 test'
+        script: |
+          printf 'eternal bzip2 test\n' > /tmp/bzip2-test
+          bzip2 -k /tmp/bzip2-test
+          test -f /tmp/bzip2-test.bz2
+          rm /tmp/bzip2-test
+          bunzip2 /tmp/bzip2-test.bz2
+          test "$(cat /tmp/bzip2-test)" = "eternal bzip2 test"
+          bzip2 -c /tmp/bzip2-test | bzcat | grep -F 'eternal bzip2 test'
 
   - name: bzip2-libs
     summary: Libraries for applications using bzip2
@@ -98,16 +94,12 @@ outputs:
         - /usr/share/licenses/bzip2-libs/**
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libbz2.so.* /usr/lib/libbz2.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libbz2.so.* /usr/lib/libbz2.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: bzip2-devel
     summary: Development files for bzip2
@@ -122,15 +114,11 @@ outputs:
         - bzip2-libs = ${package.version}-${package.release}
     tests:
       - name: link
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '#include <bzlib.h>\nint main(void){return BZ_OK;}\n' > /tmp/bz.c
-            gcc /tmp/bz.c -lbz2 -o /tmp/bz
-            /tmp/bz
+        script: |
+          printf '#include <bzlib.h>\nint main(void){return BZ_OK;}\n' > /tmp/bz.c
+          gcc /tmp/bz.c -lbz2 -o /tmp/bz
+          /tmp/bz
 
   - name: bzip2-static
     summary: Static bzip2 library

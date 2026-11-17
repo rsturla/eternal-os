@@ -19,7 +19,7 @@
 # `cpan/`: the vendored trees are removed before configuration, which is what
 # Fedora and Wolfi do, and it keeps the compression modules on the same
 # libraries as the rest of the distribution.
-schema: 1
+schema: 2
 
 package:
   name: perl-5.44
@@ -156,19 +156,15 @@ outputs:
         - perl(:VERSION) = ${package.version}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, grep, bzip2-libs, zlib]
-        argv:
-          - sh
-          - -c
-          - |
-            perl5.44.0 -V:version | grep -q '5\.44\.0'
-            perl5.44.0 -e 'use strict; use warnings; print "ok\n"' | grep -qx ok
-            perl5.44.0 -MIO::Socket::INET -e 'print "core modules load\n"'
-            perl5.44.0 -MCompress::Raw::Zlib -e 'print "zlib module loads\n"'
-            perl5.44.0 -MCompress::Raw::Bzip2 -e 'print "bzip2 module loads\n"'
-            # pod2man has no --version; it prints its usage instead.
-            pod2man --help | grep -q 'pod2man \[--center'
+        script: |
+          perl5.44.0 -V:version | grep -q '5\.44\.0'
+          perl5.44.0 -e 'use strict; use warnings; print "ok\n"' | grep -qx ok
+          perl5.44.0 -MIO::Socket::INET -e 'print "core modules load\n"'
+          perl5.44.0 -MCompress::Raw::Zlib -e 'print "zlib module loads\n"'
+          perl5.44.0 -MCompress::Raw::Bzip2 -e 'print "bzip2 module loads\n"'
+          # pod2man has no --version; it prints its usage instead.
+          pod2man --help | grep -q 'pod2man \[--center'
 
   - name: perl-5.44-default
     summary: Unversioned Perl 5.44 command names
@@ -188,14 +184,10 @@ outputs:
         - perl-interpreter = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, grep, bzip2-libs, zlib]
-        argv:
-          - sh
-          - -c
-          - |
-            perl --version | grep -q 'v5\.44'
-            perl -e 'print "ok\n"' | grep -qx ok
+        script: |
+          perl --version | grep -q 'v5\.44'
+          perl -e 'print "ok\n"' | grep -qx ok
 
   - name: perl-5.44-devel
     summary: Development files for Perl 5.44
@@ -216,25 +208,21 @@ outputs:
         - perl-5.44 = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, grep, bzip2-libs, zlib]
-        argv:
-          - sh
-          - -c
-          - |
-            for header in /usr/lib64/perl5/5.44/CORE/perl.h /usr/lib/perl5/5.44/CORE/perl.h; do
-              test -e "$header" && break
-            done
-            test -e "$header"
-            # libperl lives in the versioned CORE directory, which is not on the
-            # loader's default path; an embedder has to record the rpath.
-            cc -I"$(dirname "$header")" -L"$(dirname "$header")" \
-               -Wl,-rpath,"$(dirname "$header")" -x c - -o /tmp/ext -lperl <<'EOF'
-            #include <EXTERN.h>
-            #include <perl.h>
-            int main(void) { return 0; }
-            EOF
-            /tmp/ext
+        script: |
+          for header in /usr/lib64/perl5/5.44/CORE/perl.h /usr/lib/perl5/5.44/CORE/perl.h; do
+            test -e "$header" && break
+          done
+          test -e "$header"
+          # libperl lives in the versioned CORE directory, which is not on the
+          # loader's default path; an embedder has to record the rpath.
+          cc -I"$(dirname "$header")" -L"$(dirname "$header")" \
+             -Wl,-rpath,"$(dirname "$header")" -x c - -o /tmp/ext -lperl <<'EOF'
+          #include <EXTERN.h>
+          #include <perl.h>
+          int main(void) { return 0; }
+          EOF
+          /tmp/ext
 
   - name: perl-5.44-utils
     summary: Utilities distributed with Perl 5.44
@@ -270,20 +258,16 @@ outputs:
         - perl-5.44 = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, grep, bzip2-libs, zlib]
-        argv:
-          - sh
-          - -c
-          - |
-            corelist --version | head -1 | grep -q '5\.44'
-            prove --version
-            shasum --version | head -1
-            cat > /tmp/t.pl <<'EOF'
-            use Test::More tests => 1;
-            ok(1, 'prove runs');
-            EOF
-            prove -v /tmp/t.pl
+        script: |
+          corelist --version | head -1 | grep -q '5\.44'
+          prove --version
+          shasum --version | head -1
+          cat > /tmp/t.pl <<'EOF'
+          use Test::More tests => 1;
+          ok(1, 'prove runs');
+          EOF
+          prove -v /tmp/t.pl
 
   - name: perl-5.44-doc
     summary: Documentation for Perl 5.44
@@ -303,7 +287,6 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       # The launcher is the interpreter's shim around libperl: it has no stack
       # buffer and no libc call to fortify, so those two properties cannot

@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # XML parsing and toolkit library.
-schema: 1
+schema: 2
 
 package:
   name: libxml2
@@ -70,14 +70,10 @@ outputs:
         - zlib
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '<root><item>ok</item></root>\n' > /tmp/libxml2-test.xml
-            xmllint --xpath 'string(/root/item)' /tmp/libxml2-test.xml | grep -Fx ok
+        script: |
+          printf '<root><item>ok</item></root>\n' > /tmp/libxml2-test.xml
+          xmllint --xpath 'string(/root/item)' /tmp/libxml2-test.xml | grep -Fx ok
 
   - name: libxml2-devel
     summary: Development files for libxml2
@@ -92,15 +88,11 @@ outputs:
         - libxml2 = ${package.version}-${package.release}
     tests:
       - name: link
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '#include <libxml/parser.h>\nint main(void){return 0;}\n' > /tmp/xml.c
-            gcc /tmp/xml.c $(pkg-config --cflags --libs libxml-2.0) -o /tmp/xml-test
-            /tmp/xml-test
+        script: |
+          printf '#include <libxml/parser.h>\nint main(void){return 0;}\n' > /tmp/xml.c
+          gcc /tmp/xml.c $(pkg-config --cflags --libs libxml-2.0) -o /tmp/xml-test
+          /tmp/xml-test
 
   - name: libxml2-doc
     summary: Documentation for libxml2

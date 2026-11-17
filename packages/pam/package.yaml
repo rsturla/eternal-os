@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Disable optional host services and install private helpers under libexec/pam.
 # Keep PAM modules separate from the linkable runtime libraries.
-schema: 1
+schema: 2
 package:
   name: pam
   version: 1.7.3
@@ -87,12 +87,7 @@ outputs:
     - libxcrypt
   tests:
   - name: modules
-    stage: installed
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       test -f /usr/lib/security/pam_permit.so || test -f /usr/lib64/security/pam_permit.so
       test -x /usr/libexec/pam/unix_chkpwd
 - name: pam-libs
@@ -106,14 +101,9 @@ outputs:
     - /usr/share/licenses/pam-libs/**
   tests:
   - name: load
-    stage: installed
     packages:
       - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       python3 -c 'import ctypes; ctypes.CDLL("libpam.so.0")'
 - name: pam-devel
   files:
@@ -129,16 +119,11 @@ outputs:
     - pam-libs = ${package.version}-${package.release}
   tests:
   - name: compile-and-run
-    stage: installed
     packages:
       - gcc
       - glibc-devel
       - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       cat > /tmp/test.c <<'EOF'
       #include <security/pam_appl.h>
       int main(void) { return pam_strerror(0, PAM_SUCCESS) == 0; }
@@ -147,7 +132,6 @@ outputs:
       /tmp/test
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check
     with:
@@ -155,15 +139,10 @@ tests:
       - /usr/lib64/libpam.so.0.85.1
       - /usr/lib/libpam.so.0.85.1
 - name: authenticate-with-permit-module
-  stage: installed
   packages:
     - gcc
     - glibc-devel
-  argv:
-  - bash
-  - -eu
-  - -c
-  - |
+  script: |
     mkdir -p /tmp/pam.d
     printf 'auth required pam_permit.so\naccount required pam_permit.so\n' > /tmp/pam.d/eternal-test
     cat > /tmp/pam-test.c <<'EOF'

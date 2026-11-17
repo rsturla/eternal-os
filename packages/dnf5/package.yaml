@@ -3,7 +3,7 @@
 # dnf5 package manager and the libdnf5 libraries. The build keeps the core
 # package manager, the CLI library and libdnf5, and disables the daemon,
 # modulemd, comps, systemd, Python/Perl/Ruby bindings, plugins, tests and docs.
-schema: 1
+schema: 2
 
 package:
   name: dnf5
@@ -121,14 +121,10 @@ outputs:
         - rpm
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            dnf5 --version
-            dnf5 --help >/dev/null
+        script: |
+          dnf5 --version
+          dnf5 --help >/dev/null
 
   - name: libdnf5
     summary: Core library for dnf5
@@ -153,16 +149,12 @@ outputs:
         - zchunk-libs
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libdnf5.so.* /usr/lib/libdnf5.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libdnf5.so.* /usr/lib/libdnf5.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: libdnf5-devel
     summary: Development files for libdnf5
@@ -194,16 +186,12 @@ outputs:
         - libsmartcols
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libdnf5-cli.so.* /usr/lib/libdnf5-cli.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libdnf5-cli.so.* /usr/lib/libdnf5-cli.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: libdnf5-cli-devel
     summary: Development files for libdnf5-cli

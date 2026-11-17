@@ -2,7 +2,7 @@
 #
 # Terminal display library and terminfo tools. Bash links against libtinfo and
 # the base image needs a terminfo database for tput/infocmp.
-schema: 1
+schema: 2
 
 package:
   name: ncurses
@@ -111,16 +111,12 @@ outputs:
         - ncurses-libs = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            tput --version
-            infocmp --version
-            tic --version
-            TERM=xterm tput cols
+        script: |
+          tput --version
+          infocmp --version
+          tic --version
+          TERM=xterm tput cols
 
 
   - name: ncurses-base
@@ -169,14 +165,10 @@ outputs:
         - /usr/share/licenses/ncurses-base/**
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, ncurses-libs]
-        argv:
-          - sh
-          - -c
-          - |
-            test -f /usr/share/terminfo/x/xterm
-            test -f /usr/share/terminfo/l/linux
+        script: |
+          test -f /usr/share/terminfo/x/xterm
+          test -f /usr/share/terminfo/l/linux
 
   - name: ncurses-term
     summary: Additional terminal descriptions
@@ -229,13 +221,9 @@ outputs:
         - ncurses-base = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, ncurses-libs]
-        argv:
-          - sh
-          - -c
-          - |
-            test -f /usr/share/terminfo/a/ansi80x25
+        script: |
+          test -f /usr/share/terminfo/a/ansi80x25
 
   - name: ncurses-libs
     summary: Terminal handling runtime libraries
@@ -253,16 +241,12 @@ outputs:
         - ncurses-base = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libncurses.so.* /usr/lib/libncurses.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libncurses.so.* /usr/lib/libncurses.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: ncurses-devel
     summary: Development files for ncurses

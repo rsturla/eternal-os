@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # libsolv dependency solver and repository metadata library.
-schema: 1
+schema: 2
 
 package:
   name: libsolv
@@ -84,16 +84,12 @@ outputs:
         - rpm-libs
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libsolv.so.* /usr/lib/libsolv.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libsolv.so.* /usr/lib/libsolv.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: libsolv-devel
     summary: Development files for libsolv
@@ -109,15 +105,11 @@ outputs:
         - rpm-devel
     tests:
       - name: link
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '#include <solv/pool.h>\nint main(void){return 0;}\n' > /tmp/solv.c
-            gcc /tmp/solv.c $(pkg-config --cflags --libs libsolv) -o /tmp/solv-test
-            /tmp/solv-test
+        script: |
+          printf '#include <solv/pool.h>\nint main(void){return 0;}\n' > /tmp/solv.c
+          gcc /tmp/solv.c $(pkg-config --cflags --libs libsolv) -o /tmp/solv-test
+          /tmp/solv-test
 
   - name: libsolv-tools
     summary: Tools for working with libsolv repositories
@@ -132,11 +124,7 @@ outputs:
         - libsolv = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            test -x /usr/bin/testsolv
-            test -x /usr/bin/dumpsolv
+        script: |
+          test -x /usr/bin/testsolv
+          test -x /usr/bin/dumpsolv

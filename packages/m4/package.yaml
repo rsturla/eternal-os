@@ -2,7 +2,7 @@
 #
 # GNU macro processor. Part of the minimal Eternal userland and the
 # bootstrap tool set. The source is the upstream release tarball.
-schema: 1
+schema: 2
 
 package:
   name: m4
@@ -54,13 +54,9 @@ outputs:
         - /usr/share/licenses/m4/COPYING
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            test "$(printf 'eval(2+3)\n' | m4)" = 5
+        script: |
+          test "$(printf 'eval(2+3)\n' | m4)" = 5
 
   - name: m4-doc
     summary: GNU macro processor documentation

@@ -2,7 +2,7 @@
 #
 # IANA timezone data. The zoneinfo tree is compiled at build time with the zic
 # shipped by the same release, so the package does not depend on a host zic.
-schema: 1
+schema: 2
 
 package:
   name: tzdata
@@ -60,12 +60,8 @@ outputs:
         - /usr/share/licenses/tzdata/**
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            test -f /usr/share/zoneinfo/UTC
-            test -f /usr/share/zoneinfo/right/UTC
-            test "$(TZ=America/New_York date +%Z)" = EST
+        script: |
+          test -f /usr/share/zoneinfo/UTC
+          test -f /usr/share/zoneinfo/right/UTC
+          test "$(TZ=America/New_York date +%Z)" = EST

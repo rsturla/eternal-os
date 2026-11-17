@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # JSON implementation in C.
-schema: 1
+schema: 2
 
 package:
   name: json-c
@@ -61,16 +61,12 @@ outputs:
         - /usr/share/licenses/json-c/**
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libjson-c.so.* /usr/lib/libjson-c.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libjson-c.so.* /usr/lib/libjson-c.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: json-c-devel
     summary: Development files for json-c
@@ -85,21 +81,17 @@ outputs:
         - json-c = ${package.version}-${package.release}
     tests:
       - name: link
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            cat > /tmp/json-test.c <<'EOF'
-            #include <json-c/json.h>
-            int main(void) {
-                struct json_object *obj = json_tokener_parse("{\"ok\":true}");
-                return json_object_get_boolean(json_object_object_get(obj, "ok")) ? 0 : 1;
-            }
-            EOF
-            gcc /tmp/json-test.c $(pkg-config --cflags --libs json-c) -o /tmp/json-test
-            /tmp/json-test
+        script: |
+          cat > /tmp/json-test.c <<'EOF'
+          #include <json-c/json.h>
+          int main(void) {
+              struct json_object *obj = json_tokener_parse("{\"ok\":true}");
+              return json_object_get_boolean(json_object_object_get(obj, "ok")) ? 0 : 1;
+          }
+          EOF
+          gcc /tmp/json-test.c $(pkg-config --cflags --libs json-c) -o /tmp/json-test
+          /tmp/json-test
 
   - name: json-c-static
     summary: Static json-c library

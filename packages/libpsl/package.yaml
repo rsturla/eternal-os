@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/libpsl.yaml
 # Use libidn2 instead of ICU. The release archive includes its pinned public suffix data.
-schema: 1
+schema: 2
 package:
   name: libpsl
   version: 0.23.3
@@ -66,12 +66,7 @@ outputs:
     - libpsl-libs = ${package.version}-${package.release}
   tests:
   - name: suffix
-    stage: installed
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       test "$(psl --use-builtin-data --print-reg-domain example.co.uk)" = "example.co.uk: example.co.uk"
 - name: libpsl-libs
   files:
@@ -85,14 +80,9 @@ outputs:
     - libunistring
   tests:
   - name: load
-    stage: installed
     packages:
     - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       python3 -c 'import ctypes; ctypes.CDLL("libpsl.so.5")'
 - name: libpsl-devel
   files:
@@ -107,16 +97,11 @@ outputs:
     - libpsl-libs = ${package.version}-${package.release}
   tests:
   - name: compile-and-run
-    stage: installed
     packages:
     - gcc
     - glibc-devel
     - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       cat > /tmp/test.c <<'EOF'
       #include <libpsl.h>
       int main(void) { const psl_ctx_t *p = psl_builtin(); return !p || !psl_is_public_suffix(p, "com"); }
@@ -133,6 +118,5 @@ outputs:
     - /usr/share/licenses/libpsl-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check

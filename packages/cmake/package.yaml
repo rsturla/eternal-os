@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
-schema: 1
+schema: 2
 package:
   name: cmake
   version: 4.4.5
@@ -97,16 +97,11 @@ outputs:
     - libstdc++
   tests:
   - name: build-project
-    stage: installed
     packages:
       - gcc
       - glibc-devel
       - make
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       mkdir /tmp/cmake-test
       cd /tmp/cmake-test
       printf 'cmake_minimum_required(VERSION 3.20)\nproject(smoke C)\nadd_executable(smoke main.c)\n' > CMakeLists.txt
@@ -127,6 +122,5 @@ outputs:
     - /usr/share/licenses/cmake-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check

@@ -4,7 +4,7 @@
 # gobject-2.0, so the container build keeps the core libraries and development
 # files but disables documentation, tests, introspection and optional system
 # integrations.
-schema: 1
+schema: 2
 
 package:
   name: glib2
@@ -86,18 +86,14 @@ outputs:
         - zlib
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf]
-        argv:
-          - sh
-          - -c
-          - |
-            gdbus --help >/dev/null
-            glib-compile-schemas --help >/dev/null
-            for lib in /usr/lib64/libglib-2.0.so.* /usr/lib/libglib-2.0.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          gdbus --help >/dev/null
+          glib-compile-schemas --help >/dev/null
+          for lib in /usr/lib64/libglib-2.0.so.* /usr/lib/libglib-2.0.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: glib2-devel
     summary: Development files for GLib
@@ -112,12 +108,8 @@ outputs:
         - glib2 = ${package.version}-${package.release}
     tests:
       - name: link
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '#include <glib.h>\nint main(void){return 0;}\n' > /tmp/glib.c
-            gcc /tmp/glib.c $(pkg-config --cflags --libs glib-2.0) -o /tmp/glib-test
-            /tmp/glib-test
+        script: |
+          printf '#include <glib.h>\nint main(void){return 0;}\n' > /tmp/glib.c
+          gcc /tmp/glib.c $(pkg-config --cflags --libs glib-2.0) -o /tmp/glib-test
+          /tmp/glib-test

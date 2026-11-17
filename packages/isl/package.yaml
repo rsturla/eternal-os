@@ -2,7 +2,7 @@
 #
 # Integer set library for the polyhedral model. A build dependency for the GNU toolchain and the
 # rest of the minimal Eternal userland.
-schema: 1
+schema: 2
 
 package:
   name: isl
@@ -60,16 +60,12 @@ outputs:
         - /usr/share/licenses/isl/LICENSE
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libisl.so.* /usr/lib/libisl.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libisl.so.* /usr/lib/libisl.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: isl-devel
     summary: ISL development files
@@ -86,22 +82,18 @@ outputs:
 
 tests:
   - name: link
-    stage: installed
     packages: [gcc, glibc-devel, bash-binsh]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #include <isl/ctx.h>
-        int main(void) {
-          isl_ctx *context = isl_ctx_alloc();
-          if (context == 0) {
-            return 1;
-          }
-          isl_ctx_free(context);
-          return 0;
+    script: |
+      cat > /tmp/test.c <<'EOF'
+      #include <isl/ctx.h>
+      int main(void) {
+        isl_ctx *context = isl_ctx_alloc();
+        if (context == 0) {
+          return 1;
         }
-        EOF
-        gcc /tmp/test.c -lisl -o /tmp/test
-        /tmp/test
+        isl_ctx_free(context);
+        return 0;
+      }
+      EOF
+      gcc /tmp/test.c -lisl -o /tmp/test
+      /tmp/test

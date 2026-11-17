@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/jsoncpp.yaml
 # Disable unused object and static libraries. Run the upstream C++ tests.
-schema: 1
+schema: 2
 package:
   name: jsoncpp
   version: 1.9.8
@@ -59,14 +59,9 @@ outputs:
     - /usr/share/licenses/jsoncpp/**
   tests:
   - name: load
-    stage: installed
     packages:
     - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       python3 -c 'import ctypes; ctypes.CDLL("libjsoncpp.so.27")'
 - name: jsoncpp-devel
   files:
@@ -80,16 +75,11 @@ outputs:
     - jsoncpp = ${package.version}-${package.release}
   tests:
   - name: compile-and-run
-    stage: installed
     packages:
     - gcc-c++
     - glibc-devel
     - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       cat > /tmp/test.cc <<'EOF'
       #include <json/json.h>
       int main(void) { Json::Value v; v["answer"] = 42; return v["answer"].asInt() != 42; }
@@ -98,6 +88,5 @@ outputs:
       /tmp/test
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check

@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # libexslt has no fortifiable libc call. Check its other hardening properties.
 # Check all properties on xsltproc and libxslt.
-schema: 1
+schema: 2
 package:
   name: libxslt
   version: 1.1.45
@@ -68,12 +68,7 @@ outputs:
     - libxslt-libs = ${package.version}-${package.release}
   tests:
   - name: transform
-    stage: installed
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       printf '<root>ok</root>\n' > /tmp/input.xml
       cat > /tmp/style.xsl <<'EOF'
       <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"><xsl:output method="text"/><xsl:template match="/"><xsl:value-of select="root"/></xsl:template></xsl:stylesheet>
@@ -92,14 +87,9 @@ outputs:
     - libxml2
   tests:
   - name: load
-    stage: installed
     packages:
       - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       python3 -c 'import ctypes; ctypes.CDLL("libxslt.so.1")'
 - name: libxslt-devel
   files:
@@ -115,16 +105,11 @@ outputs:
     - libxslt-libs = ${package.version}-${package.release}
   tests:
   - name: compile-and-run
-    stage: installed
     packages:
       - gcc
       - glibc-devel
       - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       cat > /tmp/test.c <<'EOF'
       #include <libxslt/xslt.h>
       int main(void) { xsltInit(); xsltCleanupGlobals(); return 0; }
@@ -143,7 +128,6 @@ outputs:
     - /usr/share/gtk-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check
     with:

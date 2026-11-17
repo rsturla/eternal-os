@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # Portable foreign function interface library. A dependency for the minimal Eternal build root.
-schema: 1
+schema: 2
 
 package:
   name: libffi
@@ -53,16 +53,12 @@ outputs:
         - /usr/share/licenses/libffi/LICENSE
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libffi.so.* /usr/lib/libffi.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libffi.so.* /usr/lib/libffi.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: libffi-devel
     summary: libffi development files
@@ -89,19 +85,15 @@ outputs:
 
 tests:
   - name: link
-    stage: installed
     packages: [gcc, glibc-devel, bash-binsh]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #include <ffi.h>
-        int main(void) {
-          ffi_cif cif;
-          (void)cif;
-          return 0;
-        }
-        EOF
-        gcc /tmp/test.c -lffi -o /tmp/test
-        /tmp/test
+    script: |
+      cat > /tmp/test.c <<'EOF'
+      #include <ffi.h>
+      int main(void) {
+        ffi_cif cif;
+        (void)cif;
+        return 0;
+      }
+      EOF
+      gcc /tmp/test.c -lffi -o /tmp/test
+      /tmp/test

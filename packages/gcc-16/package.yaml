@@ -9,7 +9,7 @@
 # compiler) and without Fortran for the first import. The runtime libraries are
 # split the same way Wolfi splits them: libstdc++, libatomic and the compiler
 # proper are independent outputs.
-schema: 1
+schema: 2
 
 package:
   name: gcc-16
@@ -194,7 +194,6 @@ outputs:
         - cc = ${package.version}-${package.release}
     tests:
       - name: compiler-hardening
-        stage: installed
         packages: [bash, binutils, coreutils, findutils, grep, openssf-compiler-options, sed]
         environment:
           PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -203,16 +202,11 @@ outputs:
             with:
               cc: cc
       - name: cxx-link
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -eu
-          - -c
-          - |
-            printf '#include <iostream>\nint main() { std::cout << "ok"; }\n' > /tmp/gcc-cxx-test.cc
-            c++ /tmp/gcc-cxx-test.cc -o /tmp/gcc-cxx-test
-            test "$(/tmp/gcc-cxx-test)" = ok
+        script: |
+          printf '#include <iostream>\nint main() { std::cout << "ok"; }\n' > ./gcc-cxx-test.cc
+          c++ ./gcc-cxx-test.cc -o ./gcc-cxx-test
+          test "$(./gcc-cxx-test)" = ok
 
   - name: libstdc++-16
     summary: GNU Standard C++ Library
@@ -300,23 +294,20 @@ outputs:
         - /usr/share/licenses/gcc-16-doc/COPYING.RUNTIME
 
 tests:
-  - name: build
-    stage: build
-    argv:
-      - sh
-      - -c
-      - |
-        "$STAGE/usr/bin/gcc-16" --version | grep -q '16.2.0'
-        "$STAGE/usr/bin/g++-16" --version | grep -q '16.2.0'
-        "$STAGE/usr/bin/cc" --version | grep -q '16.2.0'
-        "$STAGE/usr/bin/c++" --version | grep -q '16.2.0'
-        printf '#include <stdio.h>\nint main(void) { puts("gcc-ok"); return 0; }\n' > /tmp/gcc-16-test.c
-        "$STAGE/usr/bin/gcc-16" /tmp/gcc-16-test.c -o /tmp/gcc-16-test
-        /tmp/gcc-16-test | grep -q gcc-ok
-        "$STAGE/usr/bin/cc" /tmp/gcc-16-test.c -o /tmp/gcc-16-test-cc
-        /tmp/gcc-16-test-cc | grep -q gcc-ok
-        printf '#include <iostream>\nint main() { std::cout << "g++-ok\\n"; }\n' > /tmp/gcc-16-test.cc
-        "$STAGE/usr/bin/g++-16" /tmp/gcc-16-test.cc -o /tmp/gcc-16-test-cxx
-        /tmp/gcc-16-test-cxx | grep -q g++-ok
-        "$STAGE/usr/bin/c++" /tmp/gcc-16-test.cc -o /tmp/gcc-16-test-cxx-default
-        /tmp/gcc-16-test-cxx-default | grep -q g++-ok
+  - name: installed-compiler-smoke
+    packages: [grep]
+    script: |
+      "/usr/bin/gcc-16" --version | grep -q '16.2.0'
+      "/usr/bin/g++-16" --version | grep -q '16.2.0'
+      "/usr/bin/cc" --version | grep -q '16.2.0'
+      "/usr/bin/c++" --version | grep -q '16.2.0'
+      printf '#include <stdio.h>\nint main(void) { puts("gcc-ok"); return 0; }\n' > ./gcc-16-test.c
+      "/usr/bin/gcc-16" ./gcc-16-test.c -o ./gcc-16-test
+      ./gcc-16-test | grep -q gcc-ok
+      "/usr/bin/cc" ./gcc-16-test.c -o ./gcc-16-test-cc
+      ./gcc-16-test-cc | grep -q gcc-ok
+      printf '#include <iostream>\nint main() { std::cout << "g++-ok\\n"; }\n' > ./gcc-16-test.cc
+      "/usr/bin/g++-16" ./gcc-16-test.cc -o ./gcc-16-test-cxx
+      ./gcc-16-test-cxx | grep -q g++-ok
+      "/usr/bin/c++" ./gcc-16-test.cc -o ./gcc-16-test-cxx-default
+      ./gcc-16-test-cxx-default | grep -q g++-ok
