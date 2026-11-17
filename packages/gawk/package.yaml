@@ -63,10 +63,12 @@ outputs:
       provides:
         - awk = ${package.version}-${package.release}
     tests:
-      - name: installed
-        packages: [bash-binsh, coreutils]
+      - name: language
+        packages:
+          - coreutils
+        files: tests
         script: |
-          test "$(printf 'a 2\nb 3\n' | gawk '{sum += $2} END {print sum}')" = 5
+          bash "$TEST_FILES/language.sh"
       - name: high-precision
         files: tests
         script: |
