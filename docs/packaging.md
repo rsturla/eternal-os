@@ -540,6 +540,25 @@ package:
   significant whitespace are exempt from the repository's
   trailing-whitespace hook.
 
+### Patches
+
+Declare upstream fixes in the native `patches` list, in application order:
+
+```yaml
+patches:
+  - file: patches/fix-upstream-bug.patch
+    reason: Backport upstream commit abc123 to correct the affected behavior
+```
+
+Keep patch files inside the package directory. Use `strip` when the patch needs
+an alternative to the default `-p1`. Do not apply these patches in shell build
+steps or copy them through `context`.
+
+rpmx tracks patch contents in the package lock and includes them in the source
+RPM. Patch application rejects mismatched context, reversed patches and already
+applied patches. The source snapshot contains the patched tree, so a rebuild
+does not apply patches again.
+
 ### Source selection
 
 Default to the artifact upstream publishes, not to a git branch:
