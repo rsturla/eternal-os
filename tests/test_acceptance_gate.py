@@ -72,6 +72,45 @@ else:
                                             EXPECTED_PROFILE=str(expected)), capture_output=True, text=True)
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_optional_cases_are_required_only_when_requested(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rpmx = root / "rpmx"
+            rpmx.write_text('''#!/usr/bin/env python3
+import json, os, sys
+args = sys.argv[1:]
+if args[0] == 'plan':
+    tests = [{'optional': True}] if os.environ['ONLY_OPTIONAL'] == '1' else [{}, {'optional': True}]
+    print(json.dumps({'plan': {'cells': [{'tests': tests}]}}))
+else:
+    assert os.environ['ONLY_OPTIONAL'] != '1', 'unselected optional cases must not run'
+    assert ('--include-optional-tests' in args) == (os.environ['INCLUDE_OPTIONAL'] == '1')
+    print(json.dumps({'document': 'rpmx-run-report', 'version': 1, 'outcome': 'passed',
+                      'acceptance': 'completed', 'tests': json.loads(os.environ['CASES'])}))
+''')
+            rpmx.chmod(0o755)
+            cases = [
+                (False, False, [{"status": "passed"}], True),
+                (True, False, [{"status": "passed"}, {"status": "passed"}], True),
+                (True, False, [{"status": "passed"}], False),
+                (True, False, [{"status": "passed"}, {"status": "skipped"}], False),
+                (False, True, [], True),
+            ]
+            for include, only_optional, reported, succeeds in cases:
+                with self.subTest(include=include, only_optional=only_optional, reported=reported):
+                    output = root / "reports"
+                    command = [str(ROOT / "scripts/accept-rpms.py"), "recipe.yaml",
+                               "--install-dir", "rpms", "--output", str(output), "--arch", "x86_64"]
+                    if include:
+                        command.append("--include-optional-tests")
+                    env = dict(os.environ, RPMX=str(rpmx), INCLUDE_OPTIONAL=str(int(include)),
+                               ONLY_OPTIONAL=str(int(only_optional)), CASES=json.dumps(reported))
+                    result = subprocess.run(command, env=env, capture_output=True, text=True)
+                    self.assertEqual(result.returncode == 0, succeeds, result.stdout + result.stderr)
+                    if only_optional:
+                        self.assertIn("acceptance not requested", result.stderr)
+                        self.assertFalse((output / "results.json").exists())
+
     def test_complete_report_required_even_when_process_succeeds(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

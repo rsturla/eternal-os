@@ -20,6 +20,7 @@ jobs=
 force=0
 locked=0
 no_tests=0
+include_optional_tests=0
 defer_acceptance=0
 extra=()
 
@@ -39,6 +40,7 @@ usage: build-all.sh [options]
   --jobs N           Parallel build jobs exported to steps as JOBS
   --locked           Refuse recipe, source or root drift
   --defer-acceptance Run source tests; accept the resulting RPMs separately
+  --include-optional-tests  Also run optional source and installed tests
   --no-tests         Build without running the recipe's tests
   -h, --help         Show this help
 EOF
@@ -96,6 +98,11 @@ while (($# > 0)); do
       defer_acceptance=1
       shift
       ;;
+    --include-optional-tests)
+      include_optional_tests=1
+      extra+=(--include-optional-tests)
+      shift
+      ;;
     --no-tests)
       no_tests=1
       extra+=(--no-tests)
@@ -112,6 +119,11 @@ while (($# > 0)); do
       ;;
   esac
 done
+
+if ((include_optional_tests && no_tests)); then
+  echo "--include-optional-tests cannot be combined with --no-tests" >&2
+  exit 2
+fi
 
 if ((defer_acceptance && no_tests)); then
   echo "--defer-acceptance requires source tests; cannot combine with --no-tests" >&2
@@ -197,7 +209,7 @@ for line in "${hashes[@]}"; do
 done
 
 stamp_dir="$output/.stamps/${arch:-native}"
-variant="tests=$((1 - no_tests)) signed=$([[ -n $signing_key ]] && echo 1 || echo 0) locked=$locked deferred=$defer_acceptance"
+variant="tests=$((1 - no_tests)) optional=$include_optional_tests signed=$([[ -n $signing_key ]] && echo 1 || echo 0) locked=$locked deferred=$defer_acceptance"
 
 for recipe in "${recipes[@]}"; do
   name=$(basename "$(dirname "$recipe")")
@@ -263,6 +275,7 @@ PY_REPORT
         --arch "$target" --install-dir "$pkg_output/$target"
         --output "$pkg_output/acceptance/$target")
       [[ -z $build_release ]] || accept+=(--build-release "$build_release")
+      ((include_optional_tests == 0)) || accept+=(--include-optional-tests)
       "${accept[@]}"
     done
   fi
