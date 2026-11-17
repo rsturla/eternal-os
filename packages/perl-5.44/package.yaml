@@ -158,13 +158,14 @@ outputs:
       - name: installed
         packages: [bash-binsh, coreutils, gcc, grep, bzip2-libs, zlib]
         script: |
-          perl5.44.0 -V:version | grep -q '5\.44\.0'
-          perl5.44.0 -e 'use strict; use warnings; print "ok\n"' | grep -qx ok
+          perl5.44.0 -V:version | grep -F "version='${package.version}';" > /dev/null
+          perl5.44.0 -e 'use strict; use warnings; print "ok\n"' | grep -x ok > /dev/null
           perl5.44.0 -MIO::Socket::INET -e 'print "core modules load\n"'
           perl5.44.0 -MCompress::Raw::Zlib -e 'print "zlib module loads\n"'
           perl5.44.0 -MCompress::Raw::Bzip2 -e 'print "bzip2 module loads\n"'
           # pod2man has no --version; it prints its usage instead.
-          pod2man --help | grep -q 'pod2man \[--center'
+          pod2man --help > pod2man-help.txt
+          grep -F 'pod2man [--center' pod2man-help.txt > /dev/null
 
   - name: perl-5.44-default
     summary: Unversioned Perl 5.44 command names
@@ -260,9 +261,11 @@ outputs:
       - name: installed
         packages: [bash-binsh, coreutils, gcc, grep, bzip2-libs, zlib]
         script: |
-          corelist --version | head -1 | grep -q '5\.44'
+          # corelist -v lists supported Perl releases, not the tool's version.
+          corelist -v > corelist-versions.txt
+          grep -Fx 'v${package.version}' corelist-versions.txt
           prove --version
-          shasum --version | head -1
+          shasum --version
           cat > /tmp/t.pl <<'EOF'
           use Test::More tests => 1;
           ok(1, 'prove runs');
