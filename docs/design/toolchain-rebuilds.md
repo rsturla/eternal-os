@@ -28,7 +28,8 @@ The answer must remain available after temporary CI artifacts expire.
 - Record incorporated components and build tools separately from runtime dependencies.
 - Select consumer rebuilds across language toolchains and native libraries.
 - Distinguish toolchain streams, architectures and distribution backports.
-- Resolve toolchains through stable capabilities rather than distribution RPM names.
+- Keep existing build requirements as the only input-selection interface.
+- Identify resolved providers through portable capabilities for rebuild queries.
 - Verify that a rebuild used the required replacement inputs.
 - Apply the same rules to local builds, PR builds, merge-queue checks and releases.
 - Preserve one shared SRPM per source identity across native architectures.
@@ -74,9 +75,9 @@ by rpmx; it does not introduce a replacement action scheduler or cache system.
 
 | Owner | Responsibility |
 | --- | --- |
-| rpmx core | Capability resolution, immutable bindings, action/output provenance, report validation, receipt serialization, generic requirement evaluation and RPM metadata projection. |
+| rpmx core | Existing dependency resolution, immutable input identities, action/output provenance, report validation, receipt serialization, generic requirement evaluation and RPM metadata projection. |
 | Shared pipeline steps | Language or tool-specific invocation, evidence collection and conservative relationship refinement. |
-| Distribution profiles and policy | Allowed providers, external-package bindings, repair requirements and bootstrap choices. |
+| Distribution profiles and policy | Allowed providers, external-package capability annotations, repair requirements and bootstrap choices. |
 | Transaction scheduler | Published consumer discovery, source-recipe selection, build ordering, acceptance and promotion. |
 
 ## Evidence from toolchains
@@ -113,7 +114,7 @@ Sources: [Go toolchains](https://go.dev/doc/toolchain),
 | --- | --- |
 | Component | An identifiable body of code or data, such as Go stdlib, a crate, a static runtime or a header implementation. Its logical identity is independent of RPM naming. |
 | Provider | The exact RPM or source input that supplied a component or tool. A provider can supply several components. |
-| Provider capability | A stable virtual provide through which a provider advertises a logical input identity. Toolchains and libraries use the same resolution contract. |
+| Provider capability | A stable virtual provide through which a provider advertises a logical input identity. It identifies an already resolved input for rebuild queries. |
 | Build input | A resolved input available to a build. Availability alone does not prove invocation or incorporation. |
 | Build action | A pipeline-step invocation with resolved inputs and an output scope. |
 | Relationship | Evidence connecting an output RPM to a component or tool, with a role and confidence. |
@@ -158,39 +159,50 @@ runtime, headers and startup components distinct where their rebuild rules diffe
 Distinguish implementations when their ABI or command behavior differs. A shared
 language name alone does not establish that two compilers are interchangeable.
 
-A recipe requests a capability such as `rpmx(toolchain:go:1.27)`. The distribution
-profile controls allowed streams, repositories and provider policy. The resolver
-selects concrete packages, verifies their capabilities and records the exact
-provider revisions. RPMs named `golang-1.27`, `go-compiler` or another name can
-satisfy the same recipe contract if they supply the required toolchain.
+Existing build requirements remain the only input-selection interface. They
+already come from the recipe, profile and shared pipeline steps. A recipe does
+not need a second toolchain declaration, a new `build.inputs` block, a special
+`rpmx(...)` requirement or a named executable binding.
 
-Providers can ship versioned, declarative descriptors. These connect capabilities
-to named executable or file bindings, compatible targets and other capabilities.
-The descriptor format is generic data, not a catalog of known language toolchains
-or instructions to load executable engine plugins. Shared steps interpret
-tool-specific properties. Simple providers need no descriptor beyond capabilities
-and their locked package identity when no finer binding is requested.
+For example, a recipe can keep its existing form:
 
-Resolve descriptor component dependencies against the same locked package set.
-Require compatible streams and revisions across split compiler and runtime providers.
-Validate executable ownership and component evidence against the selected
-providers. Bind build steps to the selected executable, rather than whichever
-`go`, `gcc` or `rustc` happens to appear first in `PATH`. Do not run arbitrary
-probe scripts supplied through untrusted metadata.
+```yaml
+build:
+  packages: [golang-1.27]
+  pipeline:
+    - runs: go-1.27 build -o "$STAGE/usr/bin/example" ./cmd/example
+```
 
-This contract supports both split and combined packaging. One RPM can provide
-several components; several RPMs can supply one toolchain. If several providers
-match, use normal repository resolution and profile constraints. Record the
-selected provider set. Fail if the descriptor and the actual tool selection
-disagree; do not silently guess from RPM names.
+The ordinary resolver installs its dependency closure. rpmx reads the exact
+resolved RPMs and records their versioned provides in the build receipt. The
+capabilities shown above identify what those packages supply for rebuild
+selection. They do not replace `build.packages`, alter command selection or
+introduce a new provider-resolution path.
 
-External and bootstrap RPMs may lack this contract. A distribution profile can
-declare an equivalent compatibility binding for a concrete package or existing
-virtual capability. That binding supplies the descriptor and verifies the
-resolved provider version and files. Package-name mapping belongs only in this
-distribution integration layer. The core and shared steps communicate through
-logical identities and capability values. They must not infer compatibility from
-package names or execute a provider-supplied probe script merely to resolve it.
+A distribution may name this RPM `golang-1.27`, `go-compiler` or something else.
+Its recipes and profiles already express the appropriate build requirements.
+Generic rpmx code operates on their resolved package identities and advertised
+capabilities. It does not contain a table of compiler package names. Existing
+virtual capabilities can still be used in ordinary build requirements when a
+consumer prefers them; this feature does not require that migration.
+
+One RPM can advertise several capabilities. Split compiler and stdlib RPMs can
+advertise their respective identities. Record the packages actually present in
+the resolved closure, including transitive dependencies. Providers omitted by
+the resolver cannot be claimed as available inputs.
+
+Executable paths and invocation remain in recipes and shared pipeline steps.
+There is no new provider descriptor or command-binding mechanism. A shared step
+may observe which executable ran and relate it to an installed provider. Without
+that refinement, keep the conservative input relationship. Do not claim that
+installing a compiler proves which executable a script invoked.
+
+External or bootstrap RPMs may lack portable identity capabilities. Record their
+exact identities anyway. An optional profile annotation can associate additional
+capabilities with resolved packages for rebuild queries; it does not select a
+package or change its executable. Missing annotations retain conservative
+package-level tracking and explicit incomplete coverage, rather than making
+otherwise valid build requirements fail.
 
 ## One canonical inventory in rpmx
 
@@ -205,7 +217,7 @@ behavior compatible during migration, then move tool-specific collection into
 shared pipeline steps. Do not add more language-specific engine catalogers for
 this feature.
 
-The extended inventory supplies both RPM capability generation and the build
+The common inventory supplies both RPM capability generation and the build
 receipt. SBOM output consumes the same records. Recipes must not maintain
 independent copies of these facts for each output format.
 
@@ -233,15 +245,17 @@ Emit `bundled(...)` provides for incorporated components. Add a separate
 namespace for build-tool provenance. These names are illustrative proposals:
 
 ```text
+Provides: buildinput(toolchain:go:1.27) = <upstream-version>
 Provides: bundled(go-stdlib) = <upstream-version>
 Provides: builtwith(go) = <upstream-version>
 Provides: builtwith(go:1.27) = <upstream-version>
 ```
 
-Toolchain providers advertise `rpmx(toolchain:...)`. Consumers advertise
-`builtwith(...)`. Keeping those namespaces separate prevents a consumer RPM
-from satisfying a request to install a compiler. Capability versions allow
-portable queries; exact distribution EVRs and checksums remain in receipts.
+Providers advertise their capabilities. Consumers expose conservative
+`buildinput(...)` markers and can expose `builtwith(...)` or `bundled(...)` when
+evidence supports those stronger claims. The namespaces remain separate so a
+consumer RPM cannot satisfy a request to install a compiler. Capability versions
+allow portable queries; exact distribution EVRs and checksums remain in receipts.
 
 Normal runtime dependencies remain `Requires`. Neither marker requires users to
 install a compiler or treats an embedded library as a shared-library provider.
@@ -266,7 +280,7 @@ and conservatively rebuild the source recipe without claiming exact inclusion.
 ## Collection and confidence
 
 The engine creates an action record from the inputs visible to each build step.
-It records their immutable provider bindings and conservatively associates them
+It records their immutable provider identities and conservatively associates them
 with outputs that the action can affect. Initial scoping can cover every payload
 output of the source recipe. It must not create false `bundled(...)` claims for
 all those outputs.
@@ -395,7 +409,7 @@ the final compiler and its consumers to satisfy the declared repair requirement.
 ## Migration and delivery
 
 1. Refactor the provenance foundation around generic inputs, actions, outputs
-   and relationships. Define capability bindings, reporting, coverage, receipts
+   and relationships. Reuse dependency resolution and define capability capture, reporting, coverage, receipts
    and schema compatibility. Prove it with synthetic providers and custom steps.
 2. Deliver a complete conservative path through receipt publication, consumer
    discovery, scheduling, queue validation and promotion. It must work without
@@ -424,9 +438,9 @@ can populate the initial index. Do not infer a clean result from an empty index.
 | Test step with payload write access | Preserve potential influence on shipped outputs. |
 | Go stdlib fix, unchanged application recipe | Rebuild the application with the repaired stream and verify its receipt. |
 | Backport with unchanged upstream version | Select old provider revisions and accept the repaired distribution release. |
-| Different distribution RPM names | Resolve the same recipe capability and produce equivalent logical relationships with distinct provider receipts. |
-| Split compiler/stdlib packages or several matching providers | Lock the selected provider set and bind the descriptor to those packages. |
-| External provider without rpmx capabilities | Use an explicit profile binding, or fail with a missing-provider error. |
+| Different distribution RPM names | Use existing build requirements and produce equivalent logical input identities with distinct provider receipts. |
+| Split compiler/stdlib packages or several matching providers | Record the provider set selected by existing dependency resolution, without new recipe declarations. |
+| External provider without rpmx capabilities | Record the exact RPM identity and incomplete logical coverage; optional profile annotations supply portable identities. |
 | Rust stdlib or vendored crate fix | Select incorporated consumers; require a vendored source update where needed. |
 | Compatible shared glibc fix | Update the runtime without an unconditional distribution rebuild. |
 | glibc startup/header or static-library fix | Select the relevant incorporated-code consumers. |
@@ -450,7 +464,7 @@ those facts through shared-step contracts, without language-specific engine rule
 
 Before implementation, review these choices:
 
-- Final capability conventions, generic provider descriptors and recipe syntax.
+- Final provider and consumer capability conventions and optional profile annotations.
 - Action output scopes and the coverage contract required to refine influence edges.
 - The smallest component granularity for glibc and compiler runtime packages.
 - How maintainers declare output-affecting fixes and approve repair generations.
