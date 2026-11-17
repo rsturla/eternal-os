@@ -21,7 +21,7 @@ while (($# > 0)); do
   shift
 done
 
-python3 -m unittest discover -s "$root/tests" -p 'test_*.py'
+"$root/scripts/test-tools.sh"
 python3 "$root/scripts/check-package-names.py"
 
 found=0
