@@ -38,7 +38,7 @@ build:
   - runs: |
       # Keep COMP_* APIs for bootstrap consumers built against seed headers.
       # Disable all compression backends.
-      perl ./Configure --prefix="$PREFIX" --libdir="$LIBDIR" --openssldir=/etc/ssl shared no-brotli no-zstd no-zlib no-ssl3 no-weak-ssl-ciphers enable-pie
+      perl ./Configure --prefix="$PREFIX" --libdir="$LIBDIR" --openssldir=/etc/ssl shared no-afalgeng no-brotli no-zstd no-zlib no-ssl3 no-weak-ssl-ciphers enable-pie
   - uses: make/build
   - uses: make/build
     with:
@@ -61,6 +61,22 @@ build:
       - openssl3-libs
       - openssl3-devel
   - uses: strip
+  tests:
+  - name: upstream
+    packages:
+    - make
+    - perl
+    - diffutils
+    - nss_wrapper-libs
+    - tar
+    - gzip
+    files: tests
+    artifacts:
+    - upstream-reports.tar.gz
+    - upstream-hosts
+    script: |
+      bash "$TEST_FILES/upstream.sh"
+
 outputs:
 - name: openssl3
   files:
@@ -74,10 +90,29 @@ outputs:
   tests:
   - name: digest
     packages:
-      - grep
+    - grep
     script: |
       printf abc | openssl dgst -sha256 > /tmp/digest
       grep -q ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad /tmp/digest
+  - name: signatures-and-certificates
+    script: |
+      printf 'signed payload\n' > payload
+      openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out key.pem
+      openssl pkey -in key.pem -pubout -out public.pem
+      openssl dgst -sha256 -sign key.pem -out signature payload
+      openssl dgst -sha256 -verify public.pem -signature signature payload
+      printf 'tampered payload\n' > payload
+      if openssl dgst -sha256 -verify public.pem -signature signature payload; then
+        echo "signature verification accepted tampered data" >&2
+        exit 1
+      fi
+      openssl req -new -x509 -key key.pem -subj /CN=eternal-test -days 1 -out certificate.pem
+      openssl verify -CAfile certificate.pem certificate.pem
+      openssl x509 -in certificate.pem -noout -checkhost eternal-test
+      if openssl x509 -in certificate.pem -noout -checkhost wrong.example; then
+        echo "certificate matched wrong hostname" >&2
+        exit 1
+      fi
 - name: openssl3-libs
   files:
     license:
@@ -97,11 +132,17 @@ outputs:
     provides:
     - openssl-libs = ${package.version}-${package.release}
   tests:
-  - name: load
+  - name: runtime-linkage
+    pipeline:
+      - uses: test/runtime-linkage
+        with:
+          libraries: ["libssl.so.*", "libcrypto.so.*"]
+  - name: python-tls-consumer
     packages:
-      - python3
+    - python-3.14
+    files: tests
     script: |
-      python3 -c 'import ctypes; ctypes.CDLL("libssl.so.3")'
+      python3.14 "$TEST_FILES/python_tls.py"
 - name: openssl3-devel
   files:
     license:
@@ -115,26 +156,16 @@ outputs:
     provides:
     - openssl-devel = ${package.version}-${package.release}
   tests:
-  - name: compile-and-run
+  - name: api-behavior
     packages:
-      - gcc
-      - glibc-devel
-      - pkgconf
+    - gcc
+    - glibc-devel
+    - pkgconf
+    files: tests
     script: |
-      cat > /tmp/test.c <<'EOF'
-      #include <openssl/ssl.h>
-      #include <openssl/comp.h>
-      #include <openssl/objects.h>
-      int main(void) {
-        if (COMP_get_type(COMP_zlib()) != NID_undef) return 1;
-        SSL_CTX *ctx = SSL_CTX_new(TLS_method());
-        if (!ctx) return 1;
-        SSL_CTX_free(ctx);
-        return 0;
-      }
-      EOF
-      gcc /tmp/test.c $(pkg-config --cflags --libs openssl) -o /tmp/test
-      /tmp/test
+      pkg-config --exists openssl
+      gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags openssl) "$TEST_FILES/behavior.c" $(pkg-config --libs openssl) -o behavior
+      ./behavior
 tests:
 - name: hardening
   pipeline:
