@@ -46,7 +46,10 @@ The bootstrap root is deliberately contained:
   not Fedora packages.
 - `profiles/eternal.profile.yaml` lists the bootstrap repositories separately
   from the Eternal repository, pinned to Fedora 44 literally so that
-  `$releasever` continues to mean the Eternal release.
+  `$releasever` continues to mean the Eternal release. Eternal has repository
+  priority 10, ahead of the Fedora fallback. When both repositories supply a
+  dependency, use the Eternal package even if Fedora uses a higher version
+  number. Standalone acceptance uses this distribution policy.
 
 Self-hosting means removing the bootstrap repositories and every bootstrap
 dependency. Usually a package keeps the name of the component it replaces
