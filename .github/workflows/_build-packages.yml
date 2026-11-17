@@ -303,6 +303,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: candidate-${{ matrix.package }}-${{ matrix.arch }}
+          overwrite: true
           path: ${{ runner.temp }}/candidates/
           if-no-files-found: error
 
@@ -311,6 +312,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: build-${{ matrix.package }}-${{ matrix.arch }}
+          overwrite: true
           path: out/
           if-no-files-found: ignore
 
@@ -376,6 +378,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: rpm-${{ matrix.package }}-${{ matrix.arch }}
+          overwrite: true
           path: out/
           if-no-files-found: error
 
@@ -384,5 +387,6 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: acceptance-${{ matrix.package }}-${{ matrix.arch }}
+          overwrite: true
           path: out/${{ matrix.package }}/acceptance/
           if-no-files-found: ignore

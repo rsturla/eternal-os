@@ -6,12 +6,33 @@ from pathlib import Path
 import tempfile
 import unittest
 
+import yaml
+
 SPEC = importlib.util.spec_from_file_location('candidate_pool', Path(__file__).resolve().parents[1] / 'scripts/candidate-pool.py')
 POOL = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(POOL)
 
 
 class CandidatePool(unittest.TestCase):
+    def test_fixed_candidate_and_evidence_artifacts_can_be_replaced_on_job_retry(self):
+        workflow = yaml.safe_load((Path(__file__).resolve().parents[1] /
+                                  '.github/workflows/_build-packages.yml').read_text())
+        expected = {'candidate', 'build', 'rpm', 'acceptance'}
+        found = set()
+        for job in ('build', 'accept'):
+            for step in workflow['jobs'][job]['steps']:
+                if not step.get('uses', '').startswith('actions/upload-artifact@'):
+                    continue
+                options = step['with']
+                name = options['name']
+                prefix = name.split('-')[0]
+                if prefix in expected:
+                    self.assertEqual(name, prefix + '-${{ matrix.package }}-${{ matrix.arch }}')
+                    self.assertIs(options.get('overwrite'), True,
+                                  f'{name} must replace its prior attempt rather than fail with a name conflict')
+                    found.add(prefix)
+        self.assertEqual(found, expected)
+
     def test_only_direct_canonical_binary_outputs_travel(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
