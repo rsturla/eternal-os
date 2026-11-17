@@ -101,6 +101,9 @@ outputs:
           ld --version | grep -q 'GNU ld'
           as --version | grep -q 'GNU assembler'
           objdump --version | grep -q 'GNU objdump'
+    dependencies:
+      provides:
+        - rpmx(toolchain:binutils) = ${package.version}
 
   - name: binutils-devel
     summary: Binutils development headers and libraries
