@@ -1,0 +1,9 @@
+prefix=/opt/fixture
+libdir=${prefix}/lib
+includedir=${prefix}/include
+Name: fixture
+Description: dependency resolution fixture
+Version: 1.2.3
+Libs: -L${libdir} -lfixture
+Libs.private: -lprivate
+Cflags: -I${includedir}
