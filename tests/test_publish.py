@@ -267,6 +267,34 @@ printf '%s\\n' '{version}' > %{{buildroot}}/opt/publish-test/{payload}
         self.publish(signed=True, success=False)
         self.assertFalse(any(op[:2] == ['s3', 'sync'] for op in self.operations()))
 
+    def test_invalid_fresh_archive_signature_aborts_before_upload(self):
+        self.inputs('1')
+        self.env['LC_ALL'] = 'C'
+        real_gpg = shutil.which('gpg')
+        marker = self.work / 'signed-then-corrupted'
+        wrapper = self.bin / 'gpg'
+        wrapper.write_text(f'''#!/usr/bin/env python3
+import pathlib, subprocess, sys
+args = sys.argv[1:]
+result = subprocess.run([{real_gpg!r}, *args])
+if result.returncode:
+    sys.exit(result.returncode)
+if '--detach-sign' in args:
+    # Model a signer that returns success but leaves an invalid signature pair.
+    index = pathlib.Path(args[-1])
+    index.write_bytes(index.read_bytes() + b'\\n')
+    pathlib.Path({str(marker)!r}).write_text('real signing completed')
+''')
+        wrapper.chmod(0o755)
+        result = self.publish(signed=True, success=False)
+        self.assertEqual(marker.read_text(), 'real signing completed')
+        self.assertIn('BAD signature', result.stderr)
+        uploads = [op for op in self.operations()
+                   if op[:2] == ['s3', 'sync'] or
+                   (op[:2] == ['s3', 'cp'] and op[3].startswith('s3://'))]
+        self.assertEqual(uploads, [], 'invalid signed metadata must not reach S3')
+        self.assertEqual(list(self.bucket.rglob('*')), [])
+
     def test_policy_metadata_and_source_only_history_survive(self):
         self.inputs('1', kept=True)
         self.publish()

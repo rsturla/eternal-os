@@ -209,6 +209,8 @@ merge_archive() {
       gpg --homedir "$signing_home" --batch --yes --pinentry-mode error \
         --armor --detach-sign --output "$dest/repodata/repomd.xml.asc" \
         "$dest/repodata/repomd.xml"
+      gpg --homedir "$signing_home" --batch --verify \
+        "$dest/repodata/repomd.xml.asc" "$dest/repodata/repomd.xml"
     fi
   done
 }

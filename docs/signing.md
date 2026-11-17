@@ -56,7 +56,9 @@ manual releases, or use `--signing-passphrase-env` locally.
 The metadata merge uses an isolated temporary GnuPG keyring. Its signing key
 must have no passphrase. The publisher verifies existing archive signatures
 with the supplied private and public keys. Include the old public key during
-rotation. A signed archive cannot receive an unsigned update.
+rotation. A signed archive cannot receive an unsigned update. Each new archive
+signature is verified before upload. An invalid signature stops publication
+before the publisher writes any objects to the bucket.
 
 ## Sign locally
 
