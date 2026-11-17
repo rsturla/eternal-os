@@ -22,7 +22,7 @@ schema: 2
 package:
   name: python-3.13
   version: "3.13.18"
-  release: 4
+  release: 5
   summary: The Python programming language (version 3.13)
   description: |
     Python is an interpreted, interactive, object-oriented programming
@@ -172,6 +172,8 @@ outputs:
         - /usr/share/licenses/python-3.13-devel/LICENSE
     dependencies:
       run:
+        # Embedded interpreters need this stream's standard library too.
+        - python-3.13 = ${package.version}-${package.release}
         - python-3.13-libs = ${package.version}-${package.release}
     tests:
       - name: embed
