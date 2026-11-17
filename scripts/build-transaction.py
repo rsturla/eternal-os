@@ -24,6 +24,9 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 ARCHES = ('x86_64', 'aarch64')
 RPMX = os.environ.get('RPMX', 'rpmx')
+_PROVENANCE_SPEC = importlib.util.spec_from_file_location('build_provenance', ROOT / 'scripts/build-provenance.py')
+provenance = importlib.util.module_from_spec(_PROVENANCE_SPEC)
+_PROVENANCE_SPEC.loader.exec_module(provenance)
 
 
 def run(*args):
@@ -136,15 +139,30 @@ def initialise(args):
         run('mergerepo_c', '--repo', args.base_url.rstrip('/') + '/rolling/' + arch,
             '--outputdir', repository, '--no-database', '--nogroups', '--noupdateinfo', '--compress-type=gz')
         baseline[arch] = baseline_packages(repository)
+    requirements = provenance.load()
+    repair_reasons = {}
+    if requirements:
+        with tempfile.TemporaryDirectory(prefix='eternal-provenance-') as temporary:
+            for arch in ARCHES:
+                for entry in baseline[arch]:
+                    receipt = provenance.read(baseline_rpm(entry, Path(temporary)))
+                    reasons = provenance.failures(receipt, requirements, arch)
+                    if reasons:
+                        owners = [name for name, recipe in recipes.items() if entry['source'] in recipe['targets'][arch]['sources']]
+                        if not owners:
+                            raise ValueError(f'external baseline package needs repaired build inputs: {entry["name"]}: {reasons}')
+                        for owner in owners:
+                            repair_reasons.setdefault(owner, []).extend(reasons)
+        selected = sorted(set(selected) | repair_reasons.keys())
     policy = yaml.safe_load((ROOT / 'rebuild-policy.yaml').read_text()) or {}
     for provider, consumers in policy.items():
         if provider not in recipes or not isinstance(consumers, list) or set(consumers) - recipes.keys() - {'*'}:
             raise ValueError(f'invalid rebuild policy: {provider}')
     state = {'schema': 1, 'commit': args.commit, 'tree': capture('git', '-C', ROOT, 'rev-parse', 'HEAD^{tree}').strip(), 'catalog': recipes, 'baseline': baseline,
-                       'published': previous, 'policy': policy, 'pending': selected, 'wave': 0,
+                       'published': previous, 'requirements': requirements, 'policy': policy, 'pending': selected, 'wave': 0,
                        'build_release': args.build_release, 'builds': {}, 'interfaces': {},
                        'baseline_interfaces': {}, 'requested': selected,
-                       'reasons': {name: ['recipe inputs changed'] for name in selected}}
+                       'reasons': {name: repair_reasons.get(name, ['recipe inputs changed']) for name in selected}}
     state['pending'] = ready_packages(state, set(selected))
     write(args.state, state)
     emit(state)
@@ -156,6 +174,7 @@ def inspect_rpm(path):
     name, source, arch = query('%{NAME}\n%{SOURCERPM}\n%{ARCH}\n')
     evr = query('%{EPOCHNUM}\n%{VERSION}\n%{RELEASE}\n')
     provides = query('[%{PROVIDENAME}\n]')
+    provider_capabilities = query('[%{PROVIDENAME} = %{PROVIDEVERSION}\n]')
     # A changed public library payload is a possible ABI change. Headers and
     # static libraries also invalidate consumers. This deliberately overbuilds
     # rather than claiming that matching SONAMEs prove ABI compatibility.
@@ -165,7 +184,7 @@ def inspect_rpm(path):
     for line in capture('rpm', '-qp', '--dump', path).splitlines():
         fields = shlex.split(line)
         filename, checksum = fields[0], fields[3]
-        if not filename.startswith('/usr/share/sbom/'):
+        if not filename.startswith(('/usr/share/sbom/', '/usr/share/rpmx/buildinfo/')):
             payload.append([filename, checksum, fields[4], fields[-1]])
         if (Path(filename).name in sonames or
                 any(Path(filename).name.startswith(soname + '.') for soname in sonames) or
@@ -174,6 +193,7 @@ def inspect_rpm(path):
     interface = {'provides': sorted(value for value in provides if '.so' in value), 'files': sorted(public)}
     return {'name': name, 'source': source_name(source), 'arch': arch, 'evr': evr,
             'provides': provides, 'requires': query('[%{REQUIRENAME}\n]'),
+            'provider_capabilities': sorted(value for value in provider_capabilities if value.startswith('rpmx(')),
             'interface': interface, 'payload': sorted(payload), 'sha512': digest(path, 'sha512'), 'sha256': digest(path), 'file': path.name}
 
 
@@ -182,7 +202,47 @@ def fingerprint(records, all_files=False):
     public = ({record['name']: record['payload'] for record in records} if all_files else
               {record['name']: record['interface'] for record in records
                if record['interface']['provides'] or record['interface']['files']})
-    return hashlib.sha256(json.dumps(public, sort_keys=True).encode()).hexdigest()
+    # Portable providers may change compiler output, embedded code or generated
+    # sources without changing ELF interfaces. Ignore receipts and signatures.
+    providers = {record['name']: {'capabilities': record['provider_capabilities'], 'payload': record['payload']}
+                 for record in records if record.get('provider_capabilities')}
+    return hashlib.sha256(json.dumps([public, providers], sort_keys=True).encode()).hexdigest()
+
+
+def baseline_rpm(entry, directory):
+    algorithm, expected = entry['checksum'].split(':', 1)
+    path = directory / (expected + '.rpm')
+    if not path.exists():
+        with open_url(entry['url']) as response, path.open('wb') as output:
+            shutil.copyfileobj(response, output)
+    if digest(path, algorithm) != expected:
+        raise ValueError(f'published package checksum mismatch: {entry["url"]}')
+    return path
+
+
+def verify_repairs(state, artifacts, requirements=None):
+    """Verify exact candidate bytes and unchanged baseline before acceptance."""
+    requirements = provenance.load() if requirements is None else requirements
+    if not requirements:
+        return
+    with tempfile.TemporaryDirectory(prefix='eternal-repair-gate-') as temporary:
+        for arch in ARCHES:
+            replaced = set()
+            for package, build in state['builds'].items():
+                # Promotion and queue stage into the canonical package layout;
+                # native workers still use their wave artifact directories.
+                directory = artifacts / package / arch
+                if not directory.exists():
+                    directory = binary_directory(artifacts, package, arch, build['wave'])
+                for rpm in build['targets'][arch]['rpms']:
+                    path = directory / rpm['file']
+                    if digest(path) != rpm['sha256']:
+                        raise ValueError(f'changed repair candidate: {path}')
+                    provenance.verify(path, requirements, arch)
+                    replaced.add(rpm['source'])
+            for entry in state['baseline'][arch]:
+                if entry['source'] not in replaced:
+                    provenance.verify(baseline_rpm(entry, Path(temporary)), requirements, arch)
 
 
 def baseline_interface(state, package, arch, directory):
@@ -191,13 +251,7 @@ def baseline_interface(state, package, arch, directory):
     for entry in state['baseline'][arch]:
         if entry['source'] not in sources:
             continue
-        algorithm, expected = entry['checksum'].split(':', 1)
-        path = directory / (expected + '.rpm')
-        if not path.exists():
-            with open_url(entry['url']) as response, path.open('wb') as output:
-                shutil.copyfileobj(response, output)
-        if digest(path, algorithm) != expected:
-            raise ValueError(f'published package checksum mismatch: {entry["url"]}')
+        path = baseline_rpm(entry, directory)
         records.append(inspect_rpm(path))
     return fingerprint(records, package in state['policy'])
 
@@ -205,6 +259,10 @@ def baseline_interface(state, package, arch, directory):
 def dependencies(state, package, arch):
     target = state['catalog'][package]['targets'][arch]
     requires = set(target['requires'])
+    input_capabilities = set()
+    for record in state['baseline'][arch]:
+        if record['source'] in target['sources']:
+            input_capabilities.update('rpmx(' + value[len('buildinput('):] for value in record['provides'] if value.startswith('buildinput('))
     for record in state['baseline'][arch]:
         if record['source'] in target['sources']:
             requires.update(record['requires'])
@@ -220,7 +278,7 @@ def dependencies(state, package, arch):
         candidate = state['builds'].get(provider)
         if candidate:
             provides.update(candidate['targets'][arch]['provides'])
-        if requires & provides or package in state['policy'].get(provider, []) or '*' in state['policy'].get(provider, []):
+        if requires & provides or input_capabilities & provides or package in state['policy'].get(provider, []) or '*' in state['policy'].get(provider, []):
             result.add(provider)
     if build:
         result.update(build['targets'][arch]['consumed'])
@@ -373,6 +431,7 @@ def seal(args):
     state = json.loads(args.state.read_text())
     if state['pending']:
         raise ValueError('cannot accept an unfinished rebuild closure')
+    verify_repairs(state, args.artifacts)
     view(args)
     state['repositories'] = {arch: digest(args.output / arch / 'repodata/repomd.xml') for arch in ARCHES}
     write(args.state, state)

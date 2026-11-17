@@ -61,6 +61,12 @@ class BuildSelectionTest(unittest.TestCase):
         self.assertEqual(self.selected(), ['consumer', 'eternal-release', 'glibc-2.44'])
         self.assertNotEqual(before['consumer'], self.hashes()['consumer'])
 
+    def test_repair_policy_selects_a_canary_without_invalidating_recipe_hashes(self):
+        before = self.hashes()
+        (self.root / 'rebuild-requirements.yaml').write_text('schema: 1\nrequirements: []\n')
+        self.assertEqual(self.selected(), ['eternal-release'])
+        self.assertEqual(before, self.hashes())
+
     def test_builder_change_selects_canary(self):
         (self.root / '.rpmx-revision').write_text('second\n')
         self.assertEqual(self.selected(), ['eternal-release'])
