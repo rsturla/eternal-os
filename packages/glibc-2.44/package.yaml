@@ -396,6 +396,7 @@ outputs:
         - glibc >= ${package.version}
         - kernel-headers
       provides:
+        - rpmx(component:glibc-devel:2.44) = ${package.version}
         - glibc-devel = ${package.version}-${package.release}
     tests:
       - name: installed
@@ -488,6 +489,7 @@ outputs:
       run:
         - glibc-2.44-devel = ${package.version}-${package.release}
       provides:
+        - rpmx(component:glibc-static:2.44) = ${package.version}
         - glibc-static = ${package.version}-${package.release}
 
   - name: glibc-2.44-doc
