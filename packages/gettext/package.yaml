@@ -85,9 +85,12 @@ outputs:
         - xz
     tests:
       - name: installed
-        packages: [bash-binsh, grep]
+        packages: [bash-binsh, coreutils, grep]
         script: |
-          msgfmt --version | head -1 | grep -q '0\.26\|1\.0'
+          test -f /usr/share/gettext/m4/gettext.m4
+          test -f /usr/share/aclocal/nls.m4
+          msgfmt --version > msgfmt-version.txt
+          grep -Fx 'msgfmt (GNU gettext-tools) ${package.version}' msgfmt-version.txt
           cat > hello.po <<'EOF'
           msgid ""
           msgstr ""
@@ -97,10 +100,10 @@ outputs:
           msgstr "hallo"
           EOF
           msgfmt --check -o hello.mo hello.po
-          msgunfmt hello.mo | grep -qx 'msgstr "hallo"'
-          xgettext --version | head -1
-          echo 'hello world' | envsubst | grep -qx 'hello world'
-          N=eternal sh -c 'echo "hello $N"' | envsubst | grep -qx 'hello eternal'
+          msgunfmt hello.mo | grep -x 'msgstr "hallo"' > /dev/null
+          xgettext --version
+          echo 'hello world' | envsubst | grep -x 'hello world' > /dev/null
+          N=eternal sh -c 'echo "hello $N"' | envsubst | grep -x 'hello eternal' > /dev/null
 
   - name: gettext-libs
     summary: Runtime libraries for gettext
@@ -145,8 +148,6 @@ outputs:
         packages: [gcc, glibc-devel, pkgconf, grep, bash-binsh, coreutils, perl]
         script: |
           test -f /usr/include/gettext-po.h
-          test -f /usr/share/aclocal/gettext.m4
-          test -f /usr/share/aclocal/nls.m4
           cat > /tmp/po.c <<'EOF'
           #include <gettext-po.h>
           #include <libintl.h>
