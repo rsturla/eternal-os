@@ -150,6 +150,35 @@ elif args[0] == 'repo':
         self.assertFalse(any(call["command"] == "test" for call in self.calls()))
         self.assertEqual([call["name"] for call in self.calls() if call["command"] == "build"], ["python-3.15", "python-demo"])
 
+    def test_deferred_mode_keeps_source_tests_and_requires_separate_cache_stamp(self):
+        result = self.build('--defer-acceptance', '--build-release', '123')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(any(call['command'] == 'test' for call in self.calls()))
+        self.assertTrue(all('--no-tests' not in call['args'] for call in self.calls()))
+        policy = self.root / 'out/demo/x86_64/build-policy.json'
+        self.assertEqual(json.loads(policy.read_text()), {'build_release': '123'})
+        before = self.calls()
+        self.assertEqual(self.build('--defer-acceptance', '--build-release', '456').returncode, 0)
+        self.assertEqual(self.calls(), before)
+        self.assertEqual(json.loads(policy.read_text())['build_release'], '123')
+        self.assertEqual(self.build().returncode, 0)
+        self.assertTrue(any(call['command'] == 'test' for call in self.calls()))
+
+    def test_deferred_mode_rejects_disabling_source_tests_before_any_work(self):
+        result = self.build('--defer-acceptance', '--no-tests')
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('--defer-acceptance requires source tests', result.stderr)
+        self.assertFalse((self.root / 'calls.jsonl').exists())
+        self.assertFalse((self.root / 'out').exists())
+        self.assertFalse((self.root / '.work').exists())
+
+    def test_deferred_source_failure_does_not_stamp_or_run_acceptance(self):
+        result = self.build('--defer-acceptance', env=dict(self.env, SOURCE_FAIL='demo'))
+        self.assertEqual(result.returncode, 7)
+        self.assertFalse((self.root / 'out/.stamps/x86_64/demo').exists())
+        self.assertFalse(any(call['command'] == 'test' for call in self.calls()))
+        self.assertTrue((self.root / 'out/demo/evidence/source.log').exists())
+
 
 if __name__ == "__main__":
     unittest.main()
