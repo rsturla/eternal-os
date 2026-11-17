@@ -36,19 +36,6 @@ build:
         install -m 0644 LICENSE \
           "$STAGE/usr/share/licenses/eternal-release/LICENSE"
 
-  tests:
-    - name: release-files
-      script: |
-        grep -q '^ID=eternal$' os-release
-        grep -q '^VERSION_ID="rolling"$' os-release
-        grep -q '^PRETTY_NAME="Eternal Linux Rolling"$' os-release
-        test -f system-release
-        test -f redhat-release
-        grep -q 'baseurl=https://packages.eternal.sturla.tech/' eternal.repo
-        grep -q '^\[eternal-archive\]$' eternal.repo
-        grep -q 'baseurl=https://packages.eternal.sturla.tech/archive/' eternal.repo
-
-
 outputs:
   - name: eternal-release
     summary: Eternal Linux release files
@@ -81,10 +68,28 @@ outputs:
         - redhat-release
 
 tests:
-  - name: installed
-    packages: [bash-binsh]
+  - name: release-files
+    packages: [grep]
+    script: |
+      grep -q '^ID=eternal$' "$TEST_PACKAGE_ROOT/etc/os-release"
+      grep -q '^VERSION_ID="rolling"$' "$TEST_PACKAGE_ROOT/etc/os-release"
+      grep -q '^PRETTY_NAME="Eternal Linux Rolling"$' "$TEST_PACKAGE_ROOT/etc/os-release"
+      test -f "$TEST_PACKAGE_ROOT/etc/system-release"
+      test -f "$TEST_PACKAGE_ROOT/etc/redhat-release"
+      grep -q 'baseurl=https://packages.eternal.sturla.tech/' "$TEST_PACKAGE_ROOT/etc/yum.repos.d/eternal.repo"
+      grep -q '^\[eternal-archive\]$' "$TEST_PACKAGE_ROOT/etc/yum.repos.d/eternal.repo"
+      grep -q 'baseurl=https://packages.eternal.sturla.tech/archive/' "$TEST_PACKAGE_ROOT/etc/yum.repos.d/eternal.repo"
+  - name: identity-and-repositories
+    packages:
+      - bash
+      - coreutils
+      - grep
     script: |
       . /etc/os-release
       test "$ID" = eternal
-      test "$VERSION_ID" = "rolling"
-      test -f /etc/yum.repos.d/eternal.repo
+      test "$VERSION_ID" = rolling
+      test "$PRETTY_NAME" = 'Eternal Linux Rolling'
+      test "$(cat /etc/system-release)" = "$(cat /etc/redhat-release)"
+      grep '^\[eternal\]$' /etc/yum.repos.d/eternal.repo
+      grep '^\[eternal-archive\]$' /etc/yum.repos.d/eternal.repo
+      grep '^baseurl=https://packages.eternal.sturla.tech/' /etc/yum.repos.d/eternal.repo
