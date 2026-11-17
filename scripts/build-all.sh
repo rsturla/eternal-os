@@ -137,7 +137,7 @@ ensure_toolchain_repo() {
   ((no_tests)) && args+=(--no-tests)
   "${args[@]}"
 
-  find "$toolchain_out" -type f -name '*.rpm' ! -name '*.src.rpm' \
+  find "$toolchain_out" -mindepth 2 -maxdepth 2 -type f -name '*.rpm' ! -name '*.src.rpm' \
     -exec cp -t "$toolchain_rpms" {} +
   "$rpmx" repo --rpms "$toolchain_rpms" --output "$toolchain_repo"
   printf '%s\n' "$hash" >"$stamp"
@@ -216,7 +216,36 @@ for recipe in "${recipes[@]}"; do
   cmd+=("${extra[@]}")
 
   echo "==> build ${recipe#"$root"/} (${hash_of[$name]:0:12}) -> $pkg_output"
+  # A failed rebuild must not leave an earlier success stamp or acceptance
+  # receipt that can be mistaken for this invocation's result.
+  rm -f -- "$stamp"
+  rm -rf -- "$pkg_output/acceptance"
   "${cmd[@]}"
+
+  if ((no_tests == 0)); then
+    # The build report identifies this invocation's actual architecture outputs,
+    # including --arch all. Do not test stale directories from earlier builds.
+    mapfile -t built_arches < <(python3 - "$pkg_output/run-report.json" <<'PY_REPORT'
+import json
+from pathlib import Path
+import sys
+report = json.loads(Path(sys.argv[1]).read_text())
+for arch in sorted({Path(path).parent.name for path in report["artifacts"]["rpms"]}):
+    print(arch)
+PY_REPORT
+)
+    if ((${#built_arches[@]} == 0)); then
+      echo "successful build produced no reported binary RPMs: $name" >&2
+      exit 1
+    fi
+    for target in "${built_arches[@]}"; do
+      accept=(python3 "$root/scripts/accept-rpms.py" "$recipe"
+        --arch "$target" --install-dir "$pkg_output/$target"
+        --output "$pkg_output/acceptance/$target")
+      [[ -z $build_release ]] || accept+=(--build-release "$build_release")
+      "${accept[@]}"
+    done
+  fi
 
   mkdir -p "$stamp_dir"
   printf '%s\n' "$stamp_value" >"$stamp"
