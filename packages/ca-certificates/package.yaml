@@ -66,7 +66,7 @@ outputs:
         - /etc/ca-certificates.conf
     tests:
       - name: installed
-        packages: [bash-binsh, coreutils]
+        packages: [bash-binsh, coreutils, findutils]
         script: |
           test -n "$(find /usr/share/ca-certificates -name '*.crt' -print -quit)"
           test -s /etc/ca-certificates.conf
