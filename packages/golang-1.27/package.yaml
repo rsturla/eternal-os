@@ -118,6 +118,9 @@ outputs:
         - /usr/share/licenses/golang-1.27/LICENSE
         - /usr/share/licenses/golang-1.27/PATENTS
     dependencies:
+      provides:
+        - rpmx(toolchain:go:1.27) = ${package.version}
+        - rpmx(component:go-stdlib:1.27) = ${package.version}
       run: [ca-certificates]
     tests:
       - name: compile
