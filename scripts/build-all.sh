@@ -20,6 +20,7 @@ jobs=
 force=0
 locked=0
 no_tests=0
+defer_acceptance=0
 extra=()
 
 usage() {
@@ -37,6 +38,7 @@ usage: build-all.sh [options]
   --build-release N  Append +buildN to rebuilt packages (rolling releases)
   --jobs N           Parallel build jobs exported to steps as JOBS
   --locked           Refuse recipe, source or root drift
+  --defer-acceptance Run source tests; accept the resulting RPMs separately
   --no-tests         Build without running the recipe's tests
   -h, --help         Show this help
 EOF
@@ -90,6 +92,10 @@ while (($# > 0)); do
       extra+=(--locked)
       shift
       ;;
+    --defer-acceptance)
+      defer_acceptance=1
+      shift
+      ;;
     --no-tests)
       no_tests=1
       extra+=(--no-tests)
@@ -106,6 +112,11 @@ while (($# > 0)); do
       ;;
   esac
 done
+
+if ((defer_acceptance && no_tests)); then
+  echo "--defer-acceptance requires source tests; cannot combine with --no-tests" >&2
+  exit 2
+fi
 
 if [[ -n $package && $selection == affected ]]; then
   echo "--package cannot be combined with --affected" >&2
@@ -186,7 +197,7 @@ for line in "${hashes[@]}"; do
 done
 
 stamp_dir="$output/.stamps/${arch:-native}"
-variant="tests=$((1 - no_tests)) signed=$([[ -n $signing_key ]] && echo 1 || echo 0) locked=$locked"
+variant="tests=$((1 - no_tests)) signed=$([[ -n $signing_key ]] && echo 1 || echo 0) locked=$locked deferred=$defer_acceptance"
 
 for recipe in "${recipes[@]}"; do
   name=$(basename "$(dirname "$recipe")")
@@ -206,8 +217,7 @@ for recipe in "${recipes[@]}"; do
     fi
   fi
 
-  # One output directory per package: the installed-stage test root must not
-  # see RPMs from unrelated packages.
+  # Keep each package's source artifacts and acceptance evidence together.
   cmd=("$rpmx" build "$recipe" --output "$pkg_output")
   [[ -n $arch ]] && cmd+=(--arch "$arch")
   [[ -n $signing_key ]] && cmd+=(--signing-key "$signing_key")
@@ -222,7 +232,17 @@ for recipe in "${recipes[@]}"; do
   rm -rf -- "$pkg_output/acceptance"
   "${cmd[@]}"
 
-  if ((no_tests == 0)); then
+  # Persist the release that actually produced these bytes, including on cache hits.
+  python3 - "$pkg_output/run-report.json" "$build_release" <<'PY_POLICY'
+import json
+from pathlib import Path
+import sys
+report = json.loads(Path(sys.argv[1]).read_text())
+for directory in {Path(path).parent for path in report["artifacts"]["rpms"]}:
+    (directory / "build-policy.json").write_text(json.dumps({"build_release": sys.argv[2] or None}) + "\n")
+PY_POLICY
+
+  if ((no_tests == 0 && defer_acceptance == 0)); then
     # The build report identifies this invocation's actual architecture outputs,
     # including --arch all. Do not test stale directories from earlier builds.
     mapfile -t built_arches < <(python3 - "$pkg_output/run-report.json" <<'PY_REPORT'
