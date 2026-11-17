@@ -60,6 +60,23 @@ def candidate_attempt(prefix, repository, commit, run, event, pr=None, base=None
             'run_attempt': run['run_attempt'], 'artifact': artifacts[0]}
 
 
+def find_pr_attempt(repository, commit, pr):
+    prefix = f'repos/{repository}'
+    head = pr['head']['sha']
+    for run in pages(f'{prefix}/actions/workflows/ci.yml/runs?event=pull_request&head_sha={head}&status=success', 'workflow_runs'):
+        association = next((item for item in run['pull_requests'] if item['number'] == pr['number']), None)
+        if (run['event'] != 'pull_request' or run['status'] != 'completed' or run['conclusion'] != 'success'
+                or run['head_sha'] != head or run['path'] != '.github/workflows/ci.yml' or not association
+                or run['head_repository']['id'] != pr['head']['repo']['id']
+                or association['head']['sha'] != head):
+            continue
+        attempt = candidate_attempt(prefix, repository, commit, run, 'pull_request',
+                                    pr['number'], association['base']['sha'])
+        if attempt:
+            return attempt
+    raise ValueError('no successful PR run with an unexpired matching candidate; rerun PR CI before queueing')
+
+
 def find(args):
     if not re.fullmatch(r'[\w.-]+/[\w.-]+', args.repository) or not re.fullmatch(r'[0-9a-f]{40}', args.commit):
         raise ValueError('invalid repository or merged commit')
@@ -85,19 +102,12 @@ def find(args):
         if (not pr.get('merged') or pr.get('merge_commit_sha') != args.commit or
                 pr['base']['ref'] != 'main' or pr['base']['repo']['full_name'] != args.repository):
             continue
-        head = pr['head']['sha']
-        for run in pages(f'{prefix}/actions/workflows/ci.yml/runs?event=pull_request&head_sha={head}&status=success', 'workflow_runs'):
-            association = next((item for item in run['pull_requests'] if item['number'] == pr['number']), None)
-            if (run['event'] != 'pull_request' or run['status'] != 'completed' or run['conclusion'] != 'success'
-                    or run['head_sha'] != head or run['path'] != '.github/workflows/ci.yml' or not association
-                    or run['head_repository']['id'] != pr['head']['repo']['id']
-                    or association['head']['sha'] != head):
-                continue
-            attempt = candidate_attempt(prefix, args.repository, args.commit, run, 'pull_request',
-                                        pr['number'], association['base']['sha'])
-            if attempt:
-                write(args.output, attempt)
-                return {'found': True, 'run': run['id'], 'pr': pr['number'], 'event': 'pull_request'}
+        try:
+            attempt = find_pr_attempt(args.repository, args.commit, pr)
+        except ValueError:
+            continue
+        write(args.output, attempt)
+        return {'found': True, 'run': attempt['run'], 'pr': pr['number'], 'event': 'pull_request'}
     return {'found': False, 'reason': 'no successful PR or queue run with an unexpired matching candidate'}
 
 
@@ -182,18 +192,17 @@ def check_inputs(receipt, state, commit, tree, hashes, baseline, published):
     required = {name for name, value in hashes.items() if published.get('hashes', {}).get(name) != value}
     if required - state['builds'].keys():
         raise ValueError(f'PR did not build all required recipes: {sorted(required - state["builds"].keys())}')
-    # A late merge of an older PR must not downgrade an already published EVR.
-    if state['build_release'] <= published.get('build_release', 0):
+    # Queue validation checks each output's EVR and unchanged source family.
+    # Direct PR reuse retains the conservative global counter check.
+    if not state.get('queue') and state['build_release'] <= published.get('build_release', 0):
         raise ValueError('PR release counter is older than the published transaction')
     return {'schema': 1, 'commit': commit,
             'hashes': dict(published.get('hashes', {}), **{name: hashes[name] for name in state['builds']}),
-            'build_release': state['build_release'] + state['wave']}
+            'build_release': max(state['build_release'] + state['wave'], published.get('build_release', 0))}
 
 
-def verify(args):
-    attempt = json.loads(args.attempt.read_text())
-    if attempt['commit'] != args.commit or git('rev-parse', 'HEAD') != args.commit:
-        raise ValueError('release checkout differs from requested merge')
+def download_candidate(attempt, scratch):
+    """Verify the service archive, completed run and source commit before use."""
     prefix = f'repos/{attempt["repository"]}'
     # Recheck the run, attempt, and immutable artifact identity before download.
     run = api(f'{prefix}/actions/runs/{attempt["run"]}')
@@ -202,23 +211,33 @@ def verify(args):
             or run['head_sha'] != attempt['head'] or run['run_attempt'] != attempt['run_attempt']
             or artifact['expired'] or artifact['digest'] != attempt['artifact']['digest']):
         raise ValueError('PR evidence expired or changed')
+    archive = scratch / 'candidate.zip'
+    with archive.open('wb') as stream:
+        subprocess.run(['gh', 'api', f'{prefix}/actions/artifacts/{artifact["id"]}/zip'], stdout=stream, check=True)
+    data = load('package-artifacts')
+    if 'sha256:' + data.digest(archive) != artifact['digest']:
+        raise ValueError('GitHub artifact archive digest mismatch')
+    candidate = scratch / 'candidate'
+    unpack(archive, candidate)
+    receipt, state = validate_inventory(candidate)
+    if state.get('queue') and attempt.get('event') != 'merge_group':
+        raise ValueError('queue validation evidence requires a successful queue run')
+    tested = api(f'{prefix}/git/commits/{state["commit"]}')
+    parents = [parent['sha'] for parent in tested['parents']]
+    matches_run = (state['commit'] == attempt['head'] if attempt.get('event') == 'merge_group' else
+                   state['commit'] == attempt['head'] or parents == [attempt['base'], attempt['head']])
+    if tested['sha'] != state['commit'] or tested['tree']['sha'] != receipt['tree'] or not matches_run:
+        raise ValueError('candidate commit is not the PR head or its tested merge tree')
+    return candidate, receipt, state
+
+
+def verify(args):
+    attempt = json.loads(args.attempt.read_text())
+    if attempt['commit'] != args.commit or git('rev-parse', 'HEAD') != args.commit:
+        raise ValueError('release checkout differs from requested merge')
     with tempfile.TemporaryDirectory(prefix='eternal-promotion-') as temporary:
         scratch = Path(temporary)
-        archive = scratch / 'candidate.zip'
-        with archive.open('wb') as stream:
-            subprocess.run(['gh', 'api', f'{prefix}/actions/artifacts/{artifact["id"]}/zip'], stdout=stream, check=True)
-        data = load('package-artifacts')
-        if 'sha256:' + data.digest(archive) != artifact['digest']:
-            raise ValueError('GitHub artifact archive digest mismatch')
-        candidate = scratch / 'candidate'
-        unpack(archive, candidate)
-        receipt, state = validate_inventory(candidate)
-        tested = api(f'{prefix}/git/commits/{state["commit"]}')
-        parents = [parent['sha'] for parent in tested['parents']]
-        matches_run = (state['commit'] == attempt['head'] if attempt.get('event') == 'merge_group' else
-                       state['commit'] == attempt['head'] or parents == [attempt['base'], attempt['head']])
-        if tested['sha'] != state['commit'] or tested['tree']['sha'] != receipt['tree'] or not matches_run:
-            raise ValueError('candidate commit is not the PR head or its tested merge tree')
+        candidate, receipt, state = download_candidate(attempt, scratch)
         hashes = dict(line.split() for line in subprocess.check_output(
             [str(ROOT / 'scripts/package-hash.sh')], text=True).splitlines())
         transaction = load('build-transaction')
@@ -244,8 +263,9 @@ def verify(args):
         write(args.output / 'packages/promotion.json', {
             'schema': 1, 'repository': attempt['repository'], 'event': attempt.get('event', 'pull_request'),
             'pull_request': attempt['pr'],
-            'run': attempt['run'], 'run_attempt': attempt['run_attempt'], 'artifact': artifact['id'],
-            'artifact_digest': artifact['digest'], 'tested_commit': state['commit'], 'merged_commit': args.commit,
+            'run': attempt['run'], 'run_attempt': attempt['run_attempt'], 'artifact': attempt['artifact']['id'],
+            'artifact_digest': attempt['artifact']['digest'], 'tested_commit': state['commit'], 'merged_commit': args.commit,
+            'queue': state.get('queue'),
             'tree': receipt['tree'],
         })
     return {'eligible': True, 'run': attempt['run'], 'pr': attempt['pr']}

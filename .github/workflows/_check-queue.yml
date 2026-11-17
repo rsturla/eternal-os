@@ -1,0 +1,99 @@
+name: Check existing PR packages against main
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+jobs:
+  prepare:
+    name: Verify PR artifacts and current main inputs
+    runs-on: ubuntu-26.04
+    outputs:
+      matrix: ${{ steps.prepare.outputs.matrix }}
+      packages: ${{ steps.prepare.outputs.packages }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-rpmx
+      - name: Overlay the verified PR RPMs on latest main
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          BASE_URL: ${{ vars.PACKAGES_BASE_URL || 'https://packages.eternal.sturla.tech' }}
+        run: |
+          python3 ./scripts/queue-packages.py --repository "$REPOSITORY" --event "$GITHUB_EVENT_PATH" \
+            --base-url "$BASE_URL" --output .work/queue >"$RUNNER_TEMP/queue.json"
+          cat "$RUNNER_TEMP/queue.json"
+          echo "matrix=$(jq -c .matrix "$RUNNER_TEMP/queue.json")" >>"$GITHUB_OUTPUT"
+          echo "packages=$(jq -c .packages "$RUNNER_TEMP/queue.json")" >>"$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.prepare.outputs.packages != '[]'
+        with:
+          name: queue-inputs
+          path: |
+            .work/queue/artifacts/
+            .work/queue/transaction/
+          overwrite: true
+          retention-days: 1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.prepare.outputs.packages != '[]'
+        with:
+          name: acceptance-repository-x86_64
+          path: .work/queue/repository/x86_64/
+          overwrite: true
+          retention-days: 1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.prepare.outputs.packages != '[]'
+        with:
+          name: acceptance-repository-aarch64
+          path: .work/queue/repository/aarch64/
+          overwrite: true
+          retention-days: 1
+
+  accept:
+    name: Test PR RPMs with main
+    needs: prepare
+    if: needs.prepare.outputs.packages != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    uses: ./.github/workflows/_accept-rpm.yml
+    with:
+      package: ${{ matrix.package }}
+      arch: ${{ matrix.arch }}
+      runner: ${{ matrix.runner }}
+      wave: ${{ matrix.wave }}
+      queue: true
+
+  candidate:
+    name: Export the PR bytes accepted against main
+    needs: [prepare, accept]
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: queue-inputs
+          path: .work/queue
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: accepted-*
+          path: .work/queue/artifacts
+      - name: Verify and pack the bytes accepted by the queue
+        run: |
+          python3 ./scripts/transaction-artifacts.py pack --state .work/queue/transaction/state.json \
+            --artifacts .work/queue/artifacts --output .work/candidate
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-candidate
+          path: .work/candidate/
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 1

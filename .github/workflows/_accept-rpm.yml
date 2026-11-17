@@ -15,6 +15,10 @@ on:
       runner:
         required: true
         type: string
+      queue:
+        description: Use the verified PR artifacts staged by the merge queue.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -27,12 +31,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-rpmx
         with:
-          artifact: rpmx-${{ inputs.arch }}
+          artifact: ${{ !inputs.queue && format('rpmx-{0}', inputs.arch) || '' }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: inputs.queue
+        with:
+          name: queue-inputs
+          path: .work/queue
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: ${{ !inputs.queue }}
         with:
           name: source-w${{ inputs.wave }}-${{ inputs.package }}
           path: .work/bundle
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: ${{ !inputs.queue }}
         with:
           name: binary-w${{ inputs.wave }}-${{ inputs.package }}-${{ inputs.arch }}
           path: .work/binaries
@@ -43,9 +54,18 @@ jobs:
       - name: Run package acceptance
         env:
           TARGET_ARCH: ${{ inputs.arch }}
+          QUEUE: ${{ inputs.queue }}
+          PACKAGE: ${{ inputs.package }}
+          WAVE: ${{ inputs.wave }}
         run: |
-          python3 ./scripts/package-artifacts.py accept --bundle .work/bundle \
-            --binaries .work/binaries --arch "$TARGET_ARCH" --repository .work/repository --output out
+          bundle=.work/bundle
+          binaries=.work/binaries
+          if [ "$QUEUE" = true ]; then
+            bundle=".work/queue/artifacts/source-w${WAVE}-${PACKAGE}"
+            binaries=".work/queue/artifacts/binary-w${WAVE}-${PACKAGE}-${TARGET_ARCH}"
+          fi
+          python3 ./scripts/package-artifacts.py accept --bundle "$bundle" \
+            --binaries "$binaries" --arch "$TARGET_ARCH" --repository .work/repository --output out
       - name: Upload accepted package
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

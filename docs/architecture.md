@@ -115,8 +115,9 @@ manifest lists are not part of `make` or of `release.yml`, so nothing here needs
 
 ## Pipeline
 
-Pull requests lint and build affected recipes. Merge-queue runs build the
-integrated tree. Releases first try to reuse a matching successful candidate,
+Pull requests lint and build affected recipes. Merge-queue runs check those
+existing RPMs against the latest published `main` packages. They verify build
+inputs and rerun acceptance without package compilation. Releases first try to reuse a matching successful candidate,
 then build on `main` when its inputs or baseline differ. Published recipe
 hashes select changes. Each package prepares its shared
 SRPM, then starts native binary workers. Build tests gate those outputs.

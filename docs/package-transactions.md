@@ -60,7 +60,10 @@ coverage and acceptance repository identities. Current build-input hashes must
 match the tested hashes. The published package baseline must also match, and
 the PR must cover every recipe required by current published hashes. That last
 check prevents reuse from overlooking changes from an earlier failed release.
-The candidate release counter must be newer than the published counter.
+Direct PR promotion requires a newer release counter than the published counter.
+A queue can validate an older PR counter after an unrelated publication. It must
+first prove that no published source family replaced by that PR has changed.
+The publication watermark stays monotonic without changing the tested RPMs.
 
 A missing or mismatched candidate falls back to the normal main transaction.
 A failure during signing or publication fails the release instead of starting
@@ -78,24 +81,47 @@ file digests.
 ### Merge queue checks
 
 CI handles `merge_group: checks_requested` and reports a stable `Required CI`
-check. A queue run builds all recipes changed since the last successful
-publication, including outstanding changes from failed releases. It runs the
-same dependency rebuilds and final acceptance as a PR transaction. Commit
-conventions run on PR commits; they do not inspect GitHub's generated queue
-commit messages. The aggregate check fails on any applicable failure or skipped
-package workflow.
+check. `_check-queue.yml` imports the successful PR run's existing RPMs. It never
+compiles packages. `scripts/queue-packages.py` verifies the GitHub archive digest,
+completed run, exact PR head, source manifests and original acceptance records.
+
+The queue checks the following conditions before it runs acceptance:
+
+- The integrated tree is exactly current `main` plus one open PR. A tree check
+  rejects larger groups or a different PR head.
+- Every reused package has the same build-input hash as the integrated tree.
+  Unrelated recipe and documentation changes on `main` do not require recompilation.
+- Published hashes cover every other recipe on latest `main`. If a previous
+  release failed or is still in progress, the queue requires publication first.
+- The PR's replaced source families have not changed in the published baseline.
+  Each PR RPM must also have a newer epoch, version and release than its published
+  counterpart. This prevents replacement of newer RPMs by older PR artifacts.
+- Changed dependencies retain their public build inputs. The queue checks
+  declared dependencies, actual consumed build-root providers and tool policy.
+  The complete PR rebuild set must still cover all required consumers.
+
+The queue overlays the exact PR RPMs on a fresh published `main` snapshot.
+Native acceptance runs against this fixed combined repository on both
+architectures. A successful run exports the same RPM bytes in a new candidate.
+Its records bind the acceptance result to the queue tree and original PR run.
+After merge, the release prefers this candidate and signs and publishes its RPMs.
+
+Missing or expired PR artifacts block the queue. Changed build inputs or an
+incomplete rebuild set require an updated PR and a new PR build. The queue does
+not hide these failures by rebuilding. Documentation-only PRs need no package
+artifact. Commit conventions run on PR commits, while lint runs on the integrated
+queue tree. `Required CI` requires the applicable PR or queue workflow to succeed.
 
 After this workflow lands on `main`, branch protection can require `Required CI`
-and enable the merge queue. Use rebase merges to retain linear history, one
-queue build at a time, and enough check timeout for native package builds.
+and enable the merge queue. Use rebase merges to retain linear history. Set
+queue build concurrency and maximum merge group size to one. Allow enough check
+timeout for native acceptance. An unexpected combined group fails the tree check.
 Existing protection rules must be reconciled when enabling the queue. This
 changeset does not enable a queue before its workflow exists on the base branch.
 
-A queue avoids rebuilding after merge solely because the integrated source tree
-changed. A repository publication that changes dependencies during queue testing
-still invalidates the candidate. That release takes the safe rebuild path.
-PR and queue checks both build packages; a queue run can build again for its
-integrated tree. Promotion avoids a further compilation after merge.
+A queue allows the source tree to advance without recompilation when the PR's
+build inputs remain valid. A repository publication during queue testing can
+still invalidate the candidate. That release takes the safe rebuild path.
 
 ## What counts as an interface change
 

@@ -28,6 +28,8 @@ PROMOTE = load('promote-packages')
 SIGN = load('sign-packages')
 ARTIFACTS = load('package-artifacts')
 TRANSPORT = load('transaction-artifacts')
+QUEUE = load('queue-packages')
+TRANSACTION = load('build-transaction')
 HEAD, MERGED, BASE, TREE, TESTED = (letter * 40 for letter in 'abcde')
 
 
@@ -281,6 +283,46 @@ class CandidateIntegration(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'changed a tested'):
                 SIGN.sign(directory, self.fixture / 'key.asc')
         self.assertFalse((directory / 'signing.json').exists())
+
+    @unittest.skipUnless(shutil.which('mergerepo_c') and shutil.which('modifyrepo_c'), 'createrepo-c tools required')
+    def test_queue_stages_seals_and_exports_the_original_pr_rpm_bytes(self):
+        candidate, state = self.candidate()
+        queued = self.root / 'queued'
+        state.update(commit=HEAD, tree=BASE, queue={'run': 20, 'built_commit': TESTED})
+        state['baseline'] = {arch: [] for arch in PROMOTE.ARCHES}
+        binary = next((candidate / 'packages/probe/x86_64').glob('*.rpm'))
+        inspected = TRANSACTION.inspect_rpm(binary)
+        for arch in PROMOTE.ARCHES:
+            state['builds']['probe']['targets'][arch]['rpms'] = [inspected]
+        QUEUE.stage(candidate, state, queued)
+        empty = self.root / 'empty'
+        empty.mkdir()
+        for arch in PROMOTE.ARCHES:
+            (queued / 'transaction/baseline' / arch).mkdir(parents=True)
+            subprocess.run(['createrepo_c', '--no-database', '--general-compress-type=gz', str(empty), '--outputdir',
+                            str(queued / 'transaction/baseline' / arch)], check=True, capture_output=True)
+        state_path = queued / 'transaction/state.json'
+        ARTIFACTS.write_json(state_path, state)
+        TRANSACTION.seal(argparse.Namespace(state=state_path, artifacts=queued / 'artifacts', output=queued / 'repository'))
+        sealed = json.loads(state_path.read_text())
+        for arch in PROMOTE.ARCHES:
+            pool = queued / 'repository' / arch
+            self.assertEqual((pool / binary.name).read_bytes(), binary.read_bytes())
+            self.assertEqual(TRANSACTION.baseline_packages(pool)[0]['name'], 'probe')
+            self.assertEqual(TRANSACTION.baseline_packages(pool)[0]['evr'], inspected['evr'])
+            source = queued / 'artifacts' / f'binary-w0-probe-{arch}' / 'probe' / arch
+            record = json.loads((source / 'source-manifest.json').read_text())
+            record['acceptance_repository'] = sealed['repositories'][arch]
+            accepted = queued / 'artifacts' / f'accepted-probe-{arch}' / 'probe' / arch
+            shutil.copytree(source, accepted)
+            ARTIFACTS.write_json(accepted / 'source-manifest.json', record)
+        exported = self.root / 'queue-candidate'
+        TRANSPORT.pack(argparse.Namespace(state=state_path, artifacts=queued / 'artifacts', output=exported))
+        receipt, validated = PROMOTE.validate_inventory(exported)
+        self.assertEqual(receipt['tree'], BASE)
+        self.assertEqual(validated['queue']['built_commit'], TESTED)
+        for arch in PROMOTE.ARCHES:
+            self.assertEqual((exported / 'packages/probe' / arch / binary.name).read_bytes(), binary.read_bytes())
 
     def test_verified_github_archive_and_current_inputs_prepare_main_publication_without_rebuild(self):
         candidate, state = self.candidate()

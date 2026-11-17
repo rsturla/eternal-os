@@ -201,7 +201,8 @@ When run as root with `dnf5`, they also test package upgrades and metadata signa
 
 ## How a release works
 
-Pull requests build affected recipes. Merge queues build the integrated tree.
+Pull requests build affected recipes. Merge queues check those existing RPMs
+against the latest published `main` packages, then rerun acceptance without compilation.
 After merge, releases reuse matching tested artifacts or build changed recipes
 on `main`. Transactions schedule consumer rebuilds when public library payloads, headers, static
 archives or explicit tool relationships change.

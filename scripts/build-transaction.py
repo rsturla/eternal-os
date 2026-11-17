@@ -72,6 +72,7 @@ def open_url(url):
 def baseline_packages(repository):
     records = []
     for package in primary(repository):
+        version = package.find('{*}version')
         location = package.find('{*}location')
         href = location.get('href')
         base = location.get('{http://www.w3.org/XML/1998/namespace}base', '')
@@ -83,6 +84,7 @@ def baseline_packages(repository):
             'requires': [entry.get('name') for entry in package.findall('{*}format/{*}requires/{*}entry')],
             'url': urllib.parse.urljoin(base.rstrip('/') + '/', href) if base else href,
             'checksum': f'{checksum.get("type")}:{checksum.text}',
+            **({'evr': [version.get('epoch', '0'), version.get('ver'), version.get('rel')]} if version is not None else {}),
         })
     return records
 
@@ -152,6 +154,7 @@ def inspect_rpm(path):
     def query(format):
         return capture('rpm', '-qp', '--qf', format, path).splitlines()
     name, source, arch = query('%{NAME}\n%{SOURCERPM}\n%{ARCH}\n')
+    evr = query('%{EPOCHNUM}\n%{VERSION}\n%{RELEASE}\n')
     provides = query('[%{PROVIDENAME}\n]')
     # A changed public library payload is a possible ABI change. Headers and
     # static libraries also invalidate consumers. This deliberately overbuilds
@@ -169,7 +172,7 @@ def inspect_rpm(path):
                 '/include/' in filename or filename.endswith('.a')):
             public.append([filename, checksum, fields[4], fields[-1]])
     interface = {'provides': sorted(value for value in provides if '.so' in value), 'files': sorted(public)}
-    return {'name': name, 'source': source_name(source), 'arch': arch,
+    return {'name': name, 'source': source_name(source), 'arch': arch, 'evr': evr,
             'provides': provides, 'requires': query('[%{REQUIRENAME}\n]'),
             'interface': interface, 'payload': sorted(payload), 'sha512': digest(path, 'sha512'), 'sha256': digest(path), 'file': path.name}
 
