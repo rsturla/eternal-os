@@ -12,10 +12,11 @@ Run rpmx as a regular user on Linux. Native bubblewrap builds and tests require:
 - `newuidmap` and `newgidmap`, supplied by `uidmap` or `shadow-utils`.
 - At least 65,536 subordinate user IDs allocated to your account in
   `/etc/subuid`, and at least 65,536 subordinate group IDs in `/etc/subgid`.
-- A host policy that permits unprivileged user namespaces and namespace-scoped
-  `CAP_DAC_OVERRIDE` for private transaction roots.
+- A host policy that permits unprivileged user namespaces and the namespace-scoped
+  capabilities needed for private RPM transactions.
 
-The shared scripts also use rootless Podman to resolve and assemble roots.
+The shared scripts require Bash, Python 3.11 or later, and `jq`. They use
+rootless Podman to resolve and assemble roots.
 After installing the pinned rpmx revision, check the host with:
 
 ```console
@@ -30,7 +31,8 @@ well as ID mappings.
 
 Ordinary bubblewrap steps run as UID/GID 65534, mapped to your host account,
 without capabilities. Transaction tests map your host account to namespace
-root and retain only `CAP_DAC_OVERRIDE` for their private writable root.
+root with a restricted capability set for file ownership, permissions, identity
+changes and chroot in their private writable root.
 Both modes use full subordinate ID maps, set no-new-privileges and prevent
 nested user namespaces. Missing mapping prerequisites fail setup; rpmx does
 not fall back to a single-ID map.

@@ -74,7 +74,7 @@ is written to `site/`. Both are ignored by Git.
 
 ## Quick start
 
-Requirements: Linux, Rust 1.88+, `podman`, `bubblewrap`, `dnf5` and `tar`.
+Requirements: Linux, Rust 1.88+, `podman`, `bubblewrap`, `dnf5`, `tar` and `jq`.
 Root resolution and test roots run through `podman`; build steps run through
 `bubblewrap`. `rpmx doctor` checks the host.
 
