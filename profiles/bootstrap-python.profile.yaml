@@ -1,5 +1,5 @@
 # Python 3.13 is an alternate interpreter in Fedora and has no python(abi) provide.
-# Use Eternal's versioned 3.13 runtime alongside the Fedora default interpreter.
+# Use Eternal's versioned interpreters and glibc 2.44 alongside Fedora's default Python.
 document: rpmx-profile
 version: 1
 name: bootstrap-python
@@ -19,13 +19,13 @@ repositories:
   - eternal-release
   - eternal-base
   - eternal-baselayout
-  - glibc-*
+  - glibc-2.43*
   - gcc-*
-  - ld-linux-*
-  - libc-bin-*
+  - ld-linux-2.43*
+  - libc-bin-2.43*
   - libstdc++-*
   - libatomic-*
-  - nss-db-*
+  - nss-db-2.43*
   - expat*
   - acl*
   - attr*
@@ -89,6 +89,8 @@ repositories:
 - id: fedora
   baseurl: https://dl.fedoraproject.org/pub/fedora/linux/releases/$releasever/Everything/$basearch/os/
   exclude:
+  # Eternal Python streams require the adopted glibc 2.44 ABI.
+  - glibc*
   - zstd*
   - libzstd*
   - bash
@@ -113,6 +115,8 @@ repositories:
 - id: updates
   metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch
   exclude:
+  # Eternal Python streams require the adopted glibc 2.44 ABI.
+  - glibc*
   - zstd*
   - libzstd*
   - bash
