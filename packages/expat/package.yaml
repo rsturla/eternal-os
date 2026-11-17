@@ -2,7 +2,7 @@
 #
 # XML parser library. A build dependency for gettext and other tooling in the
 # minimal Eternal userland.
-schema: 1
+schema: 2
 
 package:
   name: expat
@@ -62,14 +62,10 @@ outputs:
         - expat-libs = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            xmlwf -v
-            printf '<root/>' | xmlwf
+        script: |
+          xmlwf -v
+          printf '<root/>' | xmlwf
 
   - name: expat-libs
     summary: Expat runtime library
@@ -81,16 +77,12 @@ outputs:
         - /usr/share/licenses/expat-libs/COPYING
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libexpat.so.* /usr/lib/libexpat.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libexpat.so.* /usr/lib/libexpat.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: expat-devel
     summary: Expat development files
@@ -116,20 +108,16 @@ outputs:
 
 tests:
   - name: link
-    stage: installed
     packages: [gcc, glibc-devel, bash-binsh]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #include <expat.h>
-        int main(void) {
-          XML_Parser parser = XML_ParserCreate(0);
-          if (parser == 0) return 1;
-          XML_ParserFree(parser);
-          return 0;
-        }
-        EOF
-        gcc /tmp/test.c -lexpat -o /tmp/test
-        /tmp/test
+    script: |
+      cat > /tmp/test.c <<'EOF'
+      #include <expat.h>
+      int main(void) {
+        XML_Parser parser = XML_ParserCreate(0);
+        if (parser == 0) return 1;
+        XML_ParserFree(parser);
+        return 0;
+      }
+      EOF
+      gcc /tmp/test.c -lexpat -o /tmp/test
+      /tmp/test

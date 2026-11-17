@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/nghttp2.yaml
 # Build the shared library needed by curl. Defer the server and proxy applications.
-schema: 1
+schema: 2
 package:
   name: nghttp2
   version: 1.71.0
@@ -59,14 +59,9 @@ outputs:
     - libnghttp2 = ${package.version}-${package.release}
   tests:
   - name: load
-    stage: installed
     packages:
     - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       python3 -c 'import ctypes; ctypes.CDLL("libnghttp2.so.14")'
 - name: nghttp2-devel
   files:
@@ -82,16 +77,11 @@ outputs:
     - libnghttp2-devel = ${package.version}-${package.release}
   tests:
   - name: compile-and-run
-    stage: installed
     packages:
     - gcc
     - glibc-devel
     - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       cat > /tmp/test.c <<'EOF'
       #include <nghttp2/nghttp2.h>
       int main(void) { nghttp2_session_callbacks *c; if (nghttp2_session_callbacks_new(&c)) return 1; nghttp2_session_callbacks_del(c); return 0; }
@@ -108,6 +98,5 @@ outputs:
     - /usr/share/licenses/nghttp2-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check

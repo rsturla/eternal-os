@@ -12,7 +12,7 @@
 #
 # This mirrors Wolfi's openssf-compiler-options: the compiler package depends on
 # the policy package, and every build that installs the compiler inherits it.
-schema: 1
+schema: 2
 
 package:
   name: openssf-compiler-options
@@ -77,36 +77,31 @@ outputs:
 
 tests:
   - name: layout
-    stage: build
-    argv:
-      - sh
-      - -c
-      - |
-        test -L "$STAGE/usr/libexec/eternal/gcc/bin/gcc"
-        test "$(readlink "$STAGE/usr/libexec/eternal/gcc/bin/gcc")" = gcc-wrapper
-        for version in 13 14 15 16; do
-          test -f "$STAGE/usr/lib/eternal/gcc/openssf-$version.spec"
-          test -f "$STAGE/usr/lib/eternal/gcc/openssf-soft-format-$version.spec"
-          grep -q -- '-Werror=format-security' \
-            "$STAGE/usr/lib/eternal/gcc/openssf-$version.spec"
-          ! grep -q -- '-Werror=format-security' \
-            "$STAGE/usr/lib/eternal/gcc/openssf-soft-format-$version.spec"
-        done
-        test -f "$STAGE/usr/lib/eternal/gcc/openssf-arch-x86_64.spec"
-        test -f "$STAGE/usr/lib/eternal/gcc/openssf-arch-aarch64.spec"
-        grep -q -- '-fPIE' \
-          "$STAGE/usr/lib/eternal/gcc/openssf-16.spec"
-        grep -q -- '-fzero-init-padding-bits=all' \
-          "$STAGE/usr/lib/eternal/gcc/openssf-16.spec"
-        ! grep -q -- '-fzero-init-padding-bits=all' \
-          "$STAGE/usr/lib/eternal/gcc/openssf-13.spec"
-        grep -q -- '-march=x86-64-v2' \
-          "$STAGE/usr/lib/eternal/gcc/openssf-arch-x86_64.spec"
-        grep -q -- '-mbranch-protection=standard' \
-          "$STAGE/usr/lib/eternal/gcc/openssf-arch-aarch64.spec"
+    script: |
+      test -L "$TEST_PACKAGE_ROOT/usr/libexec/eternal/gcc/bin/gcc"
+      test "$(readlink "$TEST_PACKAGE_ROOT/usr/libexec/eternal/gcc/bin/gcc")" = gcc-wrapper
+      for version in 13 14 15 16; do
+        test -f "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-$version.spec"
+        test -f "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-soft-format-$version.spec"
+        grep -q -- '-Werror=format-security' \
+          "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-$version.spec"
+        ! grep -q -- '-Werror=format-security' \
+          "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-soft-format-$version.spec"
+      done
+      test -f "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-arch-x86_64.spec"
+      test -f "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-arch-aarch64.spec"
+      grep -q -- '-fPIE' \
+        "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-16.spec"
+      grep -q -- '-fzero-init-padding-bits=all' \
+        "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-16.spec"
+      ! grep -q -- '-fzero-init-padding-bits=all' \
+        "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-13.spec"
+      grep -q -- '-march=x86-64-v2' \
+        "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-arch-x86_64.spec"
+      grep -q -- '-mbranch-protection=standard' \
+        "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-arch-aarch64.spec"
 
   - name: default-wrapper
-    stage: installed
     packages: [gcc]
     environment:
       PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -116,7 +111,6 @@ tests:
           cc: cc
 
   - name: spec-13
-    stage: installed
     packages: [gcc]
     environment:
       PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -127,7 +121,6 @@ tests:
           cc: cc
 
   - name: spec-14
-    stage: installed
     packages: [gcc]
     environment:
       PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -138,7 +131,6 @@ tests:
           cc: cc
 
   - name: spec-15
-    stage: installed
     packages: [gcc]
     environment:
       PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -149,7 +141,6 @@ tests:
           cc: cc
 
   - name: spec-16
-    stage: installed
     packages: [gcc]
     environment:
       PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

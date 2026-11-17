@@ -2,7 +2,7 @@
 #
 # Zstandard compression tools and library. Used by tar and other tooling in
 # the minimal Eternal userland.
-schema: 1
+schema: 2
 
 package:
   name: zstd
@@ -63,16 +63,12 @@ outputs:
         - zstd-libs = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '%s\n' hello > /tmp/file
-            zstd /tmp/file -o /tmp/file.zst
-            zstd -d /tmp/file.zst -o /tmp/file.out
-            test "$(cat /tmp/file.out)" = hello
+        script: |
+          printf '%s\n' hello > /tmp/file
+          zstd /tmp/file -o /tmp/file.zst
+          zstd -d /tmp/file.zst -o /tmp/file.out
+          test "$(cat /tmp/file.out)" = hello
 
   - name: zstd-libs
     summary: Zstandard runtime library
@@ -86,16 +82,12 @@ outputs:
         - /usr/share/licenses/zstd-libs/LICENSE
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libzstd.so.* /usr/lib/libzstd.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libzstd.so.* /usr/lib/libzstd.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: zstd-devel
     summary: Zstandard development files
@@ -132,16 +124,12 @@ outputs:
         - libzstd-static = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libzstd.a /usr/lib/libzstd.a; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libzstd.a /usr/lib/libzstd.a; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: zstd-doc
     summary: Zstandard documentation
@@ -157,17 +145,13 @@ outputs:
 
 tests:
   - name: link
-    stage: installed
     packages: [gcc, glibc-devel, bash-binsh, coreutils]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #include <zstd.h>
-        int main(void) {
-          return ZSTD_versionNumber() != ZSTD_VERSION_NUMBER;
-        }
-        EOF
-        gcc /tmp/test.c -lzstd -o /tmp/test
-        /tmp/test
+    script: |
+      cat > /tmp/test.c <<'EOF'
+      #include <zstd.h>
+      int main(void) {
+        return ZSTD_versionNumber() != ZSTD_VERSION_NUMBER;
+      }
+      EOF
+      gcc /tmp/test.c -lzstd -o /tmp/test
+      /tmp/test

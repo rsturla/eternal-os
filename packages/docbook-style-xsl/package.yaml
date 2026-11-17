@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Use the non-namespaced stylesheets expected by existing DocBook build tools.
-schema: 1
+schema: 2
 package:
   name: docbook-style-xsl
   version: 1.79.2
@@ -50,15 +50,10 @@ outputs:
   arch: noarch
   tests:
   - name: transform
-    stage: installed
     packages:
       - libxslt
       - grep
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       printf '<article><title>Smoke</title><para>payload</para></article>\n' > /tmp/article.xml
       xsltproc --nonet /usr/share/sgml/docbook/xsl-stylesheets/html/docbook.xsl /tmp/article.xml > /tmp/article.html
       grep -q payload /tmp/article.html

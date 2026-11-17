@@ -2,7 +2,7 @@
 #
 # A library for arbitrary precision arithmetic. A build dependency for the GNU toolchain and the
 # rest of the minimal Eternal userland.
-schema: 1
+schema: 2
 
 package:
   name: gmp
@@ -65,16 +65,12 @@ outputs:
         - /usr/share/licenses/gmp/COPYINGv3
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libgmp.so.* /usr/lib/libgmp.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libgmp.so.* /usr/lib/libgmp.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: gmp-devel
     summary: GMP development files
@@ -105,22 +101,18 @@ outputs:
 
 tests:
   - name: link
-    stage: installed
     packages: [gcc, glibc-devel, bash-binsh]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #include <gmp.h>
-        int main(void) {
-          mpz_t value;
-          mpz_init_set_ui(value, 2);
-          mpz_mul_ui(value, value, 3);
-          int result = mpz_cmp_ui(value, 6) != 0;
-          mpz_clear(value);
-          return result;
-        }
-        EOF
-        gcc /tmp/test.c -lgmp -o /tmp/test
-        /tmp/test
+    script: |
+      cat > /tmp/test.c <<'EOF'
+      #include <gmp.h>
+      int main(void) {
+        mpz_t value;
+        mpz_init_set_ui(value, 2);
+        mpz_mul_ui(value, value, 3);
+        int result = mpz_cmp_ui(value, 6) != 0;
+        mpz_clear(value);
+        return result;
+      }
+      EOF
+      gcc /tmp/test.c -lgmp -o /tmp/test
+      /tmp/test

@@ -2,7 +2,7 @@
 #
 # RPM package manager. Built with the sqlite rpmdb, Sequoia OpenPGP backend and
 # the compression libraries needed to read rpm-md repositories.
-schema: 1
+schema: 2
 
 package:
   name: rpm
@@ -103,15 +103,11 @@ outputs:
         - popt
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            rpm --version
-            rpmbuild --version
-            rpm --eval '%{_libdir}' | grep -Fx /usr/lib64
+        script: |
+          rpm --version
+          rpmbuild --version
+          rpm --eval '%{_libdir}' | grep -Fx /usr/lib64
 
   - name: rpm-libs
     summary: Libraries for manipulating RPM packages
@@ -141,16 +137,12 @@ outputs:
         - zstd-libs
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/librpm.so.* /usr/lib/librpm.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/librpm.so.* /usr/lib/librpm.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: rpm-build-libs
     summary: Libraries for building RPM packages
@@ -165,16 +157,12 @@ outputs:
         - rpm-libs = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/librpmbuild.so.* /usr/lib/librpmbuild.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/librpmbuild.so.* /usr/lib/librpmbuild.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: rpm-devel
     summary: Development files for RPM
@@ -200,15 +188,11 @@ outputs:
         - zstd-devel
     tests:
       - name: link
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '#include <rpm/rpmlib.h>\nint main(void){return 0;}\n' > /tmp/rpm.c
-            gcc /tmp/rpm.c $(pkg-config --cflags --libs rpm) -o /tmp/rpm-test
-            /tmp/rpm-test
+        script: |
+          printf '#include <rpm/rpmlib.h>\nint main(void){return 0;}\n' > /tmp/rpm.c
+          gcc /tmp/rpm.c $(pkg-config --cflags --libs rpm) -o /tmp/rpm-test
+          /tmp/rpm-test
 
   - name: rpm-doc
     summary: Documentation for RPM

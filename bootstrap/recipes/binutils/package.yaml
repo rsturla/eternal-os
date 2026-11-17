@@ -11,7 +11,7 @@
 # This bootstrap variant exists because the ladder hides the seed binutils
 # provider while a stage builds this package. The production recipe is in
 # packages/binutils/package.yaml.
-schema: 1
+schema: 2
 
 package:
   name: binutils
@@ -82,6 +82,11 @@ build:
         outputs: [binutils, binutils-devel, binutils-doc]
     - uses: strip
 
+  tests:
+    - name: build
+      script: |
+        ./binutils/objdump --version | grep -q 'GNU objdump'
+
 outputs:
   - name: binutils
     summary: A GNU collection of binary utilities
@@ -92,15 +97,11 @@ outputs:
         - /usr/share/licenses/binutils/COPYING3.LIB
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            ld --version | grep -q 'GNU ld'
-            as --version | grep -q 'GNU assembler'
-            objdump --version | grep -q 'GNU objdump'
+        script: |
+          ld --version | grep -q 'GNU ld'
+          as --version | grep -q 'GNU assembler'
+          objdump --version | grep -q 'GNU objdump'
 
   - name: binutils-devel
     summary: Binutils development headers and libraries
@@ -117,14 +118,10 @@ outputs:
         - binutils = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            test -f /usr/include/bfd.h
-            test -f /usr/lib64/libbfd.a
+        script: |
+          test -f /usr/include/bfd.h
+          test -f /usr/lib64/libbfd.a
 
   - name: binutils-doc
     summary: Binutils documentation
@@ -136,11 +133,3 @@ outputs:
       license:
         - /usr/share/licenses/binutils-doc/COPYING3
         - /usr/share/licenses/binutils-doc/COPYING3.LIB
-
-tests:
-  - name: build
-    stage: build
-    argv:
-      - sh
-      - -c
-      - ./binutils/objdump --version | grep -q 'GNU objdump'

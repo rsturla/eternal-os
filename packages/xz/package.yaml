@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # XZ and LZMA compression tools and library. A dependency for the minimal Eternal build root.
-schema: 1
+schema: 2
 
 package:
   name: xz
@@ -69,17 +69,13 @@ outputs:
         - xz-libs = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            printf 'hello\n' > /tmp/file
-            xz /tmp/file
-            test -f /tmp/file.xz
-            unxz /tmp/file.xz
-            test "$(cat /tmp/file)" = hello
+        script: |
+          printf 'hello\n' > /tmp/file
+          xz /tmp/file
+          test -f /tmp/file.xz
+          unxz /tmp/file.xz
+          test "$(cat /tmp/file)" = hello
 
   - name: xz-libs
     summary: XZ runtime library
@@ -97,16 +93,12 @@ outputs:
         - /usr/share/licenses/xz-libs/COPYING.LGPLv2.1
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/liblzma.so.* /usr/lib/liblzma.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/liblzma.so.* /usr/lib/liblzma.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: xz-devel
     summary: XZ development files
@@ -145,17 +137,13 @@ outputs:
 
 tests:
   - name: link
-    stage: installed
     packages: [gcc, glibc-devel, bash-binsh, coreutils]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #include <lzma.h>
-        int main(void) {
-          return lzma_version_number() != LZMA_VERSION;
-        }
-        EOF
-        gcc /tmp/test.c -llzma -o /tmp/test
-        /tmp/test
+    script: |
+      cat > /tmp/test.c <<'EOF'
+      #include <lzma.h>
+      int main(void) {
+        return lzma_version_number() != LZMA_VERSION;
+      }
+      EOF
+      gcc /tmp/test.c -llzma -o /tmp/test
+      /tmp/test

@@ -2,7 +2,7 @@
 #
 # An implementation of pkg-config. Part of the minimal Eternal userland and the
 # bootstrap tool set. The source is the upstream release tarball.
-schema: 1
+schema: 2
 
 package:
   name: pkgconf
@@ -59,14 +59,10 @@ outputs:
         - pkgconf-pkg-config = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            test "$(pkgconf --version)" = 3.0.10
-            test "$(pkg-config --version)" = 3.0.10
+        script: |
+          test "$(pkgconf --version)" = 3.0.10
+          test "$(pkg-config --version)" = 3.0.10
 
   - name: pkgconf-libs
     summary: pkgconf runtime library
@@ -78,16 +74,12 @@ outputs:
         - /usr/share/licenses/pkgconf-libs/COPYING
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libpkgconf.so.* /usr/lib/libpkgconf.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libpkgconf.so.* /usr/lib/libpkgconf.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: pkgconf-devel
     summary: pkgconf development files
@@ -114,13 +106,9 @@ outputs:
         - pkgconf-devel = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            test -f /usr/lib64/libpkgconf.a
+        script: |
+          test -f /usr/lib64/libpkgconf.a
 
   - name: pkgconf-doc
     summary: An implementation of pkg-config documentation

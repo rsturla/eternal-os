@@ -4,7 +4,7 @@
 # the libblkid, libfdisk, libmount, libsmartcols and libuuid runtime libraries.
 # Login and su-like tools are left to shadow so the two packages do not fight
 # over /usr/bin.
-schema: 1
+schema: 2
 
 package:
   name: util-linux
@@ -94,19 +94,14 @@ outputs:
         - pam
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, grep]
-        argv:
-          - sh
-          - -eu
-          - -c
-          - |
-            mount --version
-            lsblk --version
-            blkid --version
-            findmnt --version
-            flock --version
-            uuidgen | grep -E '^[0-9a-f-]{36}$'
+        script: |
+          mount --version
+          lsblk --version
+          blkid --version
+          findmnt --version
+          flock --version
+          uuidgen | grep -E '^[0-9a-f-]{36}$'
 
   - name: libblkid
     summary: Block device identification library
@@ -118,16 +113,12 @@ outputs:
         - /usr/share/licenses/libblkid/**
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libblkid.so.* /usr/lib/libblkid.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libblkid.so.* /usr/lib/libblkid.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: libfdisk
     summary: Partitioning library
@@ -139,16 +130,12 @@ outputs:
         - /usr/share/licenses/libfdisk/**
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libfdisk.so.* /usr/lib/libfdisk.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libfdisk.so.* /usr/lib/libfdisk.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: libmount
     summary: Block device mounting library
@@ -160,16 +147,12 @@ outputs:
         - /usr/share/licenses/libmount/**
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libmount.so.* /usr/lib/libmount.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libmount.so.* /usr/lib/libmount.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: libsmartcols
     summary: Table formatting library
@@ -181,16 +164,12 @@ outputs:
         - /usr/share/licenses/libsmartcols/**
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libsmartcols.so.* /usr/lib/libsmartcols.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libsmartcols.so.* /usr/lib/libsmartcols.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: libuuid
     summary: Universally unique identifier library
@@ -202,16 +181,12 @@ outputs:
         - /usr/share/licenses/libuuid/**
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libuuid.so.* /usr/lib/libuuid.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libuuid.so.* /usr/lib/libuuid.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: util-linux-devel
     summary: Development files for util-linux libraries

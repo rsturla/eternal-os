@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Omit the migration script, which needs optional Python bindings.
-schema: 1
+schema: 2
 package:
   name: libsemanage
   version: '3.11'
@@ -93,14 +93,9 @@ outputs:
     - bzip2-libs
   tests:
   - name: load
-    stage: installed
     packages:
       - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       python3 -c 'import ctypes; ctypes.CDLL("libsemanage.so.2")'
 - name: libsemanage-devel
   files:
@@ -114,15 +109,10 @@ outputs:
     - libsemanage = ${package.version}-${package.release}
   tests:
   - name: compile-and-run
-    stage: installed
     packages:
       - gcc
       - glibc-devel
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       cat > /tmp/test.c <<'EOF'
       #include <semanage/handle.h>
       int main(void) { semanage_handle_t *h = semanage_handle_create(); if (!h) return 1; semanage_handle_destroy(h); return 0; }
@@ -143,16 +133,11 @@ outputs:
     - bzip2-devel
   tests:
   - name: link-archive
-    stage: installed
     packages:
       - gcc
       - glibc-devel
       - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       cat > /tmp/static-test.c <<'EOF'
       #include <semanage/handle.h>
       int main(void) {
@@ -176,7 +161,6 @@ outputs:
     - /usr/share/licenses/libsemanage-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check
 patches:

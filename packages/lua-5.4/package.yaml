@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # Lua 5.4 programming language interpreter and library.
-schema: 1
+schema: 2
 
 package:
   name: lua-5.4
@@ -104,14 +104,10 @@ outputs:
         - lua = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            lua -e 'print("lua 5.4 ok")' | grep -Fx 'lua 5.4 ok'
-            lua5.4 -e 'print("lua 5.4 ok")' | grep -Fx 'lua 5.4 ok'
+        script: |
+          lua -e 'print("lua 5.4 ok")' | grep -Fx 'lua 5.4 ok'
+          lua5.4 -e 'print("lua 5.4 ok")' | grep -Fx 'lua 5.4 ok'
 
   - name: lua-5.4-libs
     summary: Lua 5.4 runtime library
@@ -126,16 +122,12 @@ outputs:
         - lua-libs = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/liblua5.4.so.* /usr/lib/liblua5.4.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/liblua5.4.so.* /usr/lib/liblua5.4.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: lua-5.4-devel
     summary: Development files for Lua 5.4
@@ -152,15 +144,11 @@ outputs:
         - lua-devel = ${package.version}-${package.release}
     tests:
       - name: link
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '#include <lua.h>\nint main(void){return 0;}\n' > /tmp/lua-test.c
-            gcc /tmp/lua-test.c $(pkg-config --cflags --libs lua5.4) -o /tmp/lua-test
-            /tmp/lua-test
+        script: |
+          printf '#include <lua.h>\nint main(void){return 0;}\n' > /tmp/lua-test.c
+          gcc /tmp/lua-test.c $(pkg-config --cflags --libs lua5.4) -o /tmp/lua-test
+          /tmp/lua-test
 
   - name: lua-5.4-doc
     summary: Documentation for Lua 5.4

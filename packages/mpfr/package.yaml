@@ -2,7 +2,7 @@
 #
 # Multiple-precision floating-point library. A build dependency for the GNU toolchain and the
 # rest of the minimal Eternal userland.
-schema: 1
+schema: 2
 
 package:
   name: mpfr
@@ -62,16 +62,12 @@ outputs:
         - gmp
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libmpfr.so.* /usr/lib/libmpfr.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libmpfr.so.* /usr/lib/libmpfr.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: mpfr-devel
     summary: MPFR development files
@@ -99,23 +95,19 @@ outputs:
 
 tests:
   - name: link
-    stage: installed
     packages: [gcc, glibc-devel, bash-binsh]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #include <mpfr.h>
-        int main(void) {
-          mpfr_t value;
-          mpfr_init2(value, 64);
-          mpfr_set_ui(value, 2, MPFR_RNDN);
-          mpfr_mul_ui(value, value, 3, MPFR_RNDN);
-          int result = mpfr_cmp_ui(value, 6) != 0;
-          mpfr_clear(value);
-          return result;
-        }
-        EOF
-        gcc /tmp/test.c -lmpfr -lgmp -o /tmp/test
-        /tmp/test
+    script: |
+      cat > /tmp/test.c <<'EOF'
+      #include <mpfr.h>
+      int main(void) {
+        mpfr_t value;
+        mpfr_init2(value, 64);
+        mpfr_set_ui(value, 2, MPFR_RNDN);
+        mpfr_mul_ui(value, value, 3, MPFR_RNDN);
+        int result = mpfr_cmp_ui(value, 6) != 0;
+        mpfr_clear(value);
+        return result;
+      }
+      EOF
+      gcc /tmp/test.c -lmpfr -lgmp -o /tmp/test
+      /tmp/test

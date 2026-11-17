@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/rhash.yaml
 # Link OpenSSL directly, as in Wolfi. Keep the library independent of the commands.
-schema: 1
+schema: 2
 package:
   name: rhash
   version: 1.4.6
@@ -70,14 +70,9 @@ outputs:
     - rhash-libs = ${package.version}-${package.release}
   tests:
   - name: digest
-    stage: installed
     packages:
     - grep
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       printf abc > /tmp/input
       rhash --sha256 /tmp/input > /tmp/digest
       grep -q ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad /tmp/digest
@@ -93,14 +88,9 @@ outputs:
     - openssl-libs
   tests:
   - name: load
-    stage: installed
     packages:
     - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       python3 -c 'import ctypes; ctypes.CDLL("librhash.so.1")'
 - name: rhash-devel
   files:
@@ -114,16 +104,11 @@ outputs:
     - rhash-libs = ${package.version}-${package.release}
   tests:
   - name: compile-and-run
-    stage: installed
     packages:
     - gcc
     - glibc-devel
     - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       cat > /tmp/test.c <<'EOF'
       #include <rhash.h>
       int main(void) { rhash_library_init(); return rhash_get_digest_size(RHASH_SHA256) != 32; }
@@ -140,6 +125,5 @@ outputs:
     - /usr/share/licenses/rhash-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check

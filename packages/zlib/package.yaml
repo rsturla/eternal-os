@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # A library implementing the zlib compression algorithms. A dependency for the minimal Eternal build root.
-schema: 1
+schema: 2
 
 package:
   name: zlib
@@ -56,16 +56,12 @@ outputs:
         - zlib-ng-compat = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libz.so.* /usr/lib/libz.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libz.so.* /usr/lib/libz.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: zlib-devel
     summary: zlib development files
@@ -98,16 +94,12 @@ outputs:
         - zlib-ng-compat-static = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libz.a /usr/lib/libz.a; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libz.a /usr/lib/libz.a; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: zlib-doc
     summary: zlib documentation
@@ -121,17 +113,13 @@ outputs:
 
 tests:
   - name: link
-    stage: installed
     packages: [gcc, glibc-devel, bash-binsh]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #include <zlib.h>
-        int main(void) {
-          return zlibVersion() == 0;
-        }
-        EOF
-        gcc /tmp/test.c -lz -o /tmp/test
-        /tmp/test
+    script: |
+      cat > /tmp/test.c <<'EOF'
+      #include <zlib.h>
+      int main(void) {
+        return zlibVersion() == 0;
+      }
+      EOF
+      gcc /tmp/test.c -lz -o /tmp/test
+      /tmp/test

@@ -4,7 +4,7 @@
 # handling, so it is imported with gettext rather than with the wider library
 # set. It has no dependencies of its own, which makes it the cheapest package
 # of the wave.
-schema: 1
+schema: 2
 
 package:
   name: libunistring
@@ -64,16 +64,12 @@ outputs:
         - /usr/share/licenses/libunistring/COPYING.LIB
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libunistring.so.* /usr/lib/libunistring.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libunistring.so.* /usr/lib/libunistring.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: libunistring-devel
     summary: Development files for libunistring
@@ -90,24 +86,20 @@ outputs:
         - libunistring = ${package.version}-${package.release}
     tests:
       - name: link
-        stage: installed
         packages: [gcc, glibc-devel, bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            cat > /tmp/u8.c <<'EOF'
-            #include <unistr.h>
-            #include <unictype.h>
-            #include <stdio.h>
-            int main(void) {
-              const uint8_t text[] = "eternal";
-              printf("%zu\n", u8_strlen(text));
-              return 0;
-            }
-            EOF
-            gcc /tmp/u8.c -lunistring -o /tmp/u8
-            test "$(/tmp/u8)" = 7
+        script: |
+          cat > /tmp/u8.c <<'EOF'
+          #include <unistr.h>
+          #include <unictype.h>
+          #include <stdio.h>
+          int main(void) {
+            const uint8_t text[] = "eternal";
+            printf("%zu\n", u8_strlen(text));
+            return 0;
+          }
+          EOF
+          gcc /tmp/u8.c -lunistring -o /tmp/u8
+          test "$(/tmp/u8)" = 7
 
   - name: libunistring-doc
     summary: Documentation for libunistring
@@ -124,6 +116,5 @@ outputs:
 
 tests:
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check

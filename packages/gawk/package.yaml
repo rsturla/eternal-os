@@ -2,7 +2,7 @@
 #
 # GNU awk pattern-matching language. Part of the minimal Eternal userland and the
 # bootstrap tool set. The source is the upstream release tarball.
-schema: 1
+schema: 2
 
 package:
   name: gawk
@@ -62,13 +62,9 @@ outputs:
         - awk = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            test "$(printf 'a 2\nb 3\n' | gawk '{sum += $2} END {print sum}')" = 5
+        script: |
+          test "$(printf 'a 2\nb 3\n' | gawk '{sum += $2} END {print sum}')" = 5
 
   - name: gawk-lang
     summary: GNU awk translations

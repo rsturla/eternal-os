@@ -2,7 +2,7 @@
 #
 # POSIX capabilities library and tools. rpm and libdnf5 link against libcap,
 # and coreutils uses it for capability-aware ls colouring.
-schema: 1
+schema: 2
 
 package:
   name: libcap
@@ -63,16 +63,12 @@ outputs:
         - /usr/share/licenses/libcap/**
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libcap.so.* /usr/lib/libcap.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libcap.so.* /usr/lib/libcap.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: libcap-utils
     summary: Utilities for manipulating POSIX capabilities
@@ -90,15 +86,11 @@ outputs:
         - libcap = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            capsh --print >/dev/null
-            getpcaps $$ >/dev/null
-            getcap /usr/bin/capsh >/dev/null
+        script: |
+          capsh --print >/dev/null
+          getpcaps $$ >/dev/null
+          getcap /usr/bin/capsh >/dev/null
 
   - name: libcap-devel
     summary: Development files for libcap

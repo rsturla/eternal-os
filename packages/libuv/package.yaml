@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Reference: https://github.com/wolfi-dev/os/blob/bb1330c86b585488efc3b7789af3f03e3557f1c8/libuv.yaml
 # Use upstream CMake support for the release archive. Keep static archives separate.
-schema: 1
+schema: 2
 package:
   name: libuv
   version: 1.53.0
@@ -58,14 +58,9 @@ outputs:
     - /usr/share/licenses/libuv/**
   tests:
   - name: load
-    stage: installed
     packages:
     - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       python3 -c 'import ctypes; ctypes.CDLL("libuv.so.1")'
 - name: libuv-devel
   files:
@@ -79,16 +74,11 @@ outputs:
     - libuv = ${package.version}-${package.release}
   tests:
   - name: compile-and-run
-    stage: installed
     packages:
     - gcc
     - glibc-devel
     - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       cat > /tmp/test.c <<'EOF'
       #include <uv.h>
       int main(void) { uv_loop_t loop; if (uv_loop_init(&loop)) return 1; return uv_loop_close(&loop); }
@@ -107,6 +97,5 @@ outputs:
     - libuv-devel = ${package.version}-${package.release}
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check

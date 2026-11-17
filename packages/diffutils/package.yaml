@@ -2,7 +2,7 @@
 #
 # GNU diff utilities. Part of the minimal Eternal userland and the
 # bootstrap tool set. The source is the upstream release tarball.
-schema: 1
+schema: 2
 
 package:
   name: diffutils
@@ -56,17 +56,13 @@ outputs:
         - /usr/share/licenses/diffutils/COPYING
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            printf 'a\n' > a
-            printf 'b\n' > b
-            if diff a b > /dev/null; then exit 1; fi
-            printf 'a\n' > b
-            diff a b
+        script: |
+          printf 'a\n' > a
+          printf 'b\n' > b
+          if diff a b > /dev/null; then exit 1; fi
+          printf 'a\n' > b
+          diff a b
 
   - name: diffutils-doc
     summary: GNU diff utilities documentation

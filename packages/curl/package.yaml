@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Use source-based split names. curl-devel provides libcurl-devel.
 # Trust roots are optional, as in Wolfi. Recommend ca-certificates-bundle.
-schema: 1
+schema: 2
 package:
   name: curl
   version: 8.23.0
@@ -92,14 +92,9 @@ outputs:
     - ca-certificates-bundle
   tests:
   - name: local-transfer
-    stage: installed
     packages:
       - diffutils
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       printf "payload\n" > /tmp/curl-input
       curl --fail --silent file:///tmp/curl-input -o /tmp/curl-output
       cmp /tmp/curl-input /tmp/curl-output
@@ -122,14 +117,9 @@ outputs:
     - libcurl = ${package.version}-${package.release}
   tests:
   - name: load
-    stage: installed
     packages:
       - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       python3 -c 'import ctypes; ctypes.CDLL("libcurl.so.4")'
 - name: curl-devel
   files:
@@ -146,16 +136,11 @@ outputs:
     - libcurl-devel = ${package.version}-${package.release}
   tests:
   - name: compile-and-run
-    stage: installed
     packages:
       - gcc
       - glibc-devel
       - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       cat > /tmp/test.c <<'EOF'
       #include <curl/curl.h>
       int main(void) { if (curl_global_init(CURL_GLOBAL_DEFAULT)) return 1; CURL *c = curl_easy_init(); if (!c) return 1; curl_easy_cleanup(c); curl_global_cleanup(); return 0; }
@@ -173,7 +158,6 @@ outputs:
     - /usr/share/licenses/curl-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check
 patches:

@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # libtoolize needs the aclocal macros at runtime; keep them with the tools.
-schema: 1
+schema: 2
 package:
   name: libtool
   version: 2.6.2
@@ -73,12 +73,7 @@ outputs:
     - make
   tests:
   - name: link-library
-    stage: installed
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       mkdir /tmp/libtool-test
       cd /tmp/libtool-test
       printf 'int answer(void) { return 42; }\n' > answer.c
@@ -94,14 +89,9 @@ outputs:
     - /usr/share/licenses/libtool-libs/**
   tests:
   - name: load
-    stage: installed
     packages:
       - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       python3 -c 'import ctypes; ctypes.CDLL("libltdl.so.7")'
 - name: libtool-devel
   files:
@@ -117,15 +107,10 @@ outputs:
     - libtool-libs = ${package.version}-${package.release}
   tests:
   - name: compile-and-run
-    stage: installed
     packages:
       - gcc
       - glibc-devel
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       cat > /tmp/test.c <<'EOF'
       #include <ltdl.h>
       int main(void) { if (lt_dlinit()) return 1; return lt_dlexit(); }
@@ -143,6 +128,5 @@ outputs:
     - /usr/share/licenses/libtool-doc/**
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check

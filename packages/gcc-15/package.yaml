@@ -9,7 +9,7 @@
 # compiler) and without Fortran for the first import. The runtime libraries are
 # split the same way Wolfi splits them: libstdc++, libatomic and the compiler
 # proper are independent outputs.
-schema: 1
+schema: 2
 
 package:
   name: gcc-15
@@ -193,16 +193,11 @@ outputs:
 
     tests:
       - name: cxx-link
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -eu
-          - -c
-          - |
-            printf '#include <iostream>\nint main() { std::cout << "ok"; }\n' > /tmp/gcc-cxx-test.cc
-            c++ /tmp/gcc-cxx-test.cc -o /tmp/gcc-cxx-test
-            test "$(/tmp/gcc-cxx-test)" = ok
+        script: |
+          printf '#include <iostream>\nint main() { std::cout << "ok"; }\n' > ./gcc-cxx-test.cc
+          c++ ./gcc-cxx-test.cc -o ./gcc-cxx-test
+          test "$(./gcc-cxx-test)" = ok
 
   - name: libstdc++-15
     summary: GNU Standard C++ Library
@@ -290,23 +285,20 @@ outputs:
         - /usr/share/licenses/gcc-15-doc/COPYING.RUNTIME
 
 tests:
-  - name: build
-    stage: build
-    argv:
-      - sh
-      - -c
-      - |
-        "$STAGE/usr/bin/gcc-15" --version | grep -q '15.3.0'
-        "$STAGE/usr/bin/g++-15" --version | grep -q '15.3.0'
-        "$STAGE/usr/bin/cc" --version | grep -q '15.3.0'
-        "$STAGE/usr/bin/c++" --version | grep -q '15.3.0'
-        printf '#include <stdio.h>\nint main(void) { puts("gcc-ok"); return 0; }\n' > /tmp/gcc-15-test.c
-        "$STAGE/usr/bin/gcc-15" /tmp/gcc-15-test.c -o /tmp/gcc-15-test
-        /tmp/gcc-15-test | grep -q gcc-ok
-        "$STAGE/usr/bin/cc" /tmp/gcc-15-test.c -o /tmp/gcc-15-test-cc
-        /tmp/gcc-15-test-cc | grep -q gcc-ok
-        printf '#include <iostream>\nint main() { std::cout << "g++-ok\\n"; }\n' > /tmp/gcc-15-test.cc
-        "$STAGE/usr/bin/g++-15" /tmp/gcc-15-test.cc -o /tmp/gcc-15-test-cxx
-        /tmp/gcc-15-test-cxx | grep -q g++-ok
-        "$STAGE/usr/bin/c++" /tmp/gcc-15-test.cc -o /tmp/gcc-15-test-cxx-default
-        /tmp/gcc-15-test-cxx-default | grep -q g++-ok
+  - name: installed-compiler-smoke
+    packages: [grep]
+    script: |
+      "/usr/bin/gcc-15" --version | grep -q '15.3.0'
+      "/usr/bin/g++-15" --version | grep -q '15.3.0'
+      "/usr/bin/cc" --version | grep -q '15.3.0'
+      "/usr/bin/c++" --version | grep -q '15.3.0'
+      printf '#include <stdio.h>\nint main(void) { puts("gcc-ok"); return 0; }\n' > ./gcc-15-test.c
+      "/usr/bin/gcc-15" ./gcc-15-test.c -o ./gcc-15-test
+      ./gcc-15-test | grep -q gcc-ok
+      "/usr/bin/cc" ./gcc-15-test.c -o ./gcc-15-test-cc
+      ./gcc-15-test-cc | grep -q gcc-ok
+      printf '#include <iostream>\nint main() { std::cout << "g++-ok\\n"; }\n' > ./gcc-15-test.cc
+      "/usr/bin/g++-15" ./gcc-15-test.cc -o ./gcc-15-test-cxx
+      ./gcc-15-test-cxx | grep -q g++-ok
+      "/usr/bin/c++" ./gcc-15-test.cc -o ./gcc-15-test-cxx-default
+      ./gcc-15-test-cxx-default | grep -q g++-ok

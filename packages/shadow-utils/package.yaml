@@ -2,7 +2,7 @@
 #
 # PAM login and account management utilities. This is the provider of
 # useradd/groupadd/passwd and the /etc/login.defs defaults.
-schema: 1
+schema: 2
 
 package:
   name: shadow-utils
@@ -118,17 +118,13 @@ outputs:
         - pam
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc]
-        argv:
-          - sh
-          - -c
-          - |
-            useradd --help
-            groupadd --help
-            passwd --help
-            chage --help
-            test -n "$(useradd -D)"
+        script: |
+          useradd --help
+          groupadd --help
+          passwd --help
+          chage --help
+          test -n "$(useradd -D)"
 
   - name: shadow-utils-devel
     summary: Development files for shadow-utils
@@ -143,15 +139,11 @@ outputs:
         - shadow-utils = ${package.version}-${package.release}
     tests:
       - name: link
-        stage: installed
         packages: [bash-binsh, coreutils, gcc]
-        argv:
-          - sh
-          - -c
-          - |
-            printf '#include <shadow/subid.h>\nint main(void){return 0;}\n' > /tmp/subid.c
-            gcc /tmp/subid.c -lsubid -o /tmp/subid-test
-            /tmp/subid-test
+        script: |
+          printf '#include <shadow/subid.h>\nint main(void){return 0;}\n' > /tmp/subid.c
+          gcc /tmp/subid.c -lsubid -o /tmp/subid-test
+          /tmp/subid-test
 
   - name: shadow-utils-doc
     summary: Documentation for shadow-utils

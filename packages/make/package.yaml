@@ -5,7 +5,7 @@
 # build-tool set while the seed is still in use. Keep this recipe buildable
 # from the current self-hosted root; promote changes here once they work
 # without bootstrap-only overrides.
-schema: 1
+schema: 2
 
 package:
   name: make
@@ -51,6 +51,12 @@ build:
         outputs: [make, make-devel, make-doc]
     - uses: strip
 
+  tests:
+    - name: build
+      script: |
+        ./make --version | grep -q 'GNU Make 4.4.1'
+
+
 outputs:
   - name: make
     summary: GNU Make build automation tool
@@ -79,18 +85,9 @@ outputs:
         - /usr/share/licenses/make-doc/COPYING
 
 tests:
-  - name: build
-    stage: build
-    argv:
-      - sh
-      - -c
-      - ./make --version | grep -q 'GNU Make 4.4.1'
-
   - name: installed
-    stage: installed
     argv: [make, --version]
 
   - name: hardening
-    stage: build
     pipeline:
       - uses: test/hardening-check

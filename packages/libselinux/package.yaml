@@ -3,7 +3,7 @@
 # SELinux userspace library. rpm, libdnf5 and the base userland link against
 # libselinux; the utilities are split so the library can be installed without
 # the policy management tools.
-schema: 1
+schema: 2
 
 package:
   name: libselinux
@@ -65,16 +65,12 @@ outputs:
         - libsepol
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libselinux.so.* /usr/lib/libselinux.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libselinux.so.* /usr/lib/libselinux.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: libselinux-utils
     summary: SELinux command-line utilities
@@ -119,16 +115,12 @@ outputs:
         - libselinux = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils]
-        argv:
-          - sh
-          - -c
-          - |
-            getenforce || true
-            selinuxenabled || true
-            test -x /usr/bin/matchpathcon
-            test -x /usr/bin/setenforce
+        script: |
+          getenforce || true
+          selinuxenabled || true
+          test -x /usr/bin/matchpathcon
+          test -x /usr/bin/setenforce
 
   - name: libselinux-devel
     summary: Development files for libselinux

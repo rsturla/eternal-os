@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
 # SQLite embedded database engine.
-schema: 1
+schema: 2
 
 package:
   name: sqlite
@@ -69,13 +69,9 @@ outputs:
         - sqlite-libs = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            sqlite3 /tmp/sqlite-test.db 'create table t(v text); insert into t values (char(111,107)); select v from t;' | grep -Fx ok
+        script: |
+          sqlite3 /tmp/sqlite-test.db 'create table t(v text); insert into t values (char(111,107)); select v from t;' | grep -Fx ok
 
   - name: sqlite-libs
     summary: Shared libraries for SQLite
@@ -87,16 +83,12 @@ outputs:
         - /usr/share/licenses/sqlite-libs/**
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libsqlite3.so.* /usr/lib/libsqlite3.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libsqlite3.so.* /usr/lib/libsqlite3.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: sqlite-devel
     summary: Development files for SQLite
@@ -111,21 +103,17 @@ outputs:
         - sqlite-libs = ${package.version}-${package.release}
     tests:
       - name: link
-        stage: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        argv:
-          - sh
-          - -c
-          - |
-            cat > /tmp/sqlite-test.c <<'EOF'
-            #include <sqlite3.h>
-            int main(void) {
-                sqlite3 *db = 0;
-                return sqlite3_open(":memory:", &db) == SQLITE_OK ? 0 : 1;
-            }
-            EOF
-            gcc /tmp/sqlite-test.c $(pkg-config --cflags --libs sqlite3) -o /tmp/sqlite-test
-            /tmp/sqlite-test
+        script: |
+          cat > /tmp/sqlite-test.c <<'EOF'
+          #include <sqlite3.h>
+          int main(void) {
+              sqlite3 *db = 0;
+              return sqlite3_open(":memory:", &db) == SQLITE_OK ? 0 : 1;
+          }
+          EOF
+          gcc /tmp/sqlite-test.c $(pkg-config --cflags --libs sqlite3) -o /tmp/sqlite-test
+          /tmp/sqlite-test
 
   - name: sqlite-doc
     summary: Documentation for SQLite

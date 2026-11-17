@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 # Use the supported 3.5 LTS series to retain the libssl.so.3 ABI.
 # Install the software and configuration without the optional documentation.
-schema: 1
+schema: 2
 package:
   name: openssl3
   version: 3.5.9
@@ -71,14 +71,9 @@ outputs:
     - openssl = ${package.version}-${package.release}
   tests:
   - name: digest
-    stage: installed
     packages:
       - grep
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       printf abc | openssl dgst -sha256 > /tmp/digest
       grep -q ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad /tmp/digest
 - name: openssl3-libs
@@ -101,14 +96,9 @@ outputs:
     - openssl-libs = ${package.version}-${package.release}
   tests:
   - name: load
-    stage: installed
     packages:
       - python3
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       python3 -c 'import ctypes; ctypes.CDLL("libssl.so.3")'
 - name: openssl3-devel
   files:
@@ -124,16 +114,11 @@ outputs:
     - openssl-devel = ${package.version}-${package.release}
   tests:
   - name: compile-and-run
-    stage: installed
     packages:
       - gcc
       - glibc-devel
       - pkgconf
-    argv:
-    - bash
-    - -eu
-    - -c
-    - |
+    script: |
       cat > /tmp/test.c <<'EOF'
       #include <openssl/ssl.h>
       int main(void) { SSL_CTX *ctx = SSL_CTX_new(TLS_method()); if (!ctx) return 1; SSL_CTX_free(ctx); return 0; }
@@ -142,6 +127,5 @@ outputs:
       /tmp/test
 tests:
 - name: hardening
-  stage: build
   pipeline:
   - uses: test/hardening-check

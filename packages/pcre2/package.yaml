@@ -2,7 +2,7 @@
 #
 # Perl-compatible regular expression library. A build dependency for grep and
 # the rest of the minimal Eternal userland.
-schema: 1
+schema: 2
 
 package:
   name: pcre2
@@ -61,15 +61,11 @@ outputs:
         - pcre2-libs = ${package.version}-${package.release}
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            pcre2grep --version
-            printf '%s\n' 'abc123' | pcre2grep '\d+'
-            printf '%s\n' '/a+/' 'aaa' | pcre2test
+        script: |
+          pcre2grep --version
+          printf '%s\n' 'abc123' | pcre2grep '\d+'
+          printf '%s\n' '/a+/' 'aaa' | pcre2test
 
   - name: pcre2-libs
     summary: PCRE2 runtime libraries
@@ -81,16 +77,12 @@ outputs:
         - /usr/share/licenses/pcre2-libs/COPYING
     tests:
       - name: installed
-        stage: installed
         packages: [bash-binsh]
-        argv:
-          - sh
-          - -c
-          - |
-            for lib in /usr/lib64/libpcre2-*.so.* /usr/lib/libpcre2-*.so.*; do
-              test -e "$lib" && exit 0
-            done
-            exit 1
+        script: |
+          for lib in /usr/lib64/libpcre2-*.so.* /usr/lib/libpcre2-*.so.*; do
+            test -e "$lib" && exit 0
+          done
+          exit 1
 
   - name: pcre2-devel
     summary: PCRE2 development files
@@ -117,23 +109,19 @@ outputs:
 
 tests:
   - name: link
-    stage: installed
     packages: [gcc, glibc-devel, bash-binsh]
-    argv:
-      - sh
-      - -c
-      - |
-        cat > /tmp/test.c <<'EOF'
-        #define PCRE2_CODE_UNIT_WIDTH 8
-        #include <pcre2.h>
-        int main(void) {
-          int error;
-          PCRE2_SIZE offset;
-          pcre2_code *code = pcre2_compile((PCRE2_SPTR)"a+", 2, 0, &error, &offset, 0);
-          if (code == 0) return 1;
-          pcre2_code_free(code);
-          return 0;
-        }
-        EOF
-        gcc /tmp/test.c -lpcre2-8 -o /tmp/test
-        /tmp/test
+    script: |
+      cat > /tmp/test.c <<'EOF'
+      #define PCRE2_CODE_UNIT_WIDTH 8
+      #include <pcre2.h>
+      int main(void) {
+        int error;
+        PCRE2_SIZE offset;
+        pcre2_code *code = pcre2_compile((PCRE2_SPTR)"a+", 2, 0, &error, &offset, 0);
+        if (code == 0) return 1;
+        pcre2_code_free(code);
+        return 0;
+      }
+      EOF
+      gcc /tmp/test.c -lpcre2-8 -o /tmp/test
+      /tmp/test

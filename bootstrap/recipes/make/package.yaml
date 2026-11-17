@@ -4,7 +4,7 @@
 # because the ladder hides the seed provider while a stage builds this package,
 # so the EVR does not need to outrank Fedora's copy. Epoch 1 is make's upstream
 # epoch. The production recipe is in packages/make/package.yaml.
-schema: 1
+schema: 2
 
 package:
   name: make
@@ -50,6 +50,12 @@ build:
         outputs: [make, make-devel, make-doc]
     - uses: strip
 
+  tests:
+    - name: build
+      script: |
+        ./make --version | grep -q 'GNU Make 4.4.1'
+
+
 outputs:
   - name: make
     summary: GNU Make build automation tool
@@ -78,13 +84,5 @@ outputs:
         - /usr/share/licenses/make-doc/COPYING
 
 tests:
-  - name: build
-    stage: build
-    argv:
-      - sh
-      - -c
-      - ./make --version | grep -q 'GNU Make 4.4.1'
-
   - name: installed
-    stage: installed
     argv: [make, --version]
