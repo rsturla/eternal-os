@@ -50,10 +50,7 @@ jobs:
     runs-on: ubuntu-26.04
     outputs:
       arches: ${{ steps.configure.outputs.arches }}
-      signed: ${{ steps.configure.outputs.signed }}
       build_release: ${{ steps.configure.outputs.build_release }}
-    env:
-      RPMX_SIGNING_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -67,12 +64,6 @@ jobs:
           echo "build_release=$build_release" >>"$GITHUB_OUTPUT"
           echo "arches: $arches"
           echo "build release: $build_release"
-
-          if [ -n "${RPMX_SIGNING_KEY:-}" ]; then
-            echo "signed=1" >>"$GITHUB_OUTPUT"
-          else
-            echo "signed=0" >>"$GITHUB_OUTPUT"
-          fi
 
   rpmx:
     name: rpmx (${{ matrix.arch }})

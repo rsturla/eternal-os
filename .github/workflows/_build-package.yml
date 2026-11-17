@@ -15,9 +15,6 @@ on:
       sign:
         type: boolean
         default: false
-      build-release:
-        type: string
-        default: ""
     secrets:
       RPMX_SIGNING_KEY:
         required: false
@@ -55,12 +52,10 @@ jobs:
       - name: Prepare shared source RPMs
         env:
           PACKAGE: ${{ inputs.package }}
-          BUILD_RELEASE: ${{ inputs.build-release }}
           SIGNING_KEY: ${{ inputs.sign && secrets.RPMX_SIGNING_KEY || '' }}
         run: |
           args=(--package "$PACKAGE" --output .work/prepared
             --transaction .work/transaction/state.json --candidates .work/candidates)
-          if [ -n "$BUILD_RELEASE" ]; then args+=(--build-release "$BUILD_RELEASE"); fi
           if [ -n "$SIGNING_KEY" ]; then
             install -d -m 0700 "$RUNNER_TEMP/signing"
             printf '%s' "$SIGNING_KEY" >"$RUNNER_TEMP/signing/key.asc"
