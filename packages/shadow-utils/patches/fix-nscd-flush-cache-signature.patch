@@ -8,7 +8,6 @@ which takes a const char *.
 --- a/lib/nscd.h
 +++ b/lib/nscd.h
 @@ -8,7 +8,7 @@
- #ifdef	USE_NSCD
  extern int nscd_flush_cache (const char *service);
  #else
  static inline int
