@@ -75,8 +75,7 @@ outputs:
     license:
     - /usr/share/licenses/python-${matrix.python.version}-flit-core/**
   tests:
-  - name: functional
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - from flit_core import buildapi; assert callable(buildapi.build_wheel)
+  - name: offline-behavior
+    files: tests
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/check.py" "${matrix.python.version}" "flit-core" "${package.version}"
