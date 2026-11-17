@@ -66,9 +66,18 @@ outputs:
       license:
         - /usr/share/licenses/kernel-headers/COPYING
 
+    tests:
+      - name: userspace-abi-headers
+        packages:
+          - bash
+          - gcc
+        files: tests
+        script: |
+          gcc -std=c11 -Wall -Wextra -Werror "$TEST_FILES/uapi.c" -o uapi
+          ./uapi
 tests:
   - name: headers
-    packages: [gcc, glibc-devel, bash-binsh, coreutils]
+    packages: [gcc, glibc-devel, bash-binsh, coreutils, bash]
     script: |
       for header in linux/types.h linux/ioctl.h linux/fs.h asm/types.h; do
         test -f "/usr/include/$header"
