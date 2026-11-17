@@ -603,10 +603,17 @@ Build steps can branch on `${arch}`:
 Every package needs at least one test that would fail if its primary behavior
 were missing or broken.
 
-- `stage: build` runs in the build sandbox with the source tree. Use it for
-  compilation and unit checks.
-- `stage: installed` gets a disposable root containing the built RPMs plus its
-  test dependencies. Use it for command-level smoke tests.
+- `build.tests` runs named source suites in independent workspace copies. Case
+  tools extend the pinned build closure without entering the build root.
+- Output or recipe `tests` consume existing binary RPMs in a disposable root.
+  Use them for installed behavior and consumer checks.
+- `mode: transaction` selects a private writable RPM root for lifecycle tests.
+
+Builds run source suites only. `scripts/build-all.sh` then invokes standalone
+`rpmx test` before writing a success stamp. The Python bootstrap helper uses the
+same acceptance gate before adding a dependency to its private repository.
+`--no-tests` explicitly disables both phases. Private OpenSSF seed preparation
+runs source builds only; its RPM is a build prerequisite, not an accepted release.
 
 Add an output-level test when the output has a user-facing command or runtime
 behavior. A `-doc`, `-locales` or empty metapackage output does not need an
@@ -617,17 +624,30 @@ outputs:
   - name: gcc-16
     tests:
       - name: installed
-        stage: installed
         argv: ["gcc-16", "--version"]
 
   - name: gcc-16-default
     tests:
       - name: installed
-        stage: installed
-        argv: ["sh", "-c", "gcc --version && cc --version"]
+        script: |
+          gcc --version
+          cc --version
 ```
 
 Only add `packages` to a test when the test actually invokes those packages. A simple binary smoke test usually needs no extra test packages.
+
+Use `script` for strict Bash, direct `argv` with `expect` for exact results, or
+`pipeline` for reusable steps. Do not put shell `-c` commands in `argv`.
+Package-local `files: tests` exposes immutable fixtures through `TEST_FILES`;
+`TEST_PACKAGE_ROOT` exposes the extracted candidate payload for layout checks.
+
+Build reports and source evidence stay in the package output directory.
+Standalone acceptance reports, JUnit and command evidence are retained under
+`out/NAME/acceptance/ARCH/`. The explicit Python bootstrap helper keeps private
+dependency build and acceptance evidence under `.work/python-deps/ARCH/NAME/`;
+failed dependencies retain their evidence without a completion stamp.
+Missing or skipped declared acceptance cases fail
+the gate, even when the test process exits successfully.
 
 Tests must not rely on the network.
 

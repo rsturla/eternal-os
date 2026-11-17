@@ -122,8 +122,10 @@ materialization, artifact transfer between jobs and object-storage credentials.
   recompiling it;
 - `prepare` selects changed packages and computes their content hashes
   (`scripts/affected.sh`, `scripts/package-hash.sh`);
-- a matrix builds only the affected packages in parallel, which runs the
-  recipe's tests by default, and uploads per-package artifacts.
+- a matrix builds only the affected packages in parallel. The shared build
+  script runs source suites during build, then standalone acceptance against
+  the produced RPMs before recording success. It uploads both phases' reports
+  and command evidence with the per-package artifacts.
 
 `release.yml` runs on `main`, on `v*` tags and on demand:
 
