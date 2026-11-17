@@ -4,7 +4,7 @@ schema: 2
 package:
   name: python-3.11
   version: "3.11.18"
-  release: 2
+  release: 3
   summary: The Python programming language (version 3.11)
   description: |
     Python is an interpreted, interactive, object-oriented programming
@@ -159,6 +159,8 @@ outputs:
         - /usr/share/licenses/python-3.11-devel/LICENSE
     dependencies:
       run:
+        # Embedded interpreters need this stream's standard library too.
+        - python-3.11 = ${package.version}-${package.release}
         - python-3.11-libs = ${package.version}-${package.release}
     tests:
       - name: embed
