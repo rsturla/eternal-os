@@ -28,7 +28,7 @@ def bootstrap_recipes(root):
             yield recipe
 
 
-def dependency_order(plans, name):
+def dependency_order(plans, name, *, tests=True):
     providers = {
         output["name"]: source
         for source, plan in plans.items()
@@ -51,6 +51,11 @@ def dependency_order(plans, name):
                 dependencies.update(step["needs"])
             for output in cell["outputs"]:
                 dependencies.update(output["requires"])
+            if tests:
+                for case in [*cell.get("build_tests", []), *cell.get("tests", [])]:
+                    dependencies.update(case.get("packages", []))
+                    for step in case.get("pipeline", []):
+                        dependencies.update(step.get("needs", []))
         for dependency in sorted(dependencies):
             provider = providers.get(dependency.split()[0])
             if provider and provider != source:
@@ -87,10 +92,11 @@ def main():
         return subprocess.check_output(command, cwd=root, text=True)
 
     plans = {
-        recipe.parent.name: json.loads(capture(rpmx, "plan", str(recipe), "--json"))["plan"]
+        recipe.parent.name: json.loads(capture(rpmx, "plan", str(recipe), "--arch", args.arch, "--json"))["plan"]
         for recipe in bootstrap_recipes(root)
     }
-    order = dependency_order(plans, args.name)
+    tests = "--no-tests" not in build_args
+    order = dependency_order(plans, args.name, tests=tests)
     hashes = dict(line.split() for line in capture(
         str(root / "scripts/package-hash.sh"), *order
     ).splitlines())
@@ -107,14 +113,15 @@ def main():
         local = work / "repo"
         local.mkdir()
         for repository in profile["repositories"]:
-            url = repository.get("baseurl", "")
-            if url.startswith("file://"):
-                path = (profile_path.parent / url[7:]).resolve()
-                repository["baseurl"] = path.as_uri()
-                # The compiler policy package also needs a private label.
-                if repository["id"] == "eternal-toolchain":
-                    shutil.copytree(path, work / "toolchain")
-                    repository["baseurl"] = (work / "toolchain").as_uri()
+            for field in ("baseurl", "gpgkey"):
+                url = repository.get(field, "")
+                if url.startswith("file://"):
+                    path = (profile_path.parent / url[7:]).resolve()
+                    repository[field] = path.as_uri()
+                    # The compiler policy package also needs a private label.
+                    if field == "baseurl" and repository["id"] == "eternal-toolchain":
+                        shutil.copytree(path, work / "toolchain")
+                        repository[field] = (work / "toolchain").as_uri()
         profile_file = work / "profile.yaml"
         # Include interpreter-qualified package names and declared capabilities.
         available = set()
@@ -128,11 +135,24 @@ def main():
             stamp = cache / ".complete"
             if name == args.name or not stamp.is_file():
                 print(f"==> Python matrix {name}", flush=True)
+                stamp.unlink(missing_ok=True)
+                shutil.rmtree(output / "acceptance", ignore_errors=True)
                 subprocess.run([
                     rpmx, "build", str(root / "packages" / name / "package.yaml"),
                     "--profile", str(profile_file), "--arch", args.arch,
                     "--output", str(output), *build_args,
                 ], check=True, cwd=root)
+                if tests:
+                    acceptance = [
+                        "python3", str(root / "scripts/accept-rpms.py"),
+                        str(root / "packages" / name / "package.yaml"),
+                        "--arch", args.arch, "--install-dir", str(output / args.arch),
+                        "--test-profile", str(profile_file),
+                        "--output", str(output / "acceptance" / args.arch),
+                    ]
+                    if "--build-release" in build_args:
+                        acceptance.extend(["--build-release", build_args[build_args.index("--build-release") + 1]])
+                    subprocess.run(acceptance, check=True, cwd=root)
                 if name != args.name:
                     cache.mkdir(parents=True, exist_ok=True)
                     stamp.write_text("complete\n")
