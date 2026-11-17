@@ -1,0 +1,8 @@
+rule copy
+  command = cp $in $out
+rule fail
+  command = false
+build first: copy input
+build second: copy first
+build broken: fail
+default second
