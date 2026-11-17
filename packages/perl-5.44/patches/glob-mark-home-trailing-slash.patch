@@ -1,0 +1,22 @@
+File::Glob: retain an existing trailing slash in the GLOB_MARK expectation
+
+The assertion introduced by upstream commit 07bff9c36ac74dfa09e0f426659302304f0834fa
+always adds a slash to the account home. bsd_glob intentionally adds one only
+when absent. A real account with home / therefore correctly returns /, not //.
+Keep the directory-mark assertion for both root and ordinary home paths.
+
+Upstream assertion provenance:
+https://github.com/Perl/perl5/commit/07bff9c36ac74dfa09e0f426659302304f0834fa
+
+--- a/ext/File-Glob/t/basic.t
++++ b/ext/File-Glob/t/basic.t
+@@ -83,7 +83,8 @@
+     if (GLOB_ERROR) {
+         fail(GLOB_ERROR);
+     } else {
+-        is_deeply (\@b, ["$home/"],
++        my $marked_home = $home =~ m{/$} ? $home : "$home/";
++        is_deeply (\@b, [$marked_home],
+             "GLOB_MARK matches directories with path separator attached"
+         );
+     }
