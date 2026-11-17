@@ -113,9 +113,11 @@ outputs:
       - name: installed
         packages: [bash-binsh, coreutils]
         script: |
-          tput --version
-          infocmp --version
-          tic --version
+          for command in tput infocmp tic; do
+            reported_version=$("$command" -V)
+            test "$${reported_version%.*}" = 'ncurses ${package.version}'
+            [[ $${reported_version##*.} =~ ^[0-9]{8}$ ]]
+          done
           TERM=xterm tput cols
 
 
