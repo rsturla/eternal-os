@@ -214,7 +214,7 @@ Until then, the shell entry points are intentionally boring and reviewable.
 
 ## Roadmap
 
-The [toolchain and bundled-component rebuild proposal](design/toolchain-rebuilds.md)
+The [build-input provenance and consumer rebuild proposal](design/toolchain-rebuilds.md)
 describes consumer tracking for embedded code, compiler fixes and generated
 outputs. It is a design for review, not an implemented pipeline feature.
 

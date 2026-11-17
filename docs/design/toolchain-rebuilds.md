@@ -1,4 +1,4 @@
-# Toolchain and bundled-component rebuilds
+# Build-input provenance and consumer rebuilds
 
 Status: proposed. This document defines a design for review, not current behavior.
 It changes no recipes, RPM metadata, build commands or repository settings.
@@ -24,6 +24,7 @@ The answer must remain available after temporary CI artifacts expire.
 
 ## Goals and scope
 
+- Implement a general input-to-output relationship model before toolchain integrations.
 - Record incorporated components and build tools separately from runtime dependencies.
 - Select consumer rebuilds across language toolchains and native libraries.
 - Distinguish toolchain streams, architectures and distribution backports.
@@ -41,6 +42,42 @@ The transaction, acceptance and promotion workflow in
 This proposal extends its consumer selection and artifact eligibility rules.
 The design PR can land independently; implementation will depend on that work
 or an equivalent transaction interface.
+
+## Design from first principles
+
+A build transforms resolved inputs into outputs. Rebuild selection asks whether
+an output can still be accepted after an input or repair requirement changes.
+This question applies to compilers, libraries, generators, schemas, assets and
+other inputs. A language-specific rule in the engine is not required.
+
+The core records these transformations, validates their provenance and evaluates
+requirements. It treats capability identities as data. It must support a new
+provider and a custom pipeline step without a new language enum, built-in
+cataloger or toolchain adapter in rpmx's engine.
+
+The baseline is conservative. Record every input available to a payload-producing
+build action as a potential influence on its outputs. This is useful evidence
+without claiming that every input was executed or copied. Missing precision can
+cause extra rebuilds; it must not omit a required repair.
+
+Shared pipeline steps can refine these relationships. A step can identify its
+selected command, incorporated components and affected files through the same
+generic reporting interface. Toolchain knowledge and optimizations belong in
+these steps. The engine must not interpret Go build information, Cargo graphs,
+compiler flags or linker maps to decide rebuild behavior.
+
+Refactor existing modules when needed to establish this model. Do not add a
+Go-specific receipt path and later wrap it in a nominally generic interface.
+Existing inventories, SBOMs and locks must converge on one model rather than
+grow independent provenance systems. This records build actions already run
+by rpmx; it does not introduce a replacement action scheduler or cache system.
+
+| Owner | Responsibility |
+| --- | --- |
+| rpmx core | Capability resolution, immutable bindings, action/output provenance, report validation, receipt serialization, generic requirement evaluation and RPM metadata projection. |
+| Shared pipeline steps | Language or tool-specific invocation, evidence collection and conservative relationship refinement. |
+| Distribution profiles and policy | Allowed providers, external-package bindings, repair requirements and bootstrap choices. |
+| Transaction scheduler | Published consumer discovery, source-recipe selection, build ordering, acceptance and promotion. |
 
 ## Evidence from toolchains
 
@@ -76,14 +113,17 @@ Sources: [Go toolchains](https://go.dev/doc/toolchain),
 | --- | --- |
 | Component | An identifiable body of code or data, such as Go stdlib, a crate, a static runtime or a header implementation. Its logical identity is independent of RPM naming. |
 | Provider | The exact RPM or source input that supplied a component or tool. A provider can supply several components. |
-| Toolchain capability | A stable virtual provide through which a provider advertises a logical toolchain or component. |
+| Provider capability | A stable virtual provide through which a provider advertises a logical input identity. Toolchains and libraries use the same resolution contract. |
 | Build input | A resolved input available to a build. Availability alone does not prove invocation or incorporation. |
+| Build action | A pipeline-step invocation with resolved inputs and an output scope. |
 | Relationship | Evidence connecting an output RPM to a component or tool, with a role and confidence. |
 | Build receipt | The versioned record of inputs, relationships and evidence for a completed build. |
 | Rebuild requirement | A policy rule that identifies affected relationships and the replacement input or repair generation they require. |
 | Repair generation | A monotonic revision issued by a policy authority for a component and stream. It advances when consumers must incorporate a repair. |
 
-Record four relationship roles:
+Record a conservative `build-input` relationship for available inputs. It means
+potential influence, not confirmed invocation or incorporation. Steps can also
+report more precise roles:
 
 - `runtime`: the output uses a separately installed provider.
 - `incorporates`: the output contains provider-derived code or data. Evidence
@@ -96,7 +136,8 @@ the bootstrap tool's stdlib was incorporated into the final compiler's stdlib.
 
 ## Distribution-independent provider contract
 
-Toolchain RPMs advertise stable virtual capabilities. A Go provider could emit:
+Provider RPMs advertise stable virtual capabilities. Toolchains are one use of
+this contract. A Go provider could emit:
 
 ```text
 Provides: rpmx(toolchain:go) = 1.27.4
@@ -123,10 +164,12 @@ selects concrete packages, verifies their capabilities and records the exact
 provider revisions. RPMs named `golang-1.27`, `go-compiler` or another name can
 satisfy the same recipe contract if they supply the required toolchain.
 
-Providers also ship a versioned toolchain descriptor. It connects the capability
-to executable paths, host and target support, component capabilities and evidence
-adapters. RPM capabilities identify providers; they cannot by themselves describe
-which command to execute or how split compiler and stdlib packages relate.
+Providers can ship versioned, declarative descriptors. These connect capabilities
+to named executable or file bindings, compatible targets and other capabilities.
+The descriptor format is generic data, not a catalog of known language toolchains
+or instructions to load executable engine plugins. Shared steps interpret
+tool-specific properties. Simple providers need no descriptor beyond capabilities
+and their locked package identity when no finer binding is requested.
 
 Resolve descriptor component dependencies against the same locked package set.
 Require compatible streams and revisions across split compiler and runtime providers.
@@ -145,15 +188,22 @@ External and bootstrap RPMs may lack this contract. A distribution profile can
 declare an equivalent compatibility binding for a concrete package or existing
 virtual capability. That binding supplies the descriptor and verifies the
 resolved provider version and files. Package-name mapping belongs only in this
-distribution integration layer. Generic rpmx adapters and rebuild rules use
-logical identities and capability values.
+distribution integration layer. The core and shared steps communicate through
+logical identities and capability values. They must not infer compatibility from
+package names or execute a provider-supplied probe script merely to resolve it.
 
 ## One canonical inventory in rpmx
 
-Extend rpmx's existing component inventory and bundled declarations. It already
-supports output associations, evidence, confidence and source declarations.
-Its Go and Cargo catalogers inspect vendor metadata; that is not proof of the
-exact dependency subset incorporated into every binary.
+Use a general provenance model for resolved inputs, build actions, output
+relationships and components. Reuse rpmx's inventory, lock and bundled-declaration
+work where it fits; refactor their interfaces where it does not. Do not force
+action provenance into an ecosystem-specific component enum.
+
+Existing Go and Cargo catalogers inspect vendor metadata. That is not proof of
+the exact dependency subset incorporated into every binary. Keep their existing
+behavior compatible during migration, then move tool-specific collection into
+shared pipeline steps. Do not add more language-specific engine catalogers for
+this feature.
 
 The extended inventory supplies both RPM capability generation and the build
 receipt. SBOM output consumes the same records. Recipes must not maintain
@@ -163,7 +213,7 @@ Each relationship records:
 
 - Output RPM identity, source recipe identity, host and target architectures.
 - Logical component or toolchain identity, ecosystem, upstream version and stream.
-- Relationship role, incorporation mechanism, evidence and confidence.
+- Build action, output scope, relationship role, evidence and coverage.
 - Provider RPM name, epoch, version, release, architecture and resolved checksum,
   or the corresponding immutable source identity.
 - Applicable component content identity or repair generation.
@@ -215,24 +265,41 @@ and conservatively rebuild the source recipe without claiming exact inclusion.
 
 ## Collection and confidence
 
-Start with explicit declarations and toolchain adapters. Build-step declarations
-identify intended tools; resolved locks identify their available provider RPMs.
-Adapters verify selection where the toolchain exposes reliable evidence.
+The engine creates an action record from the inputs visible to each build step.
+It records their immutable provider bindings and conservatively associates them
+with outputs that the action can affect. Initial scoping can cover every payload
+output of the source recipe. It must not create false `bundled(...)` claims for
+all those outputs.
 
-- Go: inspect binary build information and bind the selected toolchain capability
-  to its resolved provider set. Reject unexplained toolchain switching or downloads.
-- Rust: capture the selected compiler, stdlib and relevant Cargo build graph.
-  A lockfile can include build, test, optional and unused dependencies. Do not
-  advertise every lockfile entry as confirmed embedded code.
-- C/C++: support explicit component and tool declarations first. Later adapters
-  can use linker maps, dependency files and compiler invocation records.
-- Generators: support explicit output relationships for generated code. This
-  covers cases that cannot be discovered through ELF dependencies.
+Provide one versioned reporting interface for built-in steps, custom steps and
+inline scripts. A report references engine-assigned action and input identifiers,
+output paths or output selectors, relationship roles, evidence and coverage.
+The engine verifies identifiers, path ownership, provider capabilities, conflicts
+and deterministic serialization. Exact input identities come from the resolver;
+a step cannot replace them with a self-reported RPM name or version.
 
-Keep declared, observed and conservatively inferred relationships distinct.
-An input installed in a build root is not automatically `compiled-by` evidence.
-Missing evidence must not be interpreted as proof that an output is unaffected.
-Unexplained prebuilt objects require a declared origin or fail strict policy.
+Reports are claims made by the trusted recipe and its pinned steps. Structural
+validation does not prove arbitrary source code behaved honestly. Preserve that
+trust scope and the difference between declared, observed and inferred evidence.
+Provider metadata is declarative and cannot introduce executable reporters.
+
+A partial report adds facts without removing conservative edges. Narrowing
+requires an explicit coverage claim for a defined input and output scope, backed
+by the step's contract and evidence. The engine enforces the same refinement
+rules for every step. Missing reports, unknown report versions, opaque prebuilt
+inputs and unsupported tool modes must retain conservative coverage or fail
+strict policy. An empty report must not mean that no inputs were consumed.
+
+Only inputs with no route to shipped outputs can be classified as test-only.
+A test step that can modify the staged payload cannot erase its influence by
+calling itself a test. Separate output scopes and read-only payload access can
+establish that exclusion through the same generic action contract.
+
+For example, a shared Go step could report selected-toolchain and binary build
+information. A Rust step could report its relevant build graph. A native link
+step could use dependency files and linker maps. A generator could declare
+relationships for emitted files. These are optional refinements of the common
+mechanism, not prerequisites for a language-specific implementation in the core.
 
 Collect target-specific provider provenance during native binary builds. The
 shared SRPM retains portable declarations and source inventories; it must not
@@ -256,15 +323,20 @@ evidence so different naming and patch policies remain distinguishable.
 | Relationship or change | Default action |
 | --- | --- |
 | Incorporated stdlib, static code or implementation headers | Rebuild consumers when the relevant component content changes. |
-| Shared runtime implementation with compatible ABI | Update the runtime and run relevant acceptance. No blanket consumer rebuild is required. |
+| Shared runtime implementation with compatible ABI | For verified runtime-only relationships, update the runtime and run relevant acceptance. Unknown build influence still takes the conservative path. |
 | Runtime ABI change | Select consumers through compatibility policy and dependency edges. An unchanged SONAME alone does not prove compatibility. |
 | Compiler or generator change | Apply an explicit output-affecting rebuild requirement. Mere version inequality does not establish that old outputs are defective. |
 | Unknown relevant input coverage | Conservatively select potential consumers or block artifact reuse until coverage is repaired. |
 
-Content comparison should cover the relevant provider component, not all files
-from its source package. Documentation, SBOM and signing-only changes must not
-invalidate consumers. Initial adapters can over-select within a declared role
-when finer evidence is unavailable.
+Unrefined build-input relationships conservatively select potentially affected
+consumers. Shared steps can identify relevant component content, header scopes
+or runtime-only relationships to reduce this set. The engine compares declared
+identities and evaluates generic requirements; it does not infer ABI safety
+from toolchain names. A mere `compiled-by` or `generated-by` assertion does not
+remove potential incorporation edges without coverage evidence.
+
+Component scopes and verified identity equivalence can exclude documentation,
+SBOM and signing-only changes. Until that scope is known, rebuild conservatively.
 
 A reviewed requirement is necessary for semantic compiler fixes. Hashes cannot
 decide whether a changed optimizer corrects old machine code. A repair generation
@@ -322,15 +394,20 @@ the final compiler and its consumers to satisfy the declared repair requirement.
 
 ## Migration and delivery
 
-1. Add the capability contract, descriptor schema, common inventory relationships
-   and explicit declarations in rpmx. Define ordering and schema compatibility.
-2. Add versioned capability ingestion and durable receipt publication. Validate
-   receipt references and retain them with supported package history.
-3. Implement Go end to end, including stdlib tracking and selected-toolchain
-   verification. Exercise consumer selection with an unchanged application recipe.
-4. Connect requirements to transaction scheduling, queue validation and promotion.
-5. Add Rust and C/C++ adapters. Improve incorporation precision without changing
-   the scheduler's relationship model.
+1. Refactor the provenance foundation around generic inputs, actions, outputs
+   and relationships. Define capability bindings, reporting, coverage, receipts
+   and schema compatibility. Prove it with synthetic providers and custom steps.
+2. Deliver a complete conservative path through receipt publication, consumer
+   discovery, scheduling, queue validation and promotion. It must work without
+   any toolchain-specific scanner or adapter.
+3. Integrate shared pipeline steps through the reporting contract. Demonstrate
+   a compiler, a generator and an incorporated library using the same engine.
+4. Add more precise Go, Rust and native-build collection in shared steps. Show
+   that refinements reduce rebuilds while preserving required repairs. New
+   toolchains must not require changes to the core relationship model.
+5. Migrate existing language-specific inventory collection to this interface
+   where appropriate. Retire duplicate models instead of maintaining parallel
+   metadata-generation paths.
 
 Existing packages have incomplete metadata. Mark coverage explicitly. Rebuild
 affected legacy packages conservatively using declared dependencies and build
@@ -341,6 +418,10 @@ can populate the initial index. Do not infer a clean result from an empty index.
 
 | Scenario | Required result |
 | --- | --- |
+| Synthetic providers and arbitrary custom build steps | Complete consumer selection and repaired-input verification without built-in language knowledge. |
+| Unreported, partial or unsupported refinement | Keep conservative influence edges; never infer an empty dependency set. |
+| New provider namespace and differently named RPMs | Work through capabilities and reports without an engine code change. |
+| Test step with payload write access | Preserve potential influence on shipped outputs. |
 | Go stdlib fix, unchanged application recipe | Rebuild the application with the repaired stream and verify its receipt. |
 | Backport with unchanged upstream version | Select old provider revisions and accept the repaired distribution release. |
 | Different distribution RPM names | Resolve the same recipe capability and produce equivalent logical relationships with distinct provider receipts. |
@@ -360,21 +441,23 @@ can populate the initial index. Do not infer a clean result from an empty index.
 
 ## Alternatives and review questions
 
-Rebuilding every build-time reverse dependency is simple but treats documentation
-tools, test tools and compilers alike. Runtime dependencies alone miss static
-and generated code. A source lockfile alone overstates actual incorporation and
-does not identify all compiler-provided runtime code. This proposal keeps those
-facts distinct and lets conservative policy use all available evidence.
+A flat reverse-build-dependency graph is a useful conservative baseline. By
+itself it cannot distinguish runtime-only use, incorporated code and generated
+output. Runtime dependencies alone miss static and generated code. A source
+lockfile alone overstates actual incorporation and does not identify all
+compiler-provided runtime code. This proposal starts conservatively and refines
+those facts through shared-step contracts, without language-specific engine rules.
 
 Before implementation, review these choices:
 
-- Final capability names, toolchain descriptor schema and public recipe syntax.
+- Final capability conventions, generic provider descriptors and recipe syntax.
+- Action output scopes and the coverage contract required to refine influence edges.
 - The smallest component granularity for glibc and compiler runtime packages.
 - How maintainers declare output-affecting fixes and approve repair generations.
 - The receipt index format and compatibility rules for older clients.
-- Whether initial Go/Rust toolchain updates conservatively invalidate all
-  consumers in the stream, or only changed component and tool roles.
+- Which shared-step contracts can safely narrow conservative component influence.
 
-The initial implementation should prioritize complete, explainable selection.
-More precise tracing can reduce unnecessary rebuilds after the repair mechanism
+The initial implementation must work for arbitrary build inputs and custom
+steps. Prioritize a clean general model and complete, explainable selection.
+Shared-step optimizations can reduce unnecessary rebuilds after that mechanism
 works across build, acceptance and promotion.
