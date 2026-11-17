@@ -608,63 +608,72 @@ Build steps can branch on `${arch}`:
 
 ## 7. Tests
 
-Every package needs at least one test that would fail if its primary behavior
-were missing or broken.
+Tests must establish package behavior, error handling and installation correctness.
+A file-presence check or version command alone does not establish runtime coverage.
+Use [the testing guide](testing.md) for commands, fixtures and review criteria.
 
-- `build.tests` runs named source suites in independent workspace copies. Case
-  tools extend the pinned build closure without entering the build root.
-- Output or recipe `tests` consume existing binary RPMs in a disposable root.
-  Use them for installed behavior and consumer checks.
-- `mode: transaction` selects a private writable RPM root for lifecycle tests.
+- `build.tests` runs named source suites in independent workspace copies. Each case extends the pinned build closure with its own test tools.
+- Output or recipe `tests` use packaged RPMs in a separate root and a fresh workspace.
+- `mode: transaction` selects a private writable root for real RPM installation, upgrade and removal checks.
 
-Builds run source suites only. `scripts/build-all.sh` then invokes standalone
-`rpmx test` before writing a success stamp. The Python bootstrap helper uses the
-same acceptance gate before adding a dependency to its private repository.
-The gate explicitly selects `profiles/eternal.profile.yaml` for runtime repository
-policy, so bootstrap build exclusions do not hide runtime dependencies. The
-Python helper explicitly supplies its private profile instead. A direct invocation
-must likewise select runtime policy:
+Choose one execution form: `script`, `argv` or `pipeline`.
+`script` runs Bash with `-euo pipefail`. Shell `-c` commands in `argv` are errors.
+Use direct `argv` with `expect` for exact exit codes, stdout and stderr.
+Test pipeline shell steps also use strict Bash options.
 
-```sh
-rpmx test packages/NAME/package.yaml --install-dir out/NAME/ARCH --arch ARCH \
-  --test-profile profiles/eternal.profile.yaml
-```
+Add an output-level test for every output with runtime behavior or a usable development interface.
+Output-level installed-package tests select that output and its declared runtime siblings.
+A recipe-level installed-package test installs all outputs, so it cannot prove individual dependency closure.
+Documentation outputs need no artificial test. Test their data through the consumer when the data has runtime effects.
+A metapackage test must check its useful installed closure.
 
-`--no-tests` explicitly disables both phases. Private OpenSSF seed preparation
-runs source builds only; its RPM is a build prerequisite, not an accepted release.
-
-For a batch, `build-all.sh --defer-acceptance` runs source tests and leaves
-acceptance to a separate invocation. It cannot be combined with `--no-tests`.
-The workflow builds every selected package in parallel, collects the binary
-RPMs for each architecture, then accepts every package in parallel against that
-candidate pool. Each case still installs only its own declared dependencies.
-A package enters the release artifacts only after acceptance passes.
-
-Add an output-level test when the output has a user-facing command or runtime
-behavior. A `-doc`, `-locales` or empty metapackage output does not need an
-artificial test of its own; a package-level integration test can cover it.
+Use package-local `tests/` directories for source files, sample input and expected output:
 
 ```yaml
 outputs:
-  - name: gcc-16
+  - name: example-devel
     tests:
-      - name: installed
-        argv: ["gcc-16", "--version"]
-
-  - name: gcc-16-default
-    tests:
-      - name: installed
+      - name: compile-and-run
+        packages: [gcc, glibc-devel, pkgconf]
+        files: tests
         script: |
-          gcc --version
-          cc --version
+          gcc "$TEST_FILES/consumer.c" $(pkg-config --cflags --libs example) -o consumer
+          ./consumer
 ```
 
-Only add `packages` to a test when the test actually invokes those packages. A simple binary smoke test usually needs no extra test packages.
+The `files` directory is relative to the root recipe. rpmx bundles its contents in the SRPM and recipe digest.
+`TEST_FILES` points to a private read-only copy. Use `TEST_PACKAGE_ROOT` for
+read-only candidate payload checks. Do not use `$STAGE` to test installed behavior.
+Declare only tools the test uses in `tests[].packages`.
+Source-case tools extend a separate pinned build environment. They do not enter
+the build root. Installed-package test tools join only the selected output test root.
+Keep tools needed by configure or compilation in `build.packages`.
+Do not add runtime libraries to test packages to hide missing runtime dependencies.
 
-Use `script` for strict Bash, direct `argv` with `expect` for exact results, or
-`pipeline` for reusable steps. Do not put shell `-c` commands in `argv`.
-Package-local `files: tests` exposes immutable fixtures through `TEST_FILES`;
-`TEST_PACKAGE_ROOT` exposes the extracted candidate payload for layout checks.
+Tests default to `network: false`. Source cases in `build.tests` cannot enable
+external networking. Installed-package cases can declare `network: true` when
+external access is part of the behavior under test; see the [testing guide](testing.md#test-environments).
+Prefer fixed local input and isolated loopback services. A selected networked
+case cannot run with `--offline` and makes that run incomplete.
+Assert the response content as well as the command status. Include relevant rejected input and failure paths.
+Avoid sleeps, wall-clock dates, external account databases and host filesystem assumptions.
+Use `artifacts` to preserve upstream reports and diagnostic files after failure.
+A skipped or not-run case makes the run incomplete and fails the release gate.
+
+`rpmx build` runs source suites and writes RPMs. `scripts/build-all.sh` normally
+runs standalone `rpmx test` before recording success. Its `--defer-acceptance`
+option leaves installed-package tests for a separate invocation while keeping
+source suites enabled. CI builds selected packages in parallel, then tests them
+in parallel against the same-architecture candidate pool. Each case still
+installs only its declared dependencies. Publication requires both phases to pass.
+The Python bootstrap helper also tests a dependency before private promotion.
+
+Use `profiles/eternal.profile.yaml` for installed-package repository policy:
+
+```console
+rpmx test packages/NAME/package.yaml --install-dir out/NAME/ARCH --arch ARCH \
+  --test-profile profiles/eternal.profile.yaml
+```
 
 Tests run by default unless they declare `optional: true`. Use
 `--include-optional-tests` to run optional cases in addition to mandatory cases.
@@ -672,15 +681,16 @@ This differs from `skip:`, which prevents a selected case from passing the gate.
 Do not use `--no-tests` to opt out of one expensive suite: it disables mandatory
 tests as well.
 
-Build reports and source evidence stay in the package output directory.
-Standalone acceptance reports, JUnit and command evidence are retained under
-`out/NAME/acceptance/ARCH/`. The explicit Python bootstrap helper keeps private
-dependency build and acceptance evidence under `.work/python-deps/ARCH/NAME/`;
-failed dependencies retain their evidence without a completion stamp.
-Missing or skipped declared acceptance cases fail
-the gate, even when the test process exits successfully.
+Build reports and source evidence stay under `out/NAME/`. The shared build
+script retains installed-package reports under `out/NAME/acceptance/ARCH/`.
+The explicit Python bootstrap helper keeps private dependency evidence under
+`.work/python-deps/ARCH/NAME/`; failed dependencies have no completion stamp.
+Missing or skipped declared acceptance cases fail the gate, even when the test
+process exits successfully.
 
-Tests must not rely on the network.
+`build-all.sh --no-tests` skips both phases. Direct `rpmx build --no-tests` skips
+only source suites. Private OpenSSF seed preparation builds a prerequisite;
+it does not establish installed-package coverage for that package.
 
 ## 8. Versioned toolchain example: GCC 16
 
@@ -1031,8 +1041,10 @@ bootstrap variant; the production recipe stays.
       it. Library-only packages do not get a `-libs` output.
 - [ ] Every separately installable output has its own license copy and claims
       it in `files.include` and `files.license`.
-- [ ] Every user-facing output has a test, or the package-level test covers it.
-      Doc, locale and metapackage outputs are exempt.
+- [ ] Each functional output has an installed interface test. Package-level
+      integration tests supplement these output checks.
+- [ ] Data and locale outputs have consumer tests; metapackages check their
+      dependency closure. Only documentation-only outputs are exempt.
 - [ ] Build dependencies are package names; test-only packages are on tests.
 - [ ] `source-date-epoch` is explicit, derivable from the source, or covered
       by the repository fallback; `cpe` names the upstream project.

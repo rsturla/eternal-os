@@ -69,7 +69,13 @@ Keep the bootstrap variants' sources, patches, flags and tests in sync with
 the production streams. Their release numbers can differ.
 
 The bootstrap variants retain the installed `coinstall-fedora` test. Production
-recipes test co-installation with the other Eternal stream instead. Native
-rpmx roots include test dependencies, so this split keeps Fedora Go out of the
-production root. The C compiler and glibc remain under the existing bootstrap
-profile policy.
+recipes test co-installation with the other Eternal stream instead. Acceptance
+cases resolve their own tool dependencies separately from the build root. Only
+the bootstrap co-installation case adds Fedora Go. The C compiler and glibc
+remain under the existing bootstrap profile policy.
+Bootstrap variants keep their own tests and fixtures under `recipes/<name>/tests/`.
+Keep behavioral checks in both variants when a package participates in the ladder.
+Test tools belong in each test's `packages` list. Do not add them to the seed
+or stage policy merely to run a test. See [package testing](../docs/testing.md).
+The production `scripts/test-all.sh` runner selects `packages/`; validate bootstrap
+variants through their build or a direct `rpmx test` command.
