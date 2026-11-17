@@ -154,6 +154,7 @@ outputs:
         - glibc-devel
         - libstdc++-16 = ${package.version}-${package.release}
       provides:
+        - rpmx(toolchain:gcc:16) = ${package.version}
         - gcc-16 = ${package.version}-${package.release}
 
   - name: gcc-16-default
@@ -246,6 +247,7 @@ outputs:
         - libstdc++-16 = ${package.version}-${package.release}
         - glibc-devel
       provides:
+        - rpmx(component:libstdcxx-headers:16) = ${package.version}
         - libstdc++-devel = ${package.version}-${package.release}
 
   - name: libstdc++-16-static
@@ -264,6 +266,7 @@ outputs:
       run:
         - libstdc++-16-devel = ${package.version}-${package.release}
       provides:
+        - rpmx(component:libstdcxx-static:16) = ${package.version}
         - libstdc++-static = ${package.version}-${package.release}
 
   - name: libatomic-16

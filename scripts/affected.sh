@@ -131,6 +131,11 @@ while IFS= read -r -d '' path; do
       global=1
       break
       ;;
+    rebuild-requirements.yaml)
+      # Let the transaction planner select consumers from durable receipts.
+      # A canary ensures a policy-only queue entry reaches that planner.
+      builder=1
+      ;;
     .rpmx-revision)
       # The builder changed, not a recipe: a canary build is enough.
       builder=1

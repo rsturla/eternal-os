@@ -49,6 +49,17 @@ class ArtifactTest(unittest.TestCase):
             artifacts.import_inputs(archive, self.root / 'cache')
         self.assertEqual((self.root / 'cache' / name).read_bytes(), content)
 
+    def test_sha256_locked_inputs_match_exact_sha512_transaction_candidates(self):
+        content = b'the exact current transaction RPM'
+        relative = 'sha256/' + hashlib.sha256(content).hexdigest()
+        artifacts.import_inputs(self.archive(relative, content), self.root / 'cache')
+        path = self.root / 'cache' / relative
+        candidate = {'name': 'provider', 'sha512': hashlib.sha512(content).hexdigest()}
+        artifacts.verify_candidate(path, candidate)
+        stale = dict(candidate, sha512=hashlib.sha512(b'another RPM with the same name').hexdigest())
+        with self.assertRaisesRegex(ValueError, 'obsolete candidate: provider'):
+            artifacts.verify_candidate(path, stale)
+
     def test_target_inputs_reject_archive_paths(self):
         archive = self.archive('../escape', b'payload')
         with self.assertRaisesRegex(ValueError, 'invalid dependency archive'):

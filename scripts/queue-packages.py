@@ -70,6 +70,12 @@ def compare_evr(left, right):
 def check_reuse(original, current, transaction, scratch):
     """Reject stale build inputs, while allowing unrelated main changes."""
     built = set(original['builds'])
+    # A repair policy change needs a fresh PR transaction, even if ELF and
+    # recipe inputs match. The seal gate also verifies the actual RPM receipts.
+    if original.get('requirements', []) != current.get('requirements', []):
+        raise ValueError('build repair requirements changed; refresh PR CI')
+    if set(current.get('requested', [])) - built:
+        raise ValueError('PR does not cover the current repair rebuild closure')
     required = {name for name, data in current['catalog'].items()
                 if current['published'].get('hashes', {}).get(name) != data['hash']}
     if required - built:

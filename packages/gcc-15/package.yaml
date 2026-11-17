@@ -152,6 +152,7 @@ outputs:
         - glibc-devel
         - libstdc++-15 = ${package.version}-${package.release}
       provides:
+        - rpmx(toolchain:gcc:15) = ${package.version}
         - gcc-15 = ${package.version}-${package.release}
 
   - name: gcc-15-default
@@ -237,6 +238,7 @@ outputs:
         - libstdc++-15 = ${package.version}-${package.release}
         - glibc-devel
       provides:
+        - rpmx(component:libstdcxx-headers:15) = ${package.version}
         - libstdc++-devel = ${package.version}-${package.release}
 
   - name: libstdc++-15-static
@@ -255,6 +257,7 @@ outputs:
       run:
         - libstdc++-15-devel = ${package.version}-${package.release}
       provides:
+        - rpmx(component:libstdcxx-static:15) = ${package.version}
         - libstdc++-static = ${package.version}-${package.release}
 
   - name: libatomic-15

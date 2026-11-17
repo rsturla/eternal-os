@@ -116,6 +116,9 @@ outputs:
         - /usr/share/licenses/golang-1.26/LICENSE
         - /usr/share/licenses/golang-1.26/PATENTS
     dependencies:
+      provides:
+        - rpmx(toolchain:go:1.26) = ${package.version}
+        - rpmx(component:go-stdlib:1.26) = ${package.version}
       run: [ca-certificates]
     tests:
       - name: compile

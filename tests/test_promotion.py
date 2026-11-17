@@ -174,6 +174,13 @@ class CandidateIntegration(unittest.TestCase):
         stage = cls.fixture / 'stage'
         (stage / 'opt').mkdir(parents=True)
         (stage / 'opt/probe').write_text('tested payload\n')
+        # A durable receipt belongs to the tested payload, including through
+        # envelope signing and artifact transport. Stage mode is a fixture here.
+        cls.build_receipt = {'schema': 1, 'output': 'probe', 'source': 'probe-1-1.src.rpm',
+                             'arch': 'noarch', 'roots_complete': True, 'inputs': [], 'coverage': []}
+        receipt_path = stage / 'usr/share/rpmx/buildinfo/probe.json'
+        receipt_path.parent.mkdir(parents=True)
+        receipt_path.write_text(json.dumps(cls.build_receipt))
         recipe = cls.fixture / 'package.yaml'
         recipe.write_text("schema: 2\npackage:\n  name: probe\n  version: '1'\n  release: 1\n  summary: Promotion fixture\n  license: MIT\noutputs:\n  - name: probe\n    arch: noarch\n")
         def run(*args):
@@ -262,7 +269,10 @@ class CandidateIntegration(unittest.TestCase):
         packages = candidate / 'packages'
         before = {path.relative_to(packages).as_posix(): (SIGN.digest(path), SIGN.content_digest(path))
                   for path in packages.rglob('*.rpm')}
+        unsigned = next(packages.rglob('*.noarch.rpm'))
+        self.assertEqual(TRANSACTION.provenance.read(unsigned), self.build_receipt)
         SIGN.sign(packages, self.fixture / 'key.asc')
+        self.assertEqual(TRANSACTION.provenance.read(unsigned), self.build_receipt)
         receipt = json.loads((packages / 'signing.json').read_text())['rpms']
         self.assertEqual(set(receipt), set(before))
         for path, (original, content) in before.items():
@@ -348,6 +358,8 @@ class CandidateIntegration(unittest.TestCase):
             elif command[0] != 'git':
                 raise AssertionError(command)
         class Baseline:
+            provenance = TRANSACTION.provenance
+            verify_repairs = staticmethod(TRANSACTION.verify_repairs)
             run = staticmethod(lambda *args: None)
             baseline_packages = staticmethod(lambda directory: state['baseline'][directory.name])
         actual_load = PROMOTE.load

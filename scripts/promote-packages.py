@@ -241,6 +241,9 @@ def verify(args):
         hashes = dict(line.split() for line in subprocess.check_output(
             [str(ROOT / 'scripts/package-hash.sh')], text=True).splitlines())
         transaction = load('build-transaction')
+        if state.get('requirements', []) != transaction.provenance.load():
+            raise ValueError('build repair requirements changed since acceptance')
+        transaction.verify_repairs(state, candidate / 'packages')
         baseline = {}
         for arch in ARCHES:
             directory = scratch / 'baseline' / arch

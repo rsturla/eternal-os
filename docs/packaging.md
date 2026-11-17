@@ -932,3 +932,7 @@ bootstrap variant; the production recipe stays.
 - [ ] `rpmx lint` is clean.
 - [ ] No tracked `package.lock.json` is added while the bootstrap root floats.
 - [ ] The package builds on both x86_64 and aarch64 in CI.
+
+Build-input provider capabilities and repair policy are described in
+[build-input rebuilds](build-input-rebuilds.md). Consumer recipes keep their
+existing build requirements.

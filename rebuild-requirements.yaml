@@ -1,0 +1,9 @@
+# Portable provider capabilities, independent of package names.
+# Increment a provider capability for backported repairs, or use minimum_evr.
+# requirements:
+#   - capability: rpmx(component:example)
+#     minimum: '2'
+#     minimum_evr: '0:1.0-4'  # Optional exact provider RPM revision floor.
+#     arches: [x86_64, aarch64]
+schema: 1
+requirements: []
