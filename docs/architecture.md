@@ -49,7 +49,11 @@ The bootstrap root is deliberately contained:
   `$releasever` continues to mean the Eternal release. Eternal has repository
   priority 10, ahead of the Fedora fallback. When both repositories supply a
   dependency, use the Eternal package even if Fedora uses a higher version
-  number. Standalone acceptance uses this distribution policy.
+  number. Fedora fallback repositories exclude the package families already
+  adopted by the bootstrap build profile. Their exact package names can
+  otherwise win over versioned Eternal providers and mix incompatible
+  compiler, libc or Perl files. Standalone acceptance uses this distribution
+  policy.
 
 Self-hosting means removing the bootstrap repositories and every bootstrap
 dependency. Usually a package keeps the name of the component it replaces

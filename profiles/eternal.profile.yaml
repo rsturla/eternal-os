@@ -21,10 +21,134 @@ repositories:
   # Bootstrap repositories. Delete when self-hosting.
   - id: bootstrap
     baseurl: https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/$basearch/os/
-    exclude: [zlib, zlib-devel, zlib-static, zlib-ng-compat, zlib-ng-compat-devel, zlib-ng-compat-static]
+    # Use the same adopted package families as the bootstrap build profile.
+    # Exact Fedora names can otherwise override versioned Eternal providers.
+    exclude:
+      - autoconf*
+      - automake*
+      - libtool*
+      - perl*
+      - texinfo*
+      - glibc*
+      - gcc
+      - gcc-*
+      - cpp
+      - cpp-*
+      - libgcc*
+      - libgomp*
+      - libstdc++*
+      - libatomic*
+      - acl*
+      - attr*
+      - audit*
+      - libacl*
+      - libattr*
+      - libcap*
+      - libselinux*
+      - libsepol*
+      - libxcrypt*
+      - pam*
+      - ncurses*
+      - zstd*
+      - libzstd*
+      - xz
+      - xz-*
+      - gmp*
+      - mpfr*
+      - libmpc*
+      - isl*
+      - kernel-headers*
+      - bash
+      - bash-binsh
+      - binutils
+      - coreutils
+      - coreutils-single
+      - diffutils
+      - diffutils-*
+      - filesystem
+      - findutils
+      - findutils-*
+      - grep
+      - grep-*
+      - make
+      - pcre2
+      - pcre2-*
+      - tar
+      - tar-*
+      - pkgconf
+      - pkgconf-m4
+      - pkgconf-pkg-config
+      - libpkgconf
+      - zlib
+      - zlib-devel
+      - zlib-static
+      - zlib-ng-compat
+      - zlib-ng-compat-devel
+      - zlib-ng-compat-static
   - id: bootstrap-updates
     metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f44&arch=$basearch
-    exclude: [zlib, zlib-devel, zlib-static, zlib-ng-compat, zlib-ng-compat-devel, zlib-ng-compat-static]
+    exclude:
+      - autoconf*
+      - automake*
+      - libtool*
+      - perl*
+      - texinfo*
+      - glibc*
+      - gcc
+      - gcc-*
+      - cpp
+      - cpp-*
+      - libgcc*
+      - libgomp*
+      - libstdc++*
+      - libatomic*
+      - acl*
+      - attr*
+      - audit*
+      - libacl*
+      - libattr*
+      - libcap*
+      - libselinux*
+      - libsepol*
+      - libxcrypt*
+      - pam*
+      - ncurses*
+      - zstd*
+      - libzstd*
+      - xz
+      - xz-*
+      - gmp*
+      - mpfr*
+      - libmpc*
+      - isl*
+      - kernel-headers*
+      - bash
+      - bash-binsh
+      - binutils
+      - coreutils
+      - coreutils-single
+      - diffutils
+      - diffutils-*
+      - filesystem
+      - findutils
+      - findutils-*
+      - grep
+      - grep-*
+      - make
+      - pcre2
+      - pcre2-*
+      - tar
+      - tar-*
+      - pkgconf
+      - pkgconf-m4
+      - pkgconf-pkg-config
+      - libpkgconf
+      - zlib
+      - zlib-devel
+      - zlib-static
+      - zlib-ng-compat
+      - zlib-ng-compat-devel
+      - zlib-ng-compat-static
 packages:
   install:
     - eternal-base
