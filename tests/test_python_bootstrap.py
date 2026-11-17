@@ -61,6 +61,20 @@ class PythonBootstrap(unittest.TestCase):
         }
         self.assertEqual(bootstrap.dependency_order(plans, "python-demo"), ["python-demo"])
 
+    def test_optional_test_tools_are_built_only_when_requested(self):
+        plans = {"python-demo": plan("python-3.15-demo"),
+                 "source-tool": plan("python-3.15-source-tool"),
+                 "installed-tool": plan("python-3.15-installed-tool")}
+        cell = plans["python-demo"]["cells"][0]
+        cell["build_tests"] = [{"optional": True, "packages": ["python-3.15-source-tool"]}]
+        cell["tests"] = [{"optional": True, "pipeline": [{"needs": ["python-3.15-installed-tool"]}]}]
+        self.assertEqual(bootstrap.dependency_order(plans, "python-demo"), ["python-demo"])
+        order = bootstrap.dependency_order(plans, "python-demo", include_optional_tests=True)
+        self.assertEqual(set(order), set(plans))
+        self.assertEqual(order[-1], "python-demo")
+        self.assertEqual(bootstrap.dependency_order(plans, "python-demo", tests=False,
+                                                  include_optional_tests=True), ["python-demo"])
+
     def test_dependency_cycle_fails_before_building(self):
         plans = {
             "python-a": plan("python-3.15-a", needs=["python-3.15-b"]),

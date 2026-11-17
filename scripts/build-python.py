@@ -28,7 +28,7 @@ def bootstrap_recipes(root):
             yield recipe
 
 
-def dependency_order(plans, name, *, tests=True):
+def dependency_order(plans, name, *, tests=True, include_optional_tests=False):
     providers = {
         output["name"]: source
         for source, plan in plans.items()
@@ -53,6 +53,8 @@ def dependency_order(plans, name, *, tests=True):
                 dependencies.update(output["requires"])
             if tests:
                 for case in [*cell.get("build_tests", []), *cell.get("tests", [])]:
+                    if case.get("optional", False) and not include_optional_tests:
+                        continue
                     dependencies.update(case.get("packages", []))
                     for step in case.get("pipeline", []):
                         dependencies.update(step.get("needs", []))
@@ -85,6 +87,9 @@ def main():
     parser.add_argument("--arch", default=os.uname().machine)
     parser.add_argument("--profile", type=Path, help="Bootstrap profile for the new interpreter stream")
     args, build_args = parser.parse_known_args()
+    include_optional_tests = "--include-optional-tests" in build_args
+    if include_optional_tests and "--no-tests" in build_args:
+        parser.error("--include-optional-tests cannot be combined with --no-tests")
     root = Path(__file__).resolve().parent.parent
     rpmx = os.environ.get("RPMX", "rpmx")
 
@@ -96,7 +101,8 @@ def main():
         for recipe in bootstrap_recipes(root)
     }
     tests = "--no-tests" not in build_args
-    order = dependency_order(plans, args.name, tests=tests)
+    order = dependency_order(plans, args.name, tests=tests,
+                             include_optional_tests=include_optional_tests)
     hashes = dict(line.split() for line in capture(
         str(root / "scripts/package-hash.sh"), *order
     ).splitlines())
@@ -150,6 +156,8 @@ def main():
                         "--test-profile", str(profile_file),
                         "--output", str(output / "acceptance" / args.arch),
                     ]
+                    if include_optional_tests:
+                        acceptance.append("--include-optional-tests")
                     if "--build-release" in build_args:
                         acceptance.extend(["--build-release", build_args[build_args.index("--build-release") + 1]])
                     subprocess.run(acceptance, check=True, cwd=root)

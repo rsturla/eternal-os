@@ -21,6 +21,8 @@ def main():
                         help="Runtime repository policy (default: profiles/eternal.profile.yaml)")
     parser.add_argument("--runner", default="auto")
     parser.add_argument("--build-release")
+    parser.add_argument("--include-optional-tests", action="store_true",
+                        help="Also require optional installed-package tests")
     args = parser.parse_args()
     rpmx = os.environ.get("RPMX", "rpmx")
     args.output.mkdir(parents=True, exist_ok=True)
@@ -36,14 +38,17 @@ def main():
     planned = subprocess.check_output(plan_command, text=True)
     (args.output / "plan.json").write_text(planned)
     plan = json.loads(planned)["plan"]
-    expected = sum(len(cell["tests"]) for cell in plan["cells"])
+    expected = sum(1 for cell in plan["cells"] for test in cell["tests"]
+                   if args.include_optional_tests or not test.get("optional", False))
     if expected == 0:
-        print(f"acceptance not requested: {args.recipe} declares no package tests", file=sys.stderr)
+        print(f"acceptance not requested: {args.recipe} has no selected package tests", file=sys.stderr)
         return
     command = [rpmx, "test", str(args.recipe), "--install-dir", str(args.install_dir),
                "--arch", args.arch, "--runner", args.runner,
                "--test-output", str(evidence),
                "--junit", str(args.output / "junit.xml"), "--json"]
+    if args.include_optional_tests:
+        command.append("--include-optional-tests")
     if args.test_profile:
         command.extend(["--test-profile", str(args.test_profile)])
     if args.build_release:
