@@ -60,7 +60,13 @@ if args[0] == 'build':
     rpm.write_text('production RPM')
     (output / 'evidence').mkdir(exist_ok=True)
     (output / 'evidence/source.log').write_text('source suite evidence')
-    (output / 'run-report.json').write_text(json.dumps({'artifacts':{'rpms':[str(rpm)]}}))
+    (output / 'run-report.json').write_text(json.dumps({
+        'document':'rpmx-run-report', 'version':1,
+        'outcome':'failed' if os.environ.get('SOURCE_FAIL') == name else 'passed',
+        'build_tests_requested':'--no-tests' not in args,
+        'build_tests':[], 'evidence':[str(output / 'evidence')],
+        'artifacts':{'rpms':[str(rpm)]},
+    }))
     if os.environ.get('SOURCE_FAIL') == name:
         sys.exit(7)
 elif args[0] == 'test':
