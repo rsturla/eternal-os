@@ -59,13 +59,12 @@ outputs:
       run:
         - libattr = ${package.version}-${package.release}
     tests:
-      - name: installed
-        packages: [bash-binsh, coreutils]
+      - name: extended-attributes
+        packages:
+          - coreutils
+        files: tests
         script: |
-          echo test > /tmp/attr-test
-          setfattr -n user.eternal -v test /tmp/attr-test
-          test "$(getfattr -n user.eternal --only-values /tmp/attr-test)" = test
-          setfattr -x user.eternal /tmp/attr-test
+          bash "$TEST_FILES/extended-attributes.sh"
 
   - name: libattr
     summary: Extended attribute runtime library
@@ -76,13 +75,17 @@ outputs:
       license:
         - /usr/share/licenses/libattr/**
     tests:
-      - name: installed
-        packages: [bash-binsh, coreutils]
+      - name: minimal-runtime-dependencies
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libattr.so.[0-9]*"]
+      - name: runtime
+        packages:
+          - python3
+        files: tests
         script: |
-          for lib in /usr/lib64/libattr.so.* /usr/lib/libattr.so.*; do
-            test -e "$lib" && exit 0
-          done
-          exit 1
+          python3 "$TEST_FILES/runtime.py"
 
   - name: libattr-devel
     summary: Development files for libattr
@@ -95,6 +98,15 @@ outputs:
     dependencies:
       run:
         - libattr = ${package.version}-${package.release}
+    tests:
+      - name: attr-api
+        packages:
+          - gcc
+          - glibc-devel
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/attr-api.sh"
 
   - name: attr-doc
     summary: Documentation for attr
@@ -105,16 +117,3 @@ outputs:
         - /usr/share/licenses/attr-doc/**
       license:
         - /usr/share/licenses/attr-doc/**
-
-tests:
-  - name: link
-    packages: [gcc, glibc-devel, bash-binsh, coreutils]
-    script: |
-      cat > /tmp/attr-link.c <<'EOF'
-      #include <sys/xattr.h>
-      int main(void) {
-        return setxattr("/tmp/attr-link", "user.eternal", "1", 1, 0) != 0;
-      }
-      EOF
-      gcc /tmp/attr-link.c -lattr -o /tmp/attr-link
-      /tmp/attr-link
