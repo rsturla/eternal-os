@@ -214,6 +214,10 @@ Until then, the shell entry points are intentionally boring and reviewable.
 
 ## Roadmap
 
+The [toolchain and bundled-component rebuild proposal](design/toolchain-rebuilds.md)
+describes consumer tracking for embedded code, compiler fixes and generated
+outputs. It is a design for review, not an implemented pipeline feature.
+
 1. Add `eternal-keys` once a signing key exists (see `docs/signing.md`).
 2. Replace the bootstrap shell, coreutils and filesystem packages with in-tree
    recipes; shrink `profiles/bootstrap.profile.yaml` as each lands.
