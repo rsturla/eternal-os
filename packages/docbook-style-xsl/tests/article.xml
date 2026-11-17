@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<article id="probe">
+  <title>Eternal test article</title>
+  <section id="details">
+    <title>Details</title>
+    <para>Fixture payload with <emphasis>emphasis</emphasis> and a <xref linkend="details"/>.</para>
+    <itemizedlist>
+      <listitem><para>First item</para></listitem>
+    </itemizedlist>
+  </section>
+</article>
