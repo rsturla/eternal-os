@@ -21,6 +21,13 @@ repositories:
   - eternal-baselayout
   - glibc-2.43*
   - gcc-*
+  # Keep the seed compiler's public runtime family on Fedora too.
+  - libgcc
+  - libgcc-*
+  - libstdc++
+  - libatomic
+  - libgomp
+  - libitm
   - ld-linux-2.43*
   - libc-bin-2.43*
   - libstdc++-*
