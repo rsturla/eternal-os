@@ -1,0 +1,46 @@
+Backport of upstream PR testsuite/124872:
+https://github.com/gcc-mirror/gcc/commit/a2bd29ccfcb372472cccb4552843a10c35e4cf20
+
+GCC16 lacks the r17 et-static.def generator and loader. Use its established
+site.exp rootme binding to read CHECKING_P from generated auto-host.h instead.
+This preserves the upstream predicate without importing the newer harness.
+Missing or invalid configuration remains an error.
+
+--- a/gcc/testsuite/gcc.dg/plugin/crash-test-nested-ice.c
++++ b/gcc/testsuite/gcc.dg/plugin/crash-test-nested-ice.c
+@@ -1,4 +1,5 @@
+ /* { dg-do compile } */
++/* { dg-require-effective-target checking } */
+ /* { dg-additional-options "-fno-report-bug" } */
+ /* { dg-additional-options "-fplugin-arg-crash_test_plugin-nested" } */
+ /* { dg-additional-options "-fdiagnostics-add-output=sarif" } */
+--- a/gcc/testsuite/gcc.dg/plugin/crash-test-nested-write-through-null.c
++++ b/gcc/testsuite/gcc.dg/plugin/crash-test-nested-write-through-null.c
+@@ -1,4 +1,5 @@
+ /* { dg-do compile } */
++/* { dg-require-effective-target checking } */
+ /* { dg-additional-options "-fno-report-bug" } */
+ /* { dg-additional-options "-fplugin-arg-crash_test_plugin-nested" } */
+ /* { dg-additional-options "-fdiagnostics-add-output=sarif" } */
+--- a/gcc/testsuite/lib/target-supports.exp
++++ b/gcc/testsuite/lib/target-supports.exp
+@@ -18,6 +18,19 @@
+ # gcc-patches@gcc.gnu.org
+ 
+ # This file defines procs for determining features supported by the target.
++
++# Return 1 if this compiler was configured with internal checking enabled.
++# PR testsuite/124872: nested crash tests require CHECKING_P, not assertions.
++proc check_effective_target_checking { } {
++    global rootme
++    set header [open [file join $rootme auto-host.h] r]
++    set configuration [read $header]
++    close $header
++    if { ![regexp -line {^#define CHECKING_P ([01])$} $configuration match checking] } {
++        error "cannot determine CHECKING_P from $rootme/auto-host.h"
++    }
++    return $checking
++}
+ 
+ # Try to compile the code given by CONTENTS into an output file of
+ # type TYPE, where TYPE is as for target_compile.  Return a list

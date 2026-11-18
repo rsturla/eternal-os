@@ -1,0 +1,27 @@
+GCC16 testsuite: document the known PR121298 missed byte-swap optimization.
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=121298
+
+Mark only the three assembler assertions as expected failures. Compilation
+remains tested. An unexpected optimizer improvement becomes XPASS and must be
+reviewed; production compiler code and other assertions are unchanged.
+
+--- a/gcc/testsuite/gcc.target/i386/pr115102.c
++++ b/gcc/testsuite/gcc.target/i386/pr115102.c
+@@ -7,4 +7,5 @@
+   return (val & 0xffff0000) | ((val & 0xff00) >> 8) | ((val & 0xff) << 8);
+ }
+ 
+-/* { dg-final { scan-assembler "bswaphisi2_lowpart" } } */
++/* PR tree-optimization/121298: early reassociation hides the byte swap.  */
++/* { dg-final { scan-assembler "bswaphisi2_lowpart" { xfail *-*-* } } } */
+--- a/gcc/testsuite/gcc.target/i386/xchg-4.c
++++ b/gcc/testsuite/gcc.target/i386/xchg-4.c
+@@ -7,5 +7,6 @@
+     ext((x&~0xffff)|((x>>8)&0xff)|((x&0xff)<<8));
+ }
+ 
+-/* { dg-final { scan-assembler "rolw" } } */
+-/* { dg-final { scan-assembler-not "mov" } } */
++/* PR tree-optimization/121298: early reassociation hides the byte swap.  */
++/* { dg-final { scan-assembler "rolw" { xfail *-*-* } } } */
++/* { dg-final { scan-assembler-not "mov" { xfail *-*-* } } } */

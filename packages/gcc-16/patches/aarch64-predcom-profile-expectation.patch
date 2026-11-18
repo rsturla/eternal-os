@@ -1,0 +1,21 @@
+GCC16 testsuite: record the known AArch64 early-break profile-count defect.
+
+PR tree-optimization/118407 remains unresolved for this exact testcase.
+The upstream author recommends an expected failure rather than a large
+backport: https://gcc.gnu.org/pipermail/gcc-bugs/2026-July/966820.html
+
+Extend only the existing internal-count assertion's target predicate.
+Keep the positive predictive-commoning assertion and strict XPASS rejection.
+The separately compiled installed runtime oracle checks actual loop results.
+No production compiler code or optimization flags change.
+
+--- a/gcc/testsuite/gcc.dg/tree-ssa/predcom-8.c
++++ b/gcc/testsuite/gcc.dg/tree-ssa/predcom-8.c
+@@ -10,4 +10,6 @@
+ }
+ 
+ /* { dg-final { scan-tree-dump "Executing predictive commoning without unrolling" "pcom" } } */
+-/* { dg-final { scan-tree-dump-not "Invalid sum" "pcom" { xfail { arm*-*-* && arm_neon } } } } */
++/* PR tree-optimization/118407: early-break vectorization leaves inconsistent
++   profile counts on AArch64 as well as Arm NEON.  Keep the positive scan.  */
++/* { dg-final { scan-tree-dump-not "Invalid sum" "pcom" { xfail { { arm*-*-* && arm_neon } || aarch64*-*-* } } } } */
