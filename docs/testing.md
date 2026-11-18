@@ -407,6 +407,13 @@ Skipped and not-run cases make the run `incomplete`.
 Environment errors and missing input RPMs are not passes. A declared test that has not run is not a pass.
 Record the RPM identity, architecture, rpmx revision and dependency-root evidence with the report.
 
+An upstream suite can report its own expected failures or unsupported checks
+inside a passed rpmx case. Review those separately from skipped rpmx cases.
+Retain the upstream summary and reasons, and state which behavior the suite did
+not exercise. Glibc retains unexpected and unsupported test diagnostics in
+`upstream-reports`; missing tools and unavailable kernel features need separate
+coverage decisions.
+
 Before release, run source suites and installed-package tests on both supported architectures.
 Check package combinations and upgrades in addition to isolated output tests.
 Review every skip and failure. Passing tests establish the tested behavior in the recorded environment.
