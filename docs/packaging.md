@@ -294,10 +294,10 @@ Use these rules:
 - A package that ships commands plus one or more shared libraries uses one
   `-libs` output for all of its runtime SONAMEs. Do not invent a separate
   output per ABI unless the ABIs are independently useful in a minimal image.
-- Established toolchain identities are the exception. GCC keeps
-  `libstdc++-16` and `libatomic-16`; glibc keeps `ld-linux-2.44` and
-  `libc-bin-2.44`. Those names are part of the toolchain interface, so
-  renaming them to `gcc-libs` or `glibc-libs` would make the interface worse.
+- Established toolchain identities are the exception. GCC 16 supplies the
+  public `libgcc`, `libstdc++`, `libatomic`, `libgomp` and `libitm` runtimes;
+  glibc keeps `ld-linux-2.44` and `libc-bin-2.44`. Keep those identities instead
+  of combining independently useful runtimes into `gcc-libs` or `glibc-libs`.
 - Compiler runtime archives (`libgcc.a`, `libgcc_eh.a`, `libgcov.a`,
   `libatomic.a`, `libgomp.a`, `libitm.a`) stay in the compiler's main output.
   They are required for ordinary linking, not an optional static build.
@@ -424,6 +424,10 @@ Rules:
 - Do not add a runtime dependency on a development package unless the package
   genuinely cannot work without it; GCC needing glibc headers to compile is a
   deliberate exception.
+- Keep shared compiler runtimes in separate outputs. An application that needs
+  `libgcc_s.so.1` must not pull in the compiler, binutils or development headers.
+  Such dependencies can also create installation cycles that break scriptlets.
+  Test the runtime output in a root without compiler or development tools.
 
 ## 4. Build pipeline
 
@@ -731,12 +735,110 @@ For this stream, the optional `gcc-16-default` output provides the unversioned
 capabilities. Advertise `gcc`, `gcc-c++`, `cpp` and `cc` together so a recipe
 that asks for the C++ compiler cannot accidentally get a C-only selector.
 
-`libstdc++-16-devel` provides `libstdc++-devel`; the separate
-`libstdc++-16-static` output provides `libstdc++-static`. A static C++ link
-therefore asks for the static capability, not for the development package.
+GCC uses Wolfi's hybrid runtime layout. GCC 16 supplies the unversioned
+`libgcc`, `libstdc++`, `libatomic`, `libgomp` and `libitm` system runtimes.
+Each is usable without a compiler or development headers. GCC 13–15 use
+`--enable-version-specific-runtime-libs` and `--with-gcc-major-version-only`:
+their shared libraries, linker stubs, headers and archives stay under
+`$LIBDIR/gcc/<target>/<major>`. Their `libstdc++-N` and `libatomic-N` outputs
+are private link inputs, not alternative system runtime providers. Disable
+automatic ELF provides on older compiler and private runtime outputs with
+`generators: {elf: {provides: false}}`; retain generated requirements.
+
+All compiler streams require public runtimes at least as new as themselves,
+and their own exact-version `libstdc++-N-devel`. Older compilers also require
+their exact private `libatomic-N` link input. A private C++ development
+output requires its exact private runtime; its static output requires the
+exact development output. Normal compiled programs must have no RPATH to
+private compiler directories and must load the public system runtimes.
+Acceptance tests install all four streams together and verify both the
+private link inputs and the public libraries selected at runtime.
+
+Only `libstdc++-16-devel` provides `libstdc++-devel`; the separate
+`libstdc++-16-static` output provides `libstdc++-static`. Older streams expose
+only their explicit versioned development and static package names. A static
+C++ link therefore asks for the static capability, not the development package.
 
 Use `--disable-bootstrap` for the first import; a later toolchain-generation
 job can rebuild GCC with itself.
+
+### GCC tests and shipped runtime protection
+
+Direct compiler commands enable PIE and strong stack protection by default.
+AArch64 also retains standard branch protection. Installed tests check these
+defaults through compiler macros, actual PIE executables and stack-canary
+references. Explicit opt-out controls confirm that the fixture detects missing
+protections. The OpenSSF wrapper applies the full package hardening policy.
+GCC's `CFLAGS_FOR_TARGET`, `CXXFLAGS_FOR_TARGET` and
+`LDFLAGS_FOR_TARGET` protect shipped runtime and startup objects, while retaining
+upstream exceptions for low-level libgcc and CRT code.
+
+Keep explicit `-fexceptions` in target C flags. C++ enables exceptions by
+default, so target C++ flags omit that explicit option. This lets `libitm`
+retain its upstream `-fno-exceptions` setting and link from C without requiring
+the C++ runtime. All other target hardening flags remain the same.
+
+GCC's full upstream suites are retained in `build.tests` with `optional: true`.
+Routine builds run the mandatory installed-package tests. To include the
+upstream suites in a local build and run the installed tests afterward, use:
+
+```sh
+./scripts/build-all.sh --package gcc-16 --arch x86_64 --include-optional-tests
+```
+
+Add `--force` to repeat a previously successful cached run. The cache records
+whether optional tests ran, so a routine build cannot satisfy an opt-in request.
+The same flag on `rpmx build` or `rpmx rebuild` enables optional source suites;
+`rpmx test --include-optional-tests` enables optional installed-package tests.
+An explicitly selected optional case is required to pass, just like a mandatory
+case. Unselected optional cases are not reported as passes or skipped tests.
+
+Upstream suites run with the compiler's normal PIE, stack-protection and
+AArch64 branch-protection defaults. There are no suite-wide hardening opt-outs.
+The invocation clears inherited package warning and optimization flags so each
+upstream case controls its own options. Some upstream assembly expectations can
+still conflict with hardened defaults; an opt-in failure must be investigated,
+not turned into a pass. These suites provide broader compiler-regression
+coverage than the mandatory package tests, and are useful for compiler upgrades
+and compiler-source changes. Disabling them by default is an iteration-speed
+tradeoff, not a claim that the two test sets are equivalent.
+
+The optional suites keep strict unexpected-result gates and require recorded
+passes from C, C++ and libstdc++. They collect regular `.sum` and `.log` files
+after `make check`, excluding scratch files such as named pipes. Source tests
+install compiled locales and static libc explicitly so those upstream cases can
+run. Production libraries retain their build flags, and mandatory installed
+tests use normal compiler defaults.
+
+Installed tests inspect startup objects and run real C/C++ consumers, including
+a C++20 header unit built from `<cmath>`, atomic operations, OpenMP and
+transactional memory. The header-unit consumer also includes `<cmath>` directly
+and reads the complete imported unit. This checks that imported target types
+match their textual definitions.
+Coinstallation tests verify private link inputs, absence of private runtime
+search paths, and the public libraries actually loaded by compiled programs.
+Runtime-only tests must work without compiler or development packages.
+
+GCC 16 has three known x86 byte-swap assembly expectations tracked by upstream
+PR121298. Only those assertions are marked as expected failures. Their runtime
+fixture checks both expressions over exhaustive low bytes and deterministic
+full-width inputs. The strict source gate rejects an unexpected pass, so the
+annotations must be removed when upstream fixes the optimization. GCC 15 also
+uses upstream PR116463 expectations for two complex-vectorization assertions.
+Its remaining complex-operation assertions still require passes.
+
+SVE runtime tests retain their assertions. Upstream fixes keep half-precision
+test inputs within range and check valid vector lanes at every SVE width.
+The GCC 15 masked-math assertions require passes because the pinned glibc
+supplies the SVE libmvec functions.
+
+GCC 16 also has a known AArch64 early-exit profile-count defect, PR118407.
+Only the internal-count assertion has a target-specific expected failure.
+The positive predictive-commoning assertion must pass. An installed fixture
+compares the original loop at `-O0` and `-O3` with an independent scalar oracle.
+It covers vector boundaries, every inversion position and deterministic inputs,
+and rejects a deliberately wrong implementation.
+
 
 ## 9. Versioned ABI example: glibc
 
