@@ -1,0 +1,51 @@
+From aca3a6235baad23e7156ee8c80c0b7433a2ddfab Mon Sep 17 00:00:00 2001
+From: Alexandre Oliva <oliva@adacore.com>
+Date: Tue, 21 Apr 2026 02:17:43 -0300
+Subject: [PATCH] testsuite: arm: update fast-math-complex-mls-{float,double}.c
+ [PR116463]
+
+Changes to arm_v8_3a_complex_neon options and to
+vect_complex_add_{float,double} enabled these tests and caused them to
+fail with the same failure mode as -half-float.c, namely, reassoc
+makes ADD_ROT270 unrecognizable in fms_elemconjsnd after complex
+lowering and dce's removal of the original complex assignments.
+
+
+for  gcc/testsuite/ChangeLog
+
+	PR tree-optimization/116463
+	* gcc.dg/vect/complex/fast-math-complex-mls-float.c:
+	Don't expect COMPLEX_ADD_ROT270.
+	* gcc.dg/vect/complex/fast-math-complex-mls-double.c:
+	Likewise.
+---
+ .../gcc.dg/vect/complex/fast-math-complex-mls-double.c          | 2 +-
+ gcc/testsuite/gcc.dg/vect/complex/fast-math-complex-mls-float.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/testsuite/gcc.dg/vect/complex/fast-math-complex-mls-double.c b/gcc/testsuite/gcc.dg/vect/complex/fast-math-complex-mls-double.c
+index a69c788bacfae..ac4be7180d16d 100644
+--- a/gcc/testsuite/gcc.dg/vect/complex/fast-math-complex-mls-double.c
++++ b/gcc/testsuite/gcc.dg/vect/complex/fast-math-complex-mls-double.c
+@@ -6,7 +6,7 @@
+ #define TYPE double
+ #define N 200
+ #include "complex-mls-template.c"
+-/* { dg-final { scan-tree-dump "Found COMPLEX_ADD_ROT270" "vect" } } */
++/* { dg-final { scan-tree-dump "Found COMPLEX_ADD_ROT270" "vect" { xfail *-*-* } } } */
+ /* { dg-final { scan-tree-dump "Found COMPLEX_FMA" "vect" } } */
+ /* { dg-final { scan-tree-dump "Found COMPLEX_FMS_CONJ" "vect" } } */
+ /* { dg-final { scan-tree-dump "Found COMPLEX_FMS" "vect" } } */
+diff --git a/gcc/testsuite/gcc.dg/vect/complex/fast-math-complex-mls-float.c b/gcc/testsuite/gcc.dg/vect/complex/fast-math-complex-mls-float.c
+index 6fa3da79d3263..522e199051891 100644
+--- a/gcc/testsuite/gcc.dg/vect/complex/fast-math-complex-mls-float.c
++++ b/gcc/testsuite/gcc.dg/vect/complex/fast-math-complex-mls-float.c
+@@ -6,7 +6,7 @@
+ #define TYPE float
+ #define N 200
+ #include "complex-mls-template.c"
+-/* { dg-final { scan-tree-dump "Found COMPLEX_ADD_ROT270" "vect" } } */
++/* { dg-final { scan-tree-dump "Found COMPLEX_ADD_ROT270" "vect" { xfail *-*-* } } } */
+ /* { dg-final { scan-tree-dump "Found COMPLEX_FMA" "vect" } } */
+ /* { dg-final { scan-tree-dump "Found COMPLEX_FMS_CONJ" "vect" } } */
+ /* { dg-final { scan-tree-dump "Found COMPLEX_FMS" "vect" } } */

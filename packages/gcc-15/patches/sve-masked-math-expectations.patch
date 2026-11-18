@@ -1,0 +1,25 @@
+GCC15 testsuite: require the available SVE masked math-call support.
+
+The two assertions were expected failures while waiting for SVE libmvec.
+Eternal's pinned glibc exports _ZGVsMxv_expf@@GLIBC_2.38. Actual normal and
+LTO runs emit zero unmasked expf calls and one MASK_CALL. Remove only the stale expected
+failures and update their explanation; the assertions remain unchanged.
+
+--- a/gcc/testsuite/gcc.dg/vect/vect-fncall-mask-math.c
++++ b/gcc/testsuite/gcc.dg/vect/vect-fncall-mask-math.c
+@@ -1,6 +1,5 @@
+ /* Test the correct application of masking to autovectorized math function calls.
+-   Test is currently set to xfail pending the release of the relevant lmvec
+-   support. */
++   Eternal's pinned glibc supplies the required SVE libmvec support. */
+ /* { dg-do compile { target { aarch64*-*-* } } } */
+ /* { dg-additional-options "-march=armv8.2-a+sve -fdump-tree-ifcvt-raw -Ofast" { target { aarch64*-*-* } } } */
+ 
+@@ -29,5 +28,5 @@
+   return (0);
+ }
+ 
+-/* { dg-final { scan-tree-dump-not { gimple_call <expf, _2, _1>} ifcvt { xfail { aarch64*-*-* } } } } */
+-/* { dg-final { scan-tree-dump { gimple_call <.MASK_CALL, _2, expf, _1, _30>} ifcvt { xfail { aarch64*-*-* } } } } */
++/* { dg-final { scan-tree-dump-not { gimple_call <expf, _2, _1>} ifcvt } } */
++/* { dg-final { scan-tree-dump { gimple_call <.MASK_CALL, _2, expf, _1, _30>} ifcvt } } */
