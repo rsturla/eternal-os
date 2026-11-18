@@ -40,6 +40,16 @@ finish() {
 }
 trap finish EXIT
 
+# These source cases require C++ coverage; configure must not silently drop it.
+if ! grep -Eq '^CXX[[:space:]]*=[[:space:]]*[^[:space:]]' build/config.make; then
+  echo 'glibc upstream tests require a configured C++ compiler (CXX in build/config.make)' >&2
+  exit 1
+fi
+if ! grep -Eq '^static-cxx-tests[[:space:]]*=[[:space:]]*yes[[:space:]]*$' build/config.make; then
+  echo 'glibc upstream tests require static-cxx-tests = yes in build/config.make' >&2
+  exit 1
+fi
+
 make -C build -j2 check
 test -s build/tests.sum
 grep '^PASS:' build/tests.sum
