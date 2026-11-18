@@ -1,0 +1,40 @@
+From df87b300bd13ed047b1159022c93445f130458e6 Mon Sep 17 00:00:00 2001
+From: Richard Sandiford <richard.sandiford@arm.com>
+Date: Thu, 13 Mar 2025 15:13:00 +0000
+Subject: [PATCH] testsuite: Fix sve/mask_struct_load_3_run.c [PR113965]
+
+Among other things, this testcase tests an addition of the four
+values (n*4+[0:3])*9//2 for each n in [0:99].  The addition is
+done in multiple integer and floating-point types and the test
+is compiled with -ffast-math.
+
+One of the floating-point types is _Float16, and as Andrew says
+in the PR, _Float16's limited precision means that the order of the
+additions begins to matter for higher n.  Specifically, some orders
+begin to give different results from others at n=38, and at many
+higher n as well.
+
+This patch uses 5/3 rather than 9/2.  I tested locally that
+all addition orders give the same result over the test range.
+
+gcc/testsuite/
+	PR testsuite/113965
+	* gcc.target/aarch64/sve/mask_struct_load_3_run.c: Use an
+	input range that is suitable for _Float16.
+---
+ gcc/testsuite/gcc.target/aarch64/sve/mask_struct_load_3_run.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/testsuite/gcc.target/aarch64/sve/mask_struct_load_3_run.c b/gcc/testsuite/gcc.target/aarch64/sve/mask_struct_load_3_run.c
+index 8bc3b08fcf4dd..c0a7416cfafc2 100644
+--- a/gcc/testsuite/gcc.target/aarch64/sve/mask_struct_load_3_run.c
++++ b/gcc/testsuite/gcc.target/aarch64/sve/mask_struct_load_3_run.c
+@@ -18,7 +18,7 @@
+ 	asm volatile ("" ::: "memory");			\
+       }							\
+     for (int i = 0; i < N * 4; ++i)			\
+-      in[i] = i * 9 / 2;				\
++      in[i] = i * 5 / 3;				\
+     NAME##_4 (out, in, mask, N);			\
+     for (int i = 0; i < N; ++i)				\
+       {							\
