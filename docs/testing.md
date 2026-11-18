@@ -29,6 +29,12 @@ must adjust that policy for private transactions. The ephemeral CI hosts unload
 that specific profile. `rpmx doctor --strict` checks protected-file access as
 well as ID mappings.
 
+Host executable profiles can also attach to guest programs by pathname. Ubuntu's
+`locale` profile blocks fixture-generated locale data under the guest workspace.
+Allow read-only `/tmp/build/**` in `/etc/apparmor.d/local/locale` and reload that
+profile when it is enforced. The ephemeral CI hosts apply this rule while keeping
+`locale` confined. This changes host access policy, not package hardening.
+
 Ordinary bubblewrap steps run as UID/GID 65534, mapped to your host account,
 without capabilities. Transaction tests map your host account to namespace
 root with a restricted capability set for file ownership, permissions, identity

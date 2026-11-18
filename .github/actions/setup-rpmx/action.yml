@@ -31,6 +31,20 @@ runs:
         if [ -f /etc/apparmor.d/bwrap-userns-restrict ]; then
           sudo apparmor_parser -R /etc/apparmor.d/bwrap-userns-restrict
         fi
+        # Host executable profiles also attach by path inside guest roots.
+        # Permit private locale data without removing locale's confinement.
+        if [ -f /etc/apparmor.d/locale ] &&
+           sudo test -r /sys/kernel/security/apparmor/profiles &&
+           sudo grep -Fxq 'locale (enforce)' /sys/kernel/security/apparmor/profiles; then
+          echo 'locale (enforce): allow read-only rpmx workspace locale data'
+          locale_rules=/etc/apparmor.d/local/locale
+          sudo mkdir -p /etc/apparmor.d/local
+          sudo touch "$locale_rules"
+          if ! sudo grep -Fxq '/tmp/build/** r,' "$locale_rules"; then
+            printf '%s\n' '/tmp/build/** r,' | sudo tee -a "$locale_rules"
+          fi
+          sudo apparmor_parser -r /etc/apparmor.d/locale
+        fi
 
     - name: Install Rust
       if: inputs.artifact == ''
