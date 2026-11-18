@@ -55,6 +55,11 @@ The bootstrap root is deliberately contained:
   compiler, libc or Perl files. Standalone acceptance uses this distribution
   policy.
 
+Installed RPM package state lives in `/usr/lib/sysimage/rpm`. The `rpm-libs`
+package owns the shared macro, platform and rpmrc configuration, including this
+database path. RPM command-line tools and library consumers therefore use the
+same database as the assembled root.
+
 Self-hosting means removing the bootstrap repositories and every bootstrap
 dependency. Usually a package keeps the name of the component it replaces
 (`bash`, `coreutils`, `glibc`, `filesystem`, `dnf5`), so `eternal-base` does not
