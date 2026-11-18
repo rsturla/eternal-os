@@ -39,6 +39,12 @@ sources:
       format: tar.gz
       strip-components: 1
 
+patches:
+  - file: patches/require-protected-symbol-tests.patch
+    reason: Require protected-symbol tests to pass with the supported modern toolchain
+  - file: patches/rtld-missing-program-diagnostic.patch
+    reason: Keep missing-executable tests strict while accepting the optional ENOENT diagnostic
+
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml

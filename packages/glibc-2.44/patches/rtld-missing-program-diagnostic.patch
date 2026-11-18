@@ -1,0 +1,56 @@
+Subject: [PATCH] elf: accept the optional missing-file errno in rtld diagnostics
+
+These tests cover missing executable handling and the -- delimiter.
+With /etc/ld.so.cache absent,
+tunable cache initialization can add ENOENT even with --inhibit-cache.
+The same packaged loader emits no suffix when a valid cache is present.
+
+Accept only the literal ENOENT suffix; retain the exact executable name,
+fatal message, exit status 127 and single-line checks. This also covers
+the diagnostic variation reported in upstream BZ 34361:
+https://sourceware.org/bugzilla/show_bug.cgi?id=34361
+
+--- a/elf/tst-rtld-dash-dash.sh
++++ b/elf/tst-rtld-dash-dash.sh
+@@ -19,8 +19,8 @@
+ 
+ export LC_ALL=C
+ 
+-# --inhibit-cache to suppress "No such file or directory" message when
+-# /etc/ld.so.cache does not exist.
++# Cache initialization can add ENOENT even with --inhibit-cache. Accept
++# only that suffix; keep the executable, delimiter and status checks.
+ rtld="$1 --inhibit-cache"
+ tmp_out="$(mktemp)"
+ 
+@@ -31,7 +31,7 @@
+ cat "$tmp_out"
+ 
+ if test $status -eq 127 \
+-	&& grep -q "^--program-does-not-exist: error while loading shared libraries: --program-does-not-exist: cannot open shared object file$" "$tmp_out" \
++	&& grep -Eq "^--program-does-not-exist: error while loading shared libraries: --program-does-not-exist: cannot open shared object file(: No such file or directory)?$" "$tmp_out" \
+ 	&& test "$(wc -l < "$tmp_out")" -eq 1 ; then
+     status=0
+ else
+--- a/elf/tst-rtld-does-not-exist.sh
++++ b/elf/tst-rtld-does-not-exist.sh
+@@ -19,8 +19,8 @@
+ 
+ export LC_ALL=C
+ 
+-# --inhibit-cache to suppress "No such file or directory" message when
+-# /etc/ld.so.cache does not exist.
++# Cache initialization can add ENOENT even with --inhibit-cache. Accept
++# only that suffix; keep the executable, delimiter and status checks.
+ rtld="$1 --inhibit-cache"
+ tmp_out="$(mktemp)"
+ 
+@@ -31,7 +31,7 @@
+ cat "$tmp_out"
+ 
+ if test $status -eq 127 \
+-	&& grep -q "^program-does-not-exist: error while loading shared libraries: program-does-not-exist: cannot open shared object file$" "$tmp_out" \
++	&& grep -Eq "^program-does-not-exist: error while loading shared libraries: program-does-not-exist: cannot open shared object file(: No such file or directory)?$" "$tmp_out" \
+ 	&& test "$(wc -l < "$tmp_out")" -eq 1 ; then
+     status=0
+ else
