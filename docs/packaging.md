@@ -414,7 +414,11 @@ Rules:
 - Never add a test-only package to the build root; put it on the test.
 - `provides` describes what an output supplies. RPMX also generates ELF
   `libfoo.so.N()(64bit)`, script interpreter, pkg-config and similar
-  dependencies.
+  dependencies. A supported library filename alias needs an explicit capability
+  when it differs from the ELF SONAME. Ship the alias in the runtime output and
+  test a real consumer that records that name in `DT_NEEDED`. For bzip2 1.0.8,
+  keep upstream's `libbz2.so.1.0` SONAME and support `libbz2.so.1` through an
+  alias to the same library. Test both names with compression round-trips.
 - RPMX reads `.pc` files and generates both `pkgconfig(foo)` provides and
   `pkgconfig(foo)` requires. Do not add those by hand.
 - Do not add a runtime dependency on a development package unless the package
@@ -657,6 +661,12 @@ Use `script` for strict Bash, direct `argv` with `expect` for exact results, or
 `pipeline` for reusable steps. Do not put shell `-c` commands in `argv`.
 Package-local `files: tests` exposes immutable fixtures through `TEST_FILES`;
 `TEST_PACKAGE_ROOT` exposes the extracted candidate payload for layout checks.
+
+Tests run by default unless they declare `optional: true`. Use
+`--include-optional-tests` to run optional cases in addition to mandatory cases.
+This differs from `skip:`, which prevents a selected case from passing the gate.
+Do not use `--no-tests` to opt out of one expensive suite: it disables mandatory
+tests as well.
 
 Build reports and source evidence stay in the package output directory.
 Standalone acceptance reports, JUnit and command evidence are retained under
