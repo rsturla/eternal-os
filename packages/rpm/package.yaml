@@ -1,13 +1,13 @@
 # yaml-language-server: $schema=https://example.org/rpmx/package.schema.json
 #
-# RPM package manager. Built with the sqlite rpmdb, Sequoia OpenPGP backend and
-# the compression libraries needed to read rpm-md repositories.
+# RPM package manager. Built with the sqlite rpmdb and the compression
+# libraries needed to read rpm-md repositories.
 schema: 2
 
 package:
   name: rpm
   version: "6.1.0"
-  release: 2
+  release: 3
   summary: The RPM package manager
   description: |
     RPM is a powerful command line driven package management system capable of
@@ -19,6 +19,8 @@ package:
   cpe:
     vendor: rpm
     product: rpm
+
+context: files
 
 sources:
   - name: rpm-6.1.0.tar.gz
@@ -80,6 +82,8 @@ build:
           - -DWITH_LIBLZMA=ON
     - uses: cmake/build
     - uses: cmake/install
+    - runs: |
+        install -Dm0644 macros.eternal "$STAGE/usr/lib/rpm/macros.d/macros.eternal"
     - uses: license/copy
       with:
         files: [COPYING]
@@ -94,6 +98,11 @@ outputs:
         - /usr/bin/*
         - /usr/lib/rpm/**
         - /usr/share/licenses/rpm/**
+      exclude:
+        - /usr/lib/rpm/rpmrc
+        - /usr/lib/rpm/macros
+        - /usr/lib/rpm/macros.d/**
+        - /usr/lib/rpm/platform/**
       license:
         - /usr/share/licenses/rpm/**
     dependencies:
@@ -102,6 +111,10 @@ outputs:
         - rpm-build-libs = ${package.version}-${package.release}
         - popt
     tests:
+      - name: database-policy-and-installed-query
+        script: |
+          test "$(rpm --eval '%{_dbpath}')" = /usr/lib/sysimage/rpm
+          test "$(rpm -q --queryformat '%{NAME}' rpm)" = rpm
       - name: installed
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
         script: |
@@ -116,6 +129,11 @@ outputs:
         - /usr/lib*/librpm.so.*
         - /usr/lib*/librpmio.so.*
         - /usr/lib*/librpmsign.so.*
+        # librpm consumers need the same policy even without the CLI.
+        - /usr/lib/rpm/rpmrc
+        - /usr/lib/rpm/macros
+        - /usr/lib/rpm/macros.d/**
+        - /usr/lib/rpm/platform/**
         - /usr/share/licenses/rpm-libs/**
       license:
         - /usr/share/licenses/rpm-libs/**

@@ -1,0 +1,2 @@
+# Keep installed /usr package state in the database used by Eternal roots.
+%_dbpath /usr/lib/sysimage/rpm
