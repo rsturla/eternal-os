@@ -6,7 +6,7 @@ schema: 2
 package:
   name: bzip2
   version: "1.0.8"
-  release: 1
+  release: 2
   summary: A file compression utility
   description: |
     bzip2 is a freely available, patent free, high-quality data compressor.
@@ -45,9 +45,9 @@ build:
     - runs: |
         make PREFIX="$STAGE/usr" install
         install -Dm755 libbz2.so.1.0.8 "$STAGE"/usr/lib64/libbz2.so.1.0.8
-        ln -s libbz2.so.1.0.8 "$STAGE"/usr/lib64/libbz2.so.1
-        ln -s libbz2.so.1 "$STAGE"/usr/lib64/libbz2.so.1.0
-        ln -s libbz2.so.1 "$STAGE"/usr/lib64/libbz2.so
+        ln -s libbz2.so.1.0.8 "$STAGE"/usr/lib64/libbz2.so.1.0
+        ln -s libbz2.so.1.0 "$STAGE"/usr/lib64/libbz2.so.1
+        ln -s libbz2.so.1.0 "$STAGE"/usr/lib64/libbz2.so
         install -Dm755 bzip2-shared "$STAGE"/usr/bin/bzip2
         ln -sf bzip2 "$STAGE"/usr/bin/bunzip2
         ln -sf bzip2 "$STAGE"/usr/bin/bzcat
@@ -92,14 +92,16 @@ outputs:
         - /usr/share/licenses/bzip2-libs/**
       license:
         - /usr/share/licenses/bzip2-libs/**
+    dependencies:
+      # The .so.1 alias resolves to the same upstream .so.1.0 implementation.
+      provides: ["libbz2.so.1()(64bit)"]
     tests:
-      - name: installed
-        packages: [bash-binsh, coreutils, gcc, grep]
+      - name: soname
+        files: tests
+        artifacts: [dynamic.txt]
+        packages: [binutils, grep]
         script: |
-          for lib in /usr/lib64/libbz2.so.* /usr/lib/libbz2.so.*; do
-            test -e "$lib" && exit 0
-          done
-          exit 1
+          bash "$TEST_FILES/soname.sh" /usr/lib64
 
   - name: bzip2-devel
     summary: Development files for bzip2
@@ -114,11 +116,19 @@ outputs:
         - bzip2-libs = ${package.version}-${package.release}
     tests:
       - name: link
-        packages: [bash-binsh, coreutils, gcc, grep]
+        files: tests
+        packages: [gcc, patchelf, grep]
+        artifacts: [upstream-needed.txt, alias-needed.txt]
         script: |
-          printf '#include <bzlib.h>\nint main(void){return BZ_OK;}\n' > /tmp/bz.c
-          gcc /tmp/bz.c -lbz2 -o /tmp/bz
-          /tmp/bz
+          gcc -Wall -Wextra -Werror "$TEST_FILES/roundtrip.c" -lbz2 -o upstream-consumer
+          patchelf --print-needed upstream-consumer > upstream-needed.txt
+          grep -Fx 'libbz2.so.1.0' upstream-needed.txt
+          ./upstream-consumer
+          cp upstream-consumer alias-consumer
+          patchelf --replace-needed libbz2.so.1.0 libbz2.so.1 alias-consumer
+          patchelf --print-needed alias-consumer > alias-needed.txt
+          grep -Fx 'libbz2.so.1' alias-needed.txt
+          ./alias-consumer
 
   - name: bzip2-static
     summary: Static bzip2 library
