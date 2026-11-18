@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+import zipfile
 
 import yaml
 
@@ -32,6 +33,51 @@ class CandidatePool(unittest.TestCase):
                                   f'{name} must replace its prior attempt rather than fail with a name conflict')
                     found.add(prefix)
         self.assertEqual(found, expected)
+
+    def test_artifact_transport_preserves_package_directories_for_one_or_many(self):
+        workflow = yaml.safe_load((Path(__file__).resolve().parents[1] /
+                                  '.github/workflows/_build-packages.yml').read_text())
+        exports = {step['name']: step for step in workflow['jobs']['build']['steps']}
+        downloads = {step['name']: step for step in workflow['jobs']['accept']['steps']}
+        download = downloads['Download architecture candidates']['with']
+        self.assertIs(download.get('merge-multiple'), True)
+        for count in (1, 2):
+            with self.subTest(count=count), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                downloaded = root / 'downloaded'
+                for package in ('one', 'two')[:count]:
+                    runner = root / package
+                    source = runner / 'source'
+                    source.mkdir(parents=True)
+                    (source / f'{package}-1-1.x86_64.rpm').write_text(package)
+                    policy = {'build_release': package}
+                    (source / 'build-policy.json').write_text(json.dumps(policy))
+                    substitutions = {
+                        '$RUNNER_TEMP': str(runner),
+                        '${{ runner.temp }}': str(runner),
+                        '${{ matrix.package }}': package,
+                        '${{ matrix.arch }}': 'x86_64',
+                    }
+                    def expand(value):
+                        for key, replacement in substitutions.items():
+                            value = value.replace(key, replacement)
+                        return value
+                    # Use the workflow's actual upload root and export destination.
+                    command = exports['Export candidates']['run']
+                    destination = command.split('--output "', 1)[1].split('"', 1)[0]
+                    POOL.export(source, Path(expand(destination)), 'x86_64')
+                    upload = Path(expand(exports['Upload candidates']['with']['path']))
+                    archive = runner / 'artifact.zip'
+                    with zipfile.ZipFile(archive, 'w') as artifact:
+                        for path in upload.rglob('*'):
+                            if path.is_file():
+                                artifact.write(path, path.relative_to(upload))
+                    with zipfile.ZipFile(archive) as artifact:
+                        artifact.extractall(downloaded)
+                    restored = downloaded / f'candidate-{package}-x86_64/build-policy.json'
+                    self.assertEqual(json.loads(restored.read_text()), policy)
+                POOL.assemble(downloaded, root / 'pool', 'x86_64')
+                self.assertEqual(len(list((root / 'pool').glob('*.rpm'))), count)
 
     def test_only_direct_canonical_binary_outputs_travel(self):
         with tempfile.TemporaryDirectory() as temporary:

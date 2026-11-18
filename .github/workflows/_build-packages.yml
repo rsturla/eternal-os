@@ -293,11 +293,12 @@ jobs:
           fi
           ./scripts/build-all.sh "${args[@]}"
 
+      # Keep package identity inside the archive: downloads flatten a single match.
       - name: Export candidates
         run: |
           python3 scripts/candidate-pool.py export --arch '${{ matrix.arch }}' \
             --source 'out/${{ matrix.package }}/${{ matrix.arch }}' \
-            --output "$RUNNER_TEMP/candidates"
+            --output "$RUNNER_TEMP/candidates/candidate-${{ matrix.package }}-${{ matrix.arch }}"
 
       - name: Upload candidates
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -353,6 +354,7 @@ jobs:
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           pattern: candidate-*-${{ matrix.arch }}
+          merge-multiple: true
           path: ${{ runner.temp }}/candidates
 
       - name: Download package output
