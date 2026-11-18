@@ -246,6 +246,10 @@ the pinned build closure with its own tools; those tools do not enter the build
 root or another case. Tools needed during configure or compilation remain real
 `build.packages` dependencies.
 
+Installed-package cases leave `SOURCE_DATE_EPOCH` unset unless a timestamp is
+explicitly declared in the recipe or repository defaults. Source cases retain
+the resolved build timestamp.
+
 An installed-package case can request external access explicitly when it tests
 an external integration. For example, a case against a controlled test service
 can check the exact response:
