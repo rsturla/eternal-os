@@ -1,0 +1,51 @@
+From c9a19621a07e246385ae075b61283140b23c3b5a Mon Sep 17 00:00:00 2001
+From: Christophe Lyon <christophe.lyon@linaro.org>
+Date: Tue, 23 May 2023 09:20:05 +0000
+Subject: [PATCH] testsuite, analyzer: Fix testcases with fclose
+
+The gcc.dg/analyzer/data-model-4.c and
+gcc.dg/analyzer/torture/conftest-1.c fail with recent glibc headers
+and succeed with older headers.
+
+The new error message is:
+warning: use of possibly-NULL 'f' where non-null expected [CWE-690] [-Wanalyzer-possible-null-argument]
+
+Like similar previous fixes in this area, this patch updates the
+testcase so that this warning isn't reported.
+
+2023-05-23  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	gcc/testsuite/
+	* gcc.dg/analyzer/data-model-4.c: Exit if fopen returns NULL.
+	* gcc.dg/analyzer/torture/conftest-1.c: Likewise.
+---
+ gcc/testsuite/gcc.dg/analyzer/data-model-4.c       | 2 ++
+ gcc/testsuite/gcc.dg/analyzer/torture/conftest-1.c | 2 ++
+ 2 files changed, 4 insertions(+)
+
+diff --git a/gcc/testsuite/gcc.dg/analyzer/data-model-4.c b/gcc/testsuite/gcc.dg/analyzer/data-model-4.c
+index 33f90871dfbcd..d41868d6dbc2a 100644
+--- a/gcc/testsuite/gcc.dg/analyzer/data-model-4.c
++++ b/gcc/testsuite/gcc.dg/analyzer/data-model-4.c
+@@ -8,6 +8,8 @@ int
+ main ()
+ {
+   FILE *f = fopen ("conftest.out", "w");
++  if (f == NULL)
++    return 1;
+   return ferror (f) || fclose (f) != 0;
+ 
+   ;
+diff --git a/gcc/testsuite/gcc.dg/analyzer/torture/conftest-1.c b/gcc/testsuite/gcc.dg/analyzer/torture/conftest-1.c
+index 0cf85f0ebe190..9631bcf73e0d3 100644
+--- a/gcc/testsuite/gcc.dg/analyzer/torture/conftest-1.c
++++ b/gcc/testsuite/gcc.dg/analyzer/torture/conftest-1.c
+@@ -3,6 +3,8 @@ int
+ main ()
+ {
+   FILE *f = fopen ("conftest.out", "w");
++  if (f == NULL)
++    return 1;
+   return ferror (f) || fclose (f) != 0;
+ 
+   ;
