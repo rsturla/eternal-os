@@ -48,6 +48,8 @@ patches:
     reason: Backport glibc 2.44 IFUNC expected-failure selection for BFD versus LLD
   - file: patches/malloc-hugetlb-prerequisites.patch
     reason: Require available kernel page modes before malloc huge-page tests
+  - file: patches/malloc-hugetlb-always.patch
+    reason: Exercise transparent huge-page malloc tests in both always and madvise kernel modes
 
 build:
   root:
@@ -105,6 +107,9 @@ build:
           - --enable-stack-protector=strong
           - --enable-cet
           - '--with-pkgversion="Eternal glibc-2.43-1"'
+          # Static C++ archives belong to the isolated test root. Keep the
+          # static tests enabled without requiring those archives at configure.
+          - --disable-static-c++-link-check
           - --disable-werror
           - --disable-crypt
           - --enable-kernel=4.9
@@ -169,6 +174,10 @@ build:
       packages:
         - perl
         - gawk
+        - gdb
+        - python3-pexpect
+        - libidn2
+        - libstdc++-static
         # Match the selected build-host libc when msgfmt converts intl catalogs.
         - glibc-iconv
         # NSS tests need real passwd/group records for root and the runner user.
@@ -178,6 +187,8 @@ build:
             bash "$TEST_FILES/upstream.sh"
       artifacts:
         - build/tests.sum
+        - build/config.log
+        - build/config.make
         - upstream-reports
       timeout: 4h
 
