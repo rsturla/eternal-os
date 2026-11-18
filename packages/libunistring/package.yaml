@@ -60,8 +60,6 @@ build:
     - name: upstream
       packages:
         - diffutils
-        # Failure-only locale diagnostics retain actual file lookups.
-        - strace
         - libc-bin-2.44
         - glibc-2.44-locales
       files: tests
