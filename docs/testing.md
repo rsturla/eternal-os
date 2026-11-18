@@ -80,8 +80,9 @@ Source suites and installed-package tests have separate reports. `rpmx build --o
 `DIR/run-report.json` and `DIR/run-report.xml`, with retained case evidence.
 The shared build script writes installed-package test evidence under
 `out/<recipe>/acceptance/<arch>/`, including `results.json`, JUnit, command logs
-and declared artifacts. Files survive temporary workspace cleanup and CI uploads
-the output tree after failures.
+and declared artifacts. Test progress and diagnostics stream to the terminal
+as they run and are also retained in `run.log`. Files survive temporary workspace
+cleanup and CI uploads the output tree after failures.
 
 A report has document `rpmx-run-report`, version 1. Check `outcome`, not just the
 process exit status. A complete installed-package run requires `acceptance: completed` and

@@ -53,8 +53,14 @@ def main():
         command.extend(["--test-profile", str(args.test_profile)])
     if args.build_release:
         command.extend(["--build-release", args.build_release])
-    with result.open("w") as stdout, (args.output / "run.log").open("w") as stderr:
-        completed = subprocess.run(command, stdout=stdout, stderr=stderr)
+    with result.open("w") as stdout, (args.output / "run.log").open("wb") as log:
+        with subprocess.Popen(command, stdout=stdout, stderr=subprocess.PIPE) as process:
+            while chunk := process.stderr.read1(8192):
+                log.write(chunk)
+                log.flush()
+                sys.stderr.buffer.write(chunk)
+                sys.stderr.buffer.flush()
+            returncode = process.wait()
     report = {}
     try:
         report = json.loads(result.read_text())
@@ -67,7 +73,7 @@ def main():
     except (OSError, ValueError, KeyError, TypeError) as error:
         print(f"invalid acceptance report {result}: {error}", file=sys.stderr)
         complete = False
-    if completed.returncode or not complete:
+    if returncode or not complete:
         # Raw report includes setup failures even when no command log exists.
         try:
             for diagnostic in [report.get("primary"), *report.get("secondary", [])]:
@@ -78,8 +84,7 @@ def main():
                     print(f"{case.get('name')}: {case.get('status')}: {case.get('reason') or case.get('primary')}", file=sys.stderr)
         except (AttributeError, TypeError, KeyError):
             print(result.read_text(), file=sys.stderr)
-        print((args.output / "run.log").read_text(), file=sys.stderr)
-        raise SystemExit(completed.returncode or 1)
+        raise SystemExit(returncode or 1)
     print(f"==> acceptance evidence {args.output}", file=sys.stderr)
 
 

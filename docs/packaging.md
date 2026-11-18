@@ -702,6 +702,8 @@ tests as well.
 
 Build reports and source evidence stay under `out/NAME/`. The shared build
 script retains installed-package reports under `out/NAME/acceptance/ARCH/`.
+Acceptance output streams to the terminal as it runs and is also retained in
+`run.log`; JSON reports and command artifacts remain in the evidence directory.
 The explicit Python bootstrap helper keeps private dependency evidence under
 `.work/python-deps/ARCH/NAME/`; failed dependencies have no completion stamp.
 Missing or skipped declared acceptance cases fail the gate, even when the test
