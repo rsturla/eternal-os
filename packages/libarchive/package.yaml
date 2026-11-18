@@ -72,8 +72,6 @@ build:
   - name: upstream
     packages:
     - diffutils
-    # Failure-only locale diagnostics retain actual file lookups.
-    - strace
     - gzip
     - bzip2
     - xz
@@ -85,7 +83,8 @@ build:
     - libc-bin-2.44
     - glibc-2.44-locales
     - glibc-2.44-iconv
-    - nss_wrapper-libs
+    # Supply real root/nobody accounts for ownership and ACL tests.
+    - setup
     files: tests
     artifacts:
     - test-suite.log
