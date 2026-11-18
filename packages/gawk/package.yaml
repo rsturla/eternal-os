@@ -7,7 +7,7 @@ schema: 2
 package:
   name: gawk
   version: "5.4.1"
-  release: 1
+  release: 2
   summary: GNU awk pattern-matching language
   description: |
     GNU awk is an implementation of the AWK text-processing language.
@@ -30,17 +30,19 @@ sources:
       format: tar.xz
       strip-components: 1
 
-patches:
-  - file: patches/gawk-node-alignment-without-mpfr.patch
-    strip: 1
-    reason: "keep NODE alignment correct when gawk is built without MPFR and GMP"
-
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
-  packages: [gcc, make, bash, coreutils]
+  packages: [gcc, make, bash, coreutils, grep]
+  sysroot: [gmp-devel, mpfr-devel]
   pipeline:
     - uses: autotools/configure
+      with:
+        args: [--with-mpfr]
+    - runs: |
+        # Upstream permits a silent fallback when MPFR/GMP cannot be linked.
+        # Arbitrary precision is required in the distribution build.
+        grep -Fx '#define HAVE_MPFR 1' config.h
     - uses: make/build
     - uses: make/install
     - runs: |
@@ -65,6 +67,10 @@ outputs:
         packages: [bash-binsh, coreutils]
         script: |
           test "$(printf 'a 2\nb 3\n' | gawk '{sum += $2} END {print sum}')" = 5
+      - name: high-precision
+        files: tests
+        script: |
+          bash "$TEST_FILES/high-precision.sh"
 
   - name: gawk-lang
     summary: GNU awk translations
