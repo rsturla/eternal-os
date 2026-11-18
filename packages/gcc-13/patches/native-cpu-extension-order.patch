@@ -1,0 +1,22 @@
+From: Eternal Linux maintainers
+Subject: [PATCH] testsuite: aarch64: use GCC13 extension order in native_cpu_36
+
+The PR124629 test was backported from upstream commit
+b41352c7aa2645de6c5751d447589c2ef8c4fa4d (GCC13 backport
+38ac911b5f1c7d81f375cb4253336ed1c713967f). GCC13.5 emits crc before
+dotprod for this feature set. Keep the exact architecture, all four
+extensions, and end-of-line assertion; correct only their expected order.
+
+Observed with published Eternal GCC13.5 and reproduced by the GCC13 ARM
+source-suite failure in CI run44014032027. No production compiler change.
+Upstream provenance:
+https://gcc.gnu.org/pipermail/gcc-cvs/2026-August/459694.html
+
+--- a/gcc/testsuite/gcc.target/aarch64/cpunative/native_cpu_36.c
++++ b/gcc/testsuite/gcc.target/aarch64/cpunative/native_cpu_36.c
+@@ -7,4 +7,4 @@
+   return 0;
+ }
+ 
+-/* { dg-final { scan-assembler {\.arch armv8-a\+dotprod\+crc\+crypto\+sve2\n} } } */
++/* { dg-final { scan-assembler {\.arch armv8-a\+crc\+dotprod\+crypto\+sve2\n} } } */

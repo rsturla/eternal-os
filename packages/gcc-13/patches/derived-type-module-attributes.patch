@@ -1,0 +1,119 @@
+Backport of upstream c++: modules and function attributes:
+https://github.com/gcc-mirror/gcc/commit/664bd76a23def2d458bb3c531486b4c220f29c11
+
+The compiler change and both upstream regression bodies are unchanged.
+GCC13/14 use -fmodules-ts instead of the newer -fmodules spelling and do not
+have -Wglobal-module, so adapt only those testsuite command-line options.
+
+From 664bd76a23def2d458bb3c531486b4c220f29c11 Mon Sep 17 00:00:00 2001
+From: Jason Merrill <jason@redhat.com>
+Date: Fri, 10 Jan 2025 18:00:20 -0500
+Subject: [PATCH] c++: modules and function attributes
+
+30_threads/stop_token/stop_source/109339.cc was failing because we weren't
+representing attribute access on the METHOD_TYPE for _Stop_state_ref.
+
+The modules code expected attributes to appear on tt_variant_type and not
+on tt_derived_type, but that's backwards since build_type_attribute_variant
+gives a type with attributes its own TYPE_MAIN_VARIANT.
+
+gcc/cp/ChangeLog:
+
+	* module.cc (trees_out::type_node): Write attributes for
+	tt_derived_type, not tt_variant_type.
+	(trees_in::tree_node): Likewise for reading.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/modules/attrib-2_a.C: New test.
+	* g++.dg/modules/attrib-2_b.C: New test.
+---
+ gcc/cp/module.cc                          | 17 +++++++++++++----
+ gcc/testsuite/g++.dg/modules/attrib-2_a.C | 12 ++++++++++++
+ gcc/testsuite/g++.dg/modules/attrib-2_b.C |  9 +++++++++
+ 3 files changed, 34 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/modules/attrib-2_a.C
+ create mode 100644 gcc/testsuite/g++.dg/modules/attrib-2_b.C
+
+diff --git a/gcc/cp/module.cc b/gcc/cp/module.cc
+index 321d4164a6a78..c932c4d0a90da 100644
+--- a/gcc/cp/module.cc
++++ b/gcc/cp/module.cc
+@@ -9189,7 +9189,10 @@ trees_out::type_node (tree type)
+ 	  tree_node (raises);
+ 	}
+ 
+-      tree_node (TYPE_ATTRIBUTES (type));
++      /* build_type_attribute_variant creates a new TYPE_MAIN_VARIANT, so
++	 variants should all have the same set of attributes.  */
++      gcc_checking_assert (TYPE_ATTRIBUTES (type)
++			   == TYPE_ATTRIBUTES (TYPE_MAIN_VARIANT (type)));
+ 
+       if (streaming_p ())
+ 	{
+@@ -9406,6 +9409,8 @@ trees_out::type_node (tree type)
+       break;
+     }
+ 
++  tree_node (TYPE_ATTRIBUTES (type));
++
+   /* We may have met the type during emitting the above.  */
+   if (ref_node (type) != WK_none)
+     {
+@@ -10090,6 +10095,13 @@ trees_in::tree_node (bool is_use)
+ 	    break;
+ 	  }
+ 
++	/* In the exporting TU, a derived type with attributes was built by
++	   build_type_attribute_variant as a distinct copy, with itself as
++	   TYPE_MAIN_VARIANT.  We repeat that on import to get the version
++	   without attributes as TYPE_CANONICAL.  */
++	if (tree attribs = tree_node ())
++	  res = cp_build_type_attribute_variant (res, attribs);
++
+ 	int tag = i ();
+ 	if (!tag)
+ 	  {
+@@ -10133,9 +10145,6 @@ trees_in::tree_node (bool is_use)
+ 	    TYPE_USER_ALIGN (res) = true;
+ 	  }
+ 
+-	if (tree attribs = tree_node ())
+-	  res = cp_build_type_attribute_variant (res, attribs);
+-
+ 	int quals = i ();
+ 	if (quals >= 0 && !get_overrun ())
+ 	  res = cp_build_qualified_type (res, quals);
+diff --git a/gcc/testsuite/g++.dg/modules/attrib-2_a.C b/gcc/testsuite/g++.dg/modules/attrib-2_a.C
+new file mode 100644
+index 0000000000000..96f667ceec8c5
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/modules/attrib-2_a.C
+@@ -0,0 +1,12 @@
++// { dg-additional-options "-fmodules-ts" }
++// { dg-module-cmi M }
++
++export module M;
++
++export
++{
++  struct A { int i; };
++
++  __attribute ((access (none, 1)))
++  void f(const A&);
++}
+diff --git a/gcc/testsuite/g++.dg/modules/attrib-2_b.C b/gcc/testsuite/g++.dg/modules/attrib-2_b.C
+new file mode 100644
+index 0000000000000..c12ad117ce4f6
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/modules/attrib-2_b.C
+@@ -0,0 +1,9 @@
++// { dg-additional-options "-fmodules-ts -Wmaybe-uninitialized" }
++
++import M;
++
++int main()
++{
++  A a;
++  f(a);
++}

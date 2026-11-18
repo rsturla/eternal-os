@@ -1,0 +1,104 @@
+From a9473f9c6f2d755d2eb79dbd30877e64b4bc6fc8 Mon Sep 17 00:00:00 2001
+From: Tamar Christina <tamar.christina@arm.com>
+Date: Thu, 21 Nov 2024 15:10:24 +0000
+Subject: [PATCH] middle-end:For multiplication try swapping operands when
+ matching complex multiply [PR116463]
+
+This commit fixes the failures of complex.exp=fast-math-complex-mls-*.c on the
+GCC 14 branch and some of the ones on the master.
+
+The current matching just looks for one order for multiplication and was relying
+on canonicalization to always give the right order because of the TWO_OPERANDS.
+
+However when it comes to the multiplication trying only one order is a bit
+fragile as they can be flipped.
+
+The failing tests on the branch are:
+
+void fms180snd(_Complex TYPE a[restrict N], _Complex TYPE b[restrict N],
+               _Complex TYPE c[restrict N]) {
+  for (int i = 0; i < N; i++)
+    c[i] -= a[i] * (b[i] * I * I);
+}
+
+void fms180fst(_Complex TYPE a[restrict N], _Complex TYPE b[restrict N],
+               _Complex TYPE c[restrict N]) {
+  for (int i = 0; i < N; i++)
+    c[i] -= (a[i] * I * I) * b[i];
+}
+
+The issue is just a small difference in commutative operations.
+we look for {R,R} * {R,I} but found {R,I} * {R,R}.
+
+Since the DF analysis is cached, we should be able to swap operands and retry
+for multiply cheaply.
+
+There is a constraint being checked by vect_validate_multiplication for the data
+flow of the operands feeding the multiplications.  So e.g.
+
+between the nodes:
+
+note:   node 0x4d1d210 (max_nunits=2, refcnt=3) vector(2) double
+note:   op template: _27 = _10 * _25;
+note:      stmt 0 _27 = _10 * _25;
+note:      stmt 1 _29 = _11 * _25;
+note:   node 0x4d1d060 (max_nunits=2, refcnt=2) vector(2) double
+note:   op template: _26 = _11 * _24;
+note:      stmt 0 _26 = _11 * _24;
+note:      stmt 1 _28 = _10 * _24;
+
+we require the lanes to come from the same source which
+vect_validate_multiplication checks.  As such it doesn't make sense to flip them
+individually because that would invalidate the earlier linear_loads_p checks
+which have validated that the arguments all come from the same datarefs.
+
+This patch thus flips the operands in unison to still maintain this invariant,
+but also honor the commutative nature of multiplication.
+
+gcc/ChangeLog:
+
+	PR tree-optimization/116463
+	* tree-vect-slp-patterns.cc (complex_mul_pattern::matches,
+	complex_fms_pattern::matches): Try swapping operands on multiply.
+---
+ gcc/tree-vect-slp-patterns.cc | 20 ++++++++++++++++++--
+ 1 file changed, 18 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/tree-vect-slp-patterns.cc b/gcc/tree-vect-slp-patterns.cc
+index d62682be43c98..2535d46db3e84 100644
+--- a/gcc/tree-vect-slp-patterns.cc
++++ b/gcc/tree-vect-slp-patterns.cc
+@@ -1076,7 +1076,15 @@ complex_mul_pattern::matches (complex_operation_t op,
+   enum _conj_status status;
+   if (!vect_validate_multiplication (perm_cache, compat_cache, left_op,
+ 				     right_op, false, &status))
+-    return IFN_LAST;
++    {
++      /* Try swapping the order and re-trying since multiplication is
++	 commutative.  */
++      std::swap (left_op[0], left_op[1]);
++      std::swap (right_op[0], right_op[1]);
++      if (!vect_validate_multiplication (perm_cache, compat_cache, left_op,
++					 right_op, false, &status))
++	return IFN_LAST;
++    }
+ 
+   if (status == CONJ_NONE)
+     {
+@@ -1293,7 +1301,15 @@ complex_fms_pattern::matches (complex_operation_t op,
+   enum _conj_status status;
+   if (!vect_validate_multiplication (perm_cache, compat_cache, right_op,
+ 				     left_op, true, &status))
+-    return IFN_LAST;
++    {
++      /* Try swapping the order and re-trying since multiplication is
++	 commutative.  */
++      std::swap (left_op[0], left_op[1]);
++      std::swap (right_op[0], right_op[1]);
++      if (!vect_validate_multiplication (perm_cache, compat_cache, right_op,
++					 left_op, true, &status))
++	return IFN_LAST;
++    }
+ 
+   if (status == CONJ_NONE)
+     ifn = IFN_COMPLEX_FMS;
