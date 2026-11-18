@@ -287,10 +287,17 @@ to check installed-package behavior. Prepared roots can be shared, but case writ
 
 Declare case-only tools in that case's `packages` list.
 
+Upstream configure can disable tests before case dependencies are installed.
+Check its feature probes when tests report unsupported. Glibc's source case,
+for example, needs C++ enabled during configure; its static C++ archives belong
+only to the later test root.
+
 Reusable steps add their declared tools. Strict scripts infer Bash and coreutils.
 Add other commands only when the test uses them.
 Tests that look up their user or group need real account data in the root.
-For example, glibc's upstream suite declares `setup` as a test dependency.
+For example, glibc and libarchive declare `setup` as a test dependency.
+Use real account data for ownership and ACL checks. Account-lookup overrides can
+change the identities that those tests exercise.
 Keep installed-package runtime checks separate from compiler checks, since a
 compiler can pull extra runtime libraries into the test root.
 
@@ -412,7 +419,9 @@ inside a passed rpmx case. Review those separately from skipped rpmx cases.
 Retain the upstream summary and reasons, and state which behavior the suite did
 not exercise. Glibc retains unexpected and unsupported test diagnostics in
 `upstream-reports`; missing tools and unavailable kernel features need separate
-coverage decisions.
+coverage decisions. Read the skipped test's platform conditions before adding
+tools or permissions: a Windows-only branch remains unsupported on Linux even
+when all Linux prerequisites are present.
 
 Before release, run source suites and installed-package tests on both supported architectures.
 Check package combinations and upgrades in addition to isolated output tests.
