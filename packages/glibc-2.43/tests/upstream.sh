@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Keep individual failure diagnostics even when make check exits immediately.
+# Keep unexpected and unsupported results even when make check exits immediately.
 set -euo pipefail
 
-collect_failure_evidence() {
+collect_test_evidence() {
   mkdir -p upstream-reports || return
   [[ -f build/tests.sum ]] || return 0
   cp build/tests.sum upstream-reports/ || return
   while IFS= read -r line; do
     case "$line" in
-      FAIL:*|XPASS:*|ERROR:*|UNRESOLVED:*) ;;
+      FAIL:*|XPASS:*|ERROR:*|UNRESOLVED:*) unexpected=true ;;
+      UNSUPPORTED:*) unexpected=false ;;
       *) continue ;;
     esac
     name=${line#*: }
@@ -20,8 +21,10 @@ collect_failure_evidence() {
       path="build/$name$suffix"
       [[ -f $path ]] || continue
       cp --parents -- "$path" upstream-reports/ || return
-      printf 'upstream failure diagnostic: %s\n' "$path" >&2
-      cat -- "$path" >&2 || return
+      if "$unexpected"; then
+        printf 'upstream failure diagnostic: %s\n' "$path" >&2
+        cat -- "$path" >&2 || return
+      fi
     done
   done < build/tests.sum
 }
@@ -29,8 +32,8 @@ collect_failure_evidence() {
 finish() {
   status=$?
   trap - EXIT
-  if ! collect_failure_evidence; then
-    echo 'cannot retain upstream failure diagnostics' >&2
+  if ! collect_test_evidence; then
+    echo 'cannot retain upstream test diagnostics' >&2
     ((status != 0)) || status=1
   fi
   exit "$status"

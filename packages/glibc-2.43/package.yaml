@@ -39,6 +39,16 @@ sources:
       format: tar.gz
       strip-components: 1
 
+patches:
+  - file: patches/require-protected-symbol-tests.patch
+    reason: Require protected-symbol tests to pass with the supported modern toolchain
+  - file: patches/support-descriptors-containers.patch
+    reason: Backport upstream descriptor checks for container device mounts
+  - file: patches/ifunc-isa-bfd-expectations.patch
+    reason: Backport glibc 2.44 IFUNC expected-failure selection for BFD versus LLD
+  - file: patches/malloc-hugetlb-prerequisites.patch
+    reason: Require available kernel page modes before malloc huge-page tests
+
 build:
   root:
     profile: ../../profiles/bootstrap.profile.yaml
