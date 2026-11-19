@@ -129,15 +129,22 @@ materialization, artifact transfer between jobs and object-storage credentials.
 - check the commits against the conventions in
   [`git-workflow.md`](git-workflow.md) (`scripts/check-commits.sh`);
 - lint every recipe with `rpmx lint` (`make check` also runs pre-commit);
-- an `rpmx` matrix builds the pinned revision once per architecture and uploads
-  it; `prepare` and every build cell unpack that artifact instead of
-  recompiling it;
-- `prepare` selects changed packages and computes their content hashes
-  (`scripts/affected.sh`, `scripts/package-hash.sh`);
-- a matrix builds only the affected packages in parallel. The shared build
-  script runs source suites during build, then standalone acceptance against
-  the produced RPMs before recording success. It uploads both phases' reports
-  and command evidence with the per-package artifacts.
+- the shared setup action caches rpmx by pinned revision and runner
+  architecture;
+- the transaction planner selects affected packages and orders their build
+  dependencies into waves. Each wave resolves against the completed RPMs from
+  earlier waves, prepares one shared SRPM per package, and fans out to native
+  workers. A package starts its binaries when its own source preparation ends;
+- after each wave, changed public interfaces and recorded provider inputs can
+  select more downstream builds. Cycles repeat against the previous snapshot
+  until their inputs settle, with a fixed wave limit;
+- once all builds settle, installed-package tests use the completed candidate
+  repository. Export follows only after every acceptance job passes.
+
+The Actions adapter dispatches each wave and reports the whole transaction as
+one `RPM transaction` status on the PR. The local adapter uses the same planner,
+package commands and artifact format. See [build transactions](build-transactions.md)
+for the commands, state format and test cases.
 
 `release.yml` runs on `main`, on `v*` tags and on demand:
 

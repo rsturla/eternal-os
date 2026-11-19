@@ -1,0 +1,60 @@
+name: Test dependency waves
+run-name: >-
+  ${{ github.event.pull_request.number && format('PR #{0} · Test dependency waves', github.event.pull_request.number)
+      || format('{0} · Test dependency waves', github.ref_name) }}
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/test-build-waves.yml
+      - .github/actions/setup-rpmx/**
+      - .rpmx-revision
+      - scripts/**
+      - tests/**
+      - rebuild-*.yaml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-build-waves-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    name: Real RPM chain (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-26.04
+          - arch: aarch64
+            runner: ubuntu-26.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-rpmx
+      - name: Test real dependency rebuilds
+        env:
+          RUN_RPM_INTEGRATION: "1"
+          RPM_WAVE_TEST_OUTPUT: ${{ runner.temp }}/rpm-wave-evidence
+        run: python3 -m unittest discover -s tests -p test_build_waves_integration.py -v
+      - name: Upload build and acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rpm-wave-evidence-${{ matrix.arch }}
+          include-hidden-files: true
+          path: |
+            ${{ runner.temp }}/rpm-wave-evidence/**/commands.log
+            ${{ runner.temp }}/rpm-wave-evidence/**/state.json
+            ${{ runner.temp }}/rpm-wave-evidence/**/locks/*
+            ${{ runner.temp }}/rpm-wave-evidence/**/manifest.json
+            ${{ runner.temp }}/rpm-wave-evidence/**/source-manifest.json
+            ${{ runner.temp }}/rpm-wave-evidence/**/candidate.json
+            ${{ runner.temp }}/rpm-wave-evidence/**/results.json
+            ${{ runner.temp }}/rpm-wave-evidence/**/run.log
+          retention-days: 7
