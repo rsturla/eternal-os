@@ -159,15 +159,24 @@ A changed group tree requires refreshed PR CI; it cannot pass with stale artifac
 GitHub merge queues currently require an organisation-owned repository, so this
 personally owned repository uses strict branch protection instead.
 
-## OpenSSL bootstrap follow-up
+## OpenSSL target headers
 
-OpenSSL retains its upstream `COMP_*` entry points for consumers built against
-Fedora headers. Its zlib, zstd and Brotli compression backends stay disabled.
-Removing those entry points with `no-comp` is a separate bootstrap transition.
-Build Python and other consumers against Eternal's `no-comp` headers, replace
-seed tools that still require the APIs, and accept the complete candidate
-repository before publication. Rebuilding against the compatibility headers
-continues to permit references to those APIs.
+The shared native build profile resolves OpenSSL headers and libraries from
+Eternal and excludes Fedora's OpenSSL packages. Consumers compile against the
+same `OPENSSL_NO_COMP` configuration as the published runtime. The OpenSSL
+recipe disables compression APIs and all zlib, zstd and Brotli backends.
+
+The profile also selects Eternal's CA certificates and installs
+`ca-certificates-bundle`. Fedora's certificate package is excluded because it
+also owns OpenSSL configuration files supplied by Eternal's `openssl3-libs`.
+Eternal's curl and nghttp2 packages supply the matching HTTP client stack.
+Seed CMake can use Eternal's libcurl without requiring Fedora's OpenSSL RPM.
+
+Seed-only profiles keep their matching seed OpenSSL for build tools. They do
+not supply development headers to native OpenSSL consumers. Final acceptance
+must pass against the complete candidate before publication. This catches
+consumers that still require removed APIs; changing the library alone is not
+sufficient.
 
 ## Tests
 

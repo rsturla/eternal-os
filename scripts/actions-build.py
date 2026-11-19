@@ -120,7 +120,7 @@ def restore(args):
         names = {item['name'] for item in indexes[run['id']] if not item['expired']}
         snapshots = [(int(name.removeprefix('transaction-w')), name) for name in names
                      if re.fullmatch(r'transaction-w[0-9]+', name)]
-        if not snapshots or 'candidate-pool' not in names:
+        if not snapshots:
             continue
         _, name = max(snapshots)
         with tempfile.TemporaryDirectory(prefix='eternal-reuse-') as temporary:
@@ -141,9 +141,12 @@ def restore(args):
                 if args.run:
                     raise ValueError('requested reuse transaction has not settled')
                 continue
+            pool_run = run['id'] if 'candidate-pool' in names else context['runs'].get(str(state['wave'] - 1))
+            if pool_run is None:
+                continue
             shutil.copytree(source, args.output)
         subprocess.run(['git', 'fetch', '--no-tags', 'origin', state['commit']], check=True)
-        download(run['id'], 'candidate-pool', args.artifacts, indexes)
+        download(pool_run, 'candidate-pool', args.artifacts, indexes)
         outputs({'restored': True})
         return
     if args.run:
