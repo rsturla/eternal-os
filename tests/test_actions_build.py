@@ -220,6 +220,34 @@ class SnapshotReuse(unittest.TestCase):
                 ACTIONS.restore(args)
             outputs.assert_called_once_with({'restored': True})
 
+    def test_zero_build_snapshot_uses_its_last_build_producers_pool(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args = self.args(Path(temporary))
+
+            def api(path, **kwargs):
+                result = self.api(path, **kwargs)
+                if 'artifacts?' in path:
+                    result['artifacts'] = [item for item in result['artifacts'] if item['name'] != 'candidate-pool']
+                return result
+
+            def download(run, name, destination, indexes):
+                self.download(run, name, destination, indexes)
+                if name.startswith('transaction-w'):
+                    path = destination / 'state.json'
+                    state = json.loads(path.read_text())
+                    state['wave'] = 4
+                    path.write_text(json.dumps(state))
+                    ACTIONS.save(destination, {'source_sha': SHA, 'source_ref': 'topic', 'pr_number': 85,
+                                               'runs': {'3': 12}})
+
+            with patch.object(ACTIONS, 'api', side_effect=api), \
+                    patch.object(ACTIONS, 'download', side_effect=download) as move, \
+                    patch.object(ACTIONS.subprocess, 'run'), patch.object(ACTIONS, 'outputs') as outputs:
+                ACTIONS.restore(args)
+            self.assertEqual([(call.args[0], call.args[1]) for call in move.call_args_list],
+                             [(13, 'transaction-w4'), (12, 'candidate-pool')])
+            outputs.assert_called_once_with({'restored': True})
+
 
 class CandidateSelection(unittest.TestCase):
     def test_string_outputs_are_literal_and_collections_remain_json(self):
@@ -278,6 +306,24 @@ class CandidateSelection(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'no accepted candidate'):
                     ACTIONS.candidate(self.args())
                 outputs.assert_not_called()
+
+    def test_empty_transaction_skips_publication_without_a_candidate(self):
+        args = self.args()
+        args.run = None
+
+        def api(path, body=None):
+            if path.endswith('/status'):
+                return {'statuses': [{'context': 'RPM transaction', 'state': 'success',
+                                      'description': 'No RPM changes'}]}
+            result = self.api(path, body)
+            if '/artifacts?' in path:
+                result['artifacts'] = []
+            return result
+
+        with patch.dict(os.environ, GITHUB_REPOSITORY='owner/repo'), \
+                patch.object(ACTIONS, 'api', side_effect=api), patch.object(ACTIONS, 'outputs') as outputs:
+            ACTIONS.candidate(args)
+        outputs.assert_called_once_with({'skip': True})
 
     def test_reviewed_fork_sha_cannot_move_before_import(self):
         pull = {'state': 'open', 'base': {'repo': {'full_name': 'owner/repo'}}, 'head': {'sha': SHA}}

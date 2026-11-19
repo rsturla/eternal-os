@@ -26,6 +26,7 @@ jobs:
       contents: read
       actions: read
       pull-requests: read
+      statuses: read
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.PACKAGES_S3_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.PACKAGES_S3_SECRET_ACCESS_KEY }}
