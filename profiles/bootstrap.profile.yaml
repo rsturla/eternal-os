@@ -26,15 +26,21 @@ repositories:
     #
     # The recipes added in the first rolling release are published, but their
     # package layouts still overlap the Fedora set: archful/noarch pairs
-    # (meson, toml11), the python streams, the curl/openssl/rpm stack
-    # and the libxml2/libarchive pair. Keep them on the Fedora side until each
+    # (meson, toml11), the python streams and the curl/openssl stack.
+    # Keep them on the Fedora side until each
     # integration is validated; shrink this list as the packages are adopted.
     #
-    # util-linux and libxml2 stay on the Fedora side until their consumers are
-    # in-tree too. Fedora's libarchive still links libxml2.so.2, while Eternal
-    # libxml2 2.15 provides libxml2.so.16; the Fedora util-linux packages also
-    # require the matching libsmartcols/libuuid release. Mixing both providers
-    # makes the offline root transaction fail with file and version conflicts.
+    # Adopt libarchive, librepo and libsolv together so XML consumers can use
+    # Eternal's libxml2 without the Fedora libraries that require its older
+    # ABI. fmt consumers also build against Eternal's ABI.
+    # Fedora CMake still needs jsoncpp ABI 26;
+    # allow that runtime while CMake itself bootstraps against Eternal's 27.
+    # Keep seed libxml2 available for bootstrap gettext tools used by ACL and
+    # attr. XML consumers select Eternal's newer development package. Final
+    # acceptance uses the candidate library through the distribution profile.
+    # Explicit Lua stream requests can use Eternal. Seed Lua stays available
+    # for bootstrap RPM libraries that still need Fedora's library name.
+    # util-linux stays on Fedora until its matching library splits are adopted.
     # Keep Eternal's system-release provider available for setup's real
     # account data. Fedora's release chain requires its newer filesystem RPM.
     exclude:
@@ -67,20 +73,12 @@ repositories:
       - file
       - file-*
       - flex*
-      - fmt*
       - gettext*
       - glib2*
       - json-c*
-      # Fedora CMake needs jsoncpp ABI 26; Eternal currently ships ABI 27.
-      - jsoncpp*
-      - libarchive*
-      - librepo*
       - libsemanage*
-      - libsolv*
       - libunistring*
-      - libxml2*
       - libxslt*
-      - lua*
       - meson*
       - ninja*
       # Fedora curl requires an architecture-qualified libnghttp2 capability.
@@ -91,7 +89,6 @@ repositories:
       - python-3.13*
       - python-3.14*
       - readline*
-      - rpm*
       - scdoc*
       - shadow-utils*
       - sqlite*
@@ -110,6 +107,11 @@ repositories:
     # copies is what makes the build root consume the published Eternal
     # repository instead of only using it for metadata.
     exclude:
+      - fmt*
+      - libarchive*
+      - librepo*
+      - libsolv*
+      - rpm*
       - autoconf*
       - automake*
       - libtool*
@@ -174,6 +176,11 @@ repositories:
   - id: updates
     metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch
     exclude:
+      - fmt*
+      - libarchive*
+      - librepo*
+      - libsolv*
+      - rpm*
       - autoconf*
       - automake*
       - libtool*
@@ -235,8 +242,6 @@ repositories:
       - zlib-ng-compat
       - zlib-ng-compat-devel
       - zlib-ng-compat-static
-  - id: eternal-toolchain
-    baseurl: file://../.work/toolchain-repo
 packages:
   install:
     - openssf-compiler-options

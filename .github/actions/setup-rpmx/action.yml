@@ -22,7 +22,7 @@ runs:
           -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
         sudo apt-get "${apt_options[@]}" -o APT::Update::Error-Mode=any update
         sudo apt-get "${apt_options[@]}" install -y --no-install-recommends \
-          bubblewrap podman fuse-overlayfs uidmap python3-yaml createrepo-c gnupg rpm
+          bubblewrap podman fuse-overlayfs uidmap python3-yaml createrepo-c gnupg rpm rpm2cpio
         # Ubuntu 26.04 restricts unprivileged user namespaces via AppArmor,
         # which rootless podman needs for root resolution.
         sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true

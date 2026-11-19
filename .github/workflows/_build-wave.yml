@@ -1,0 +1,213 @@
+name: RPM dependency wave
+
+# One run executes one wave. Continuations carry only the fixed snapshot and
+# artifact run locations; dependency decisions remain in build-transaction.py.
+on:
+  workflow_call:
+    inputs:
+      phase:
+        type: string
+        required: true
+      snapshot_run:
+        description: Run containing the immutable transaction snapshot.
+        type: string
+        required: true
+      wave:
+        type: string
+        required: true
+      source_sha:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: rpm-wave-${{ inputs.snapshot_run }}-${{ inputs.phase }}-${{ inputs.wave }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-26.04
+    outputs:
+      packages: ${{ steps.plan.outputs.packages }}
+      arches: ${{ steps.plan.outputs.arches }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: transaction-w${{ inputs.wave }}
+          path: .work/transaction
+          run-id: ${{ inputs.snapshot_run }}
+          github-token: ${{ github.token }}
+      - id: plan
+        run: python3 ./scripts/actions-build.py describe
+
+  build:
+    name: Build ${{ matrix.package }}
+    if: inputs.phase == 'build'
+    needs: plan
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        package: ${{ fromJSON(needs.plan.outputs.packages) }}
+    uses: ./.github/workflows/_build-package.yml
+    with:
+      package: ${{ matrix.package }}
+      wave: ${{ fromJSON(inputs.wave) }}
+      arches: ${{ needs.plan.outputs.arches }}
+      snapshot_run: ${{ inputs.snapshot_run }}
+
+  advance:
+    name: Advance dependency closure
+    if: inputs.phase == 'build'
+    needs: [plan, build]
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      actions: write
+      statuses: write
+    outputs:
+      wave: ${{ steps.advance.outputs.wave }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-rpmx
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: transaction-w${{ inputs.wave }}
+          path: .work/transaction
+          run-id: ${{ inputs.snapshot_run }}
+          github-token: ${{ github.token }}
+      - name: Download previous candidate pool
+        if: fromJSON(inputs.wave) > 0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: candidate-pool
+          path: .work/candidates
+          run-id: ${{ inputs.snapshot_run }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: binary-w${{ inputs.wave }}-*
+          path: .work/candidates
+      - name: Advance and seal completed closure
+        id: advance
+        run: |
+          args=(--state .work/transaction/state.json --artifacts .work/candidates)
+          python3 ./scripts/build-transaction.py advance "${args[@]}"
+          python3 ./scripts/actions-build.py record
+          python3 ./scripts/transaction-artifacts.py pool --state .work/transaction/state.json \
+            --artifacts .work/candidates --output .work/pool
+          if jq -e '.pending == []' .work/transaction/state.json >/dev/null; then
+            python3 ./scripts/build-transaction.py seal --state .work/transaction/state.json \
+              --artifacts .work/candidates --output .work/repository
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: transaction-w${{ steps.advance.outputs.wave }}
+          path: .work/transaction/
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 7
+      - name: Upload next candidate pool
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: candidate-pool
+          path: .work/pool/
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 7
+      - name: Collect final source bundles
+        if: hashFiles('.work/repository/**/repomd.xml') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 ./scripts/actions-build.py sources --artifacts .work/pool
+      - name: Upload sealed acceptance inputs
+        if: hashFiles('.work/repository/**/repomd.xml') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: acceptance-inputs
+          path: |
+            .work/transaction/
+            .work/repository/
+            .work/pool/
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 7
+      - name: Dispatch continuation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 ./scripts/actions-build.py dispatch
+
+  accept:
+    name: Accept batch ${{ matrix.batch }} (${{ matrix.arch }})
+    if: inputs.phase == 'accept'
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    uses: ./.github/workflows/_accept-rpm.yml
+    with:
+      packages: ${{ toJSON(matrix.packages) }}
+      batch: ${{ matrix.batch }}
+      arch: ${{ matrix.arch }}
+      runner: ${{ matrix.runner }}
+      snapshot_run: ${{ inputs.snapshot_run }}
+
+  finish:
+    name: Export accepted transaction
+    if: inputs.phase == 'accept'
+    needs: [plan, accept]
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      actions: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: acceptance-inputs
+          path: .work/acceptance
+          run-id: ${{ inputs.snapshot_run }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: accepted-batch-*
+          path: .work/acceptance/pool
+          merge-multiple: true
+      - name: Export verified source and accepted artifacts
+        run: |
+          python3 ./scripts/transaction-artifacts.py pack --state .work/acceptance/transaction/state.json \
+            --artifacts .work/acceptance/pool --output .work/release-candidate
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-candidate
+          path: .work/release-candidate/
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14
+      - name: Pass the transaction status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: python3 ./scripts/actions-build.py status --sha "$SOURCE_SHA" --result success
+
+  failure:
+    name: Report transaction failure
+    if: always() && (needs.plan.result == 'failure' || needs.build.result == 'failure' || needs.advance.result == 'failure' || needs.accept.result == 'failure' || needs.finish.result == 'failure' || cancelled())
+    needs: [plan, build, advance, accept, finish]
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Fail the transaction status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: python3 ./scripts/actions-build.py status --sha "$SOURCE_SHA" --result failure

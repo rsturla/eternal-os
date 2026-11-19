@@ -1,18 +1,39 @@
 name: CI
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch' && inputs.phase != 'start'
+      && format('{0} · RPM {1} wave {2}', inputs.pr_number && format('PR #{0}', inputs.pr_number) || github.ref_name, inputs.phase, inputs.wave)
+      || format('{0} · CI', github.event.pull_request.number && format('PR #{0}', github.event.pull_request.number) || github.ref_name) }}
 
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      phase:
+        type: choice
+        options: [start, build, accept]
+        default: start
+      snapshot_run:
+        type: string
+      wave:
+        type: string
+      source_sha:
+        type: string
+      pr_number:
+        type: string
+      reuse_run:
+        description: Completed build run whose verified candidates may be reused.
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}-${{ inputs.snapshot_run || 'start' }}-${{ inputs.phase || 'start' }}
   cancel-in-progress: true
 
 jobs:
   commits:
+    if: github.event_name != 'workflow_dispatch' || inputs.phase == 'start'
     name: Commits
     runs-on: ubuntu-26.04
     steps:
@@ -28,13 +49,33 @@ jobs:
         run: ./scripts/check-commits.sh --base "${{ github.event.pull_request.base.sha }}"
 
   lint:
+    if: github.event_name != 'workflow_dispatch' || inputs.phase == 'start'
     name: Lint
     uses: ./.github/workflows/_lint.yml
 
   packages:
-    name: Packages
+    if: github.event_name != 'workflow_dispatch' || inputs.phase == 'start'
+    name: Start RPM transaction
     needs: [lint, commits]
-    uses: ./.github/workflows/_build-packages.yml
+    permissions:
+      contents: read
+      actions: write
+      statuses: write
+    uses: ./.github/workflows/_start-transaction.yml
     with:
-      selection: affected
       base: ${{ github.event.pull_request.base.sha }}
+      reuse_run: ${{ inputs.reuse_run }}
+
+  wave:
+    name: RPM wave
+    if: github.event_name == 'workflow_dispatch' && inputs.phase != 'start'
+    permissions:
+      contents: read
+      actions: write
+      statuses: write
+    uses: ./.github/workflows/_build-wave.yml
+    with:
+      phase: ${{ inputs.phase }}
+      snapshot_run: ${{ inputs.snapshot_run }}
+      wave: ${{ inputs.wave }}
+      source_sha: ${{ inputs.source_sha }}

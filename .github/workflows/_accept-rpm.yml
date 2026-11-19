@@ -1,0 +1,62 @@
+name: Accept a batch against the completed repository
+
+on:
+  workflow_call:
+    inputs:
+      packages:
+        type: string
+        required: true
+      batch:
+        type: number
+        required: true
+      arch:
+        type: string
+        required: true
+      runner:
+        type: string
+        required: true
+      snapshot_run:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  accept:
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-rpmx
+      - name: Download sealed transaction
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: acceptance-inputs
+          path: .work/acceptance
+          run-id: ${{ inputs.snapshot_run }}
+          github-token: ${{ github.token }}
+      - name: Run package acceptance
+        env:
+          TARGET_ARCH: ${{ inputs.arch }}
+          PACKAGES: ${{ inputs.packages }}
+        run: |
+          python3 ./scripts/package-artifacts.py accept-batch \
+            --state .work/acceptance/transaction/state.json \
+            --artifacts .work/acceptance/pool --packages "$PACKAGES" \
+            --arch "$TARGET_ARCH" --repository .work/acceptance/repository --output out
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: accepted-batch-${{ inputs.arch }}-${{ inputs.batch }}
+          path: out/
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 7
+      - name: Upload acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: acceptance-evidence-${{ inputs.arch }}-${{ inputs.batch }}
+          path: out/**/acceptance/
+          overwrite: true
+          retention-days: 7

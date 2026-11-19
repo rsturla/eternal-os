@@ -1,0 +1,119 @@
+name: Start RPM transaction
+
+on:
+  workflow_call:
+    inputs:
+      base:
+        type: string
+        required: true
+      reuse_run:
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+  actions: write
+  statuses: write
+
+jobs:
+  start:
+    name: Plan RPM transaction
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-rpmx
+      - name: Restore previous candidates
+        id: restore
+        env:
+          REUSE_RUN: ${{ inputs.reuse_run }}
+          PREVIOUS_SHA: ${{ github.event.before }}
+          SOURCE_REF: ${{ github.event.pull_request.head.ref || github.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          args=(--ref "$SOURCE_REF")
+          if [ -n "$PR_NUMBER" ]; then args+=(--pr-number "$PR_NUMBER"); fi
+          if [ -n "$REUSE_RUN" ]; then args+=(--run "$REUSE_RUN");
+          elif [ -n "$PREVIOUS_SHA" ]; then args+=(--previous-sha "$PREVIOUS_SHA"); fi
+          python3 ./scripts/actions-build.py restore "${args[@]}"
+      - name: Plan dependency closure
+        id: plan
+        env:
+          BASE_REF: ${{ inputs.base }}
+          SOURCE_REF: ${{ github.event.pull_request.head.ref || github.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+          PACKAGES_BASE_URL: ${{ vars.PACKAGES_BASE_URL || 'https://packages.eternal.sturla.tech' }}
+          GH_TOKEN: ${{ github.token }}
+          RESTORED: ${{ steps.restore.outputs.restored }}
+        run: |
+          args=(--ref "$SOURCE_REF")
+          if [ -n "$PR_NUMBER" ]; then args+=(--pr-number "$PR_NUMBER"); fi
+          if [ "$RESTORED" = true ]; then
+            python3 ./scripts/build-transaction.py reuse --state .work/transaction/state.json \
+              --previous .work/previous/state.json --artifacts .work/candidates \
+              --build-release "$(date -u +%s)"
+            args+=(--previous-context .work/previous/context.json)
+          else
+            selection=(--json)
+            if [ -n "$BASE_REF" ]; then selection+=(--base "$BASE_REF"); fi
+            packages=$(./scripts/affected.sh "${selection[@]}")
+            python3 ./scripts/build-transaction.py init --state .work/transaction/state.json \
+              --packages "$packages" --base-url "$PACKAGES_BASE_URL" --build-release "$(date -u +%s)"
+          fi
+          python3 ./scripts/actions-build.py init "${args[@]}"
+          if [ "$RESTORED" = true ] && jq -e '.pending == []' .work/transaction/state.json >/dev/null; then
+            python3 ./scripts/build-transaction.py seal --state .work/transaction/state.json \
+              --artifacts .work/candidates --output .work/repository
+            python3 ./scripts/actions-build.py sources --artifacts .work/candidates
+            mv .work/candidates .work/pool
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: transaction-w${{ steps.plan.outputs.wave }}
+          path: .work/transaction/
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 7
+      - name: Upload reused candidate pool
+        if: steps.restore.outputs.restored == 'true' && steps.plan.outputs.packages != '[]'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: candidate-pool
+          path: .work/candidates/
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 7
+      - name: Upload reused acceptance inputs
+        if: steps.restore.outputs.restored == 'true' && steps.plan.outputs.packages == '[]'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: acceptance-inputs
+          path: |
+            .work/transaction/
+            .work/repository/
+            .work/pool/
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 7
+      - name: Dispatch first dependency wave
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 ./scripts/actions-build.py dispatch
+
+  failure:
+    name: Report transaction failure
+    if: always() && needs.start.result != 'success'
+    needs: start
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Fail the transaction status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python3 ./scripts/actions-build.py status --sha "$SOURCE_SHA" --result failure
