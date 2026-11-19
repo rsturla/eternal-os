@@ -7,7 +7,7 @@ schema: 2
 package:
   name: rpm
   version: "6.1.0"
-  release: 3
+  release: 4
   summary: The RPM package manager
   description: |
     RPM is a powerful command line driven package management system capable of
@@ -44,7 +44,7 @@ build:
     - libarchive-devel
     - libcap-devel
     - libselinux-devel
-    - lua-devel
+    - lua-5.4-devel
     - openssl-devel
     - popt-devel
     - sqlite-devel
@@ -121,6 +121,7 @@ outputs:
           rpm --version
           rpmbuild --version
           rpm --eval '%{_libdir}' | grep -Fx /usr/lib64
+          rpm --eval '%{lua:assert(_VERSION == "Lua 5.4"); print(6 * 7)}' | grep -Fx 42
 
   - name: rpm-libs
     summary: Libraries for manipulating RPM packages
@@ -146,7 +147,7 @@ outputs:
         - libcap
         - libselinux
         - libstdc++
-        - lua-libs
+        - lua-5.4-libs
         - openssl-libs
         - popt
         - sqlite-libs
@@ -198,7 +199,7 @@ outputs:
         - libacl-devel
         - libcap-devel
         - libselinux-devel
-        - lua-devel
+        - lua-5.4-devel
         - popt-devel
         - sqlite-devel
         - xz-devel
