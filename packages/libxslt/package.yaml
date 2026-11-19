@@ -5,7 +5,7 @@ schema: 2
 package:
   name: libxslt
   version: 1.1.45
-  release: 1
+  release: 2
   summary: XSLT transformation tools and libraries
   description: XSLT transformation tools and libraries.
   license: MIT
@@ -25,9 +25,7 @@ sources:
     strip-components: 1
 build:
   root:
-    # libxslt 1.1.45 needs libxml2 >= 2.15.1; the shared root still uses
-    # Fedora's libxml2 for the rpm stack.
-    profile: ../../profiles/bootstrap-libxslt.profile.yaml
+    profile: ../../profiles/bootstrap.profile.yaml
   packages:
   - gcc
   - make
