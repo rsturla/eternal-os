@@ -87,8 +87,8 @@ outputs:
     - python-${matrix.python.version}-tomlkit
     - python-${matrix.python.version}-trove-classifiers
   tests:
-  - name: functional
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - from hatchling.plugin.manager import PluginManager; assert PluginManager().builder.get("wheel")
+  - name: offline-behavior
+    files: tests
+    packages: ["python-${matrix.python.version}-editables"]
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/check.py" "${matrix.python.version}" "hatchling" "${package.version}"

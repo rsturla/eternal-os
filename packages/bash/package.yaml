@@ -81,12 +81,6 @@ build:
         outputs: [bash, bash-binsh, bash-devel, bash-doc, bash-builtins]
     - uses: strip
 
-  tests:
-    - name: build
-      script: |
-        ./bash --version | grep -q 'version 5.3.9'
-
-
 outputs:
   - name: bash
     summary: The GNU Bourne Again SHell
@@ -103,10 +97,12 @@ outputs:
       provides:
         - /bin/bash
     tests:
-      - name: installed
-        packages: [bash-binsh, grep]
+      - name: language
+        packages:
+          - coreutils
+        files: tests
         script: |
-          bash --version | grep -q 'version 5.3.9'
+          bash "$TEST_FILES/language.sh"
 
   - name: bash-binsh
     summary: /bin/sh provided by Bash
@@ -122,12 +118,11 @@ outputs:
       provides:
         - /bin/sh
     tests:
-      - name: installed
-        packages: [grep]
+      - name: posix-shell
+        packages: []
+        files: tests
         script: |
-          test -L /usr/bin/sh
-          test -x /usr/bin/sh
-          sh -c 'echo ok' | grep -q ok
+          bash "$TEST_FILES/posix-shell.sh"
 
   - name: bash-doc
     summary: Bash documentation
@@ -152,6 +147,14 @@ outputs:
     dependencies:
       run:
         - bash = ${package.version}-${package.release}
+    tests:
+      - name: builtin
+        packages:
+          - gcc
+          - glibc-devel
+        files: tests
+        script: |
+          bash "$TEST_FILES/builtin.sh"
 
   - name: bash-builtins
     summary: Bash loadable builtins
@@ -164,6 +167,12 @@ outputs:
     dependencies:
       run:
         - bash = ${package.version}-${package.release}
+    tests:
+      - name: loadable
+        packages: []
+        files: tests
+        script: |
+          bash "$TEST_FILES/loadable.sh"
 
 tests:
   - name: hardening

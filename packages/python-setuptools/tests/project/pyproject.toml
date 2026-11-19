@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fixture-package"
+version = "1.2.3"
+description = "Offline Eternal packaging fixture"
+requires-python = ">=3.11"
+
+[project.scripts]
+fixture-answer = "fixture_package:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+fixture_package = ["resource.txt"]

@@ -1,0 +1,16 @@
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[project]
+name = "fixture-poetry"
+version = "1.2.3"
+description = "Offline Eternal Poetry fixture"
+requires-python = ">=3.11"
+
+[project.scripts]
+fixture-answer = "fixture_poetry:main"
+
+[tool.poetry]
+packages = [{include = "fixture_poetry", from = "src"}]
+include = ["src/fixture_poetry/resource.txt"]

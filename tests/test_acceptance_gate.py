@@ -2,6 +2,8 @@
 
 import json
 import os
+import selectors
+import socket
 from pathlib import Path
 import subprocess
 import tempfile
@@ -152,6 +154,103 @@ else:
                     self.assertEqual(result.returncode == 0, expected, result.stdout + result.stderr)
                     self.assertEqual(json.loads((output / "results.json").read_text()), report)
                     self.assertFalse(stale.exists())
+
+
+    def test_stderr_is_live_before_child_exit_without_waiting_for_a_newline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rpmx = root / "rpmx"
+            rpmx.write_text('''#!/usr/bin/env python3
+import json, os, socket, sys
+from pathlib import Path
+args = sys.argv[1:]
+if args[0] == 'plan':
+    print(json.dumps({'plan': {'cells': [{'tests': [{}]}]}}))
+else:
+    sys.stderr.buffer.write(b'waiting-for-ack')
+    sys.stderr.buffer.flush()
+    with socket.socket(socket.AF_UNIX) as connection:
+        connection.connect(os.environ['ACK_SOCKET'])
+        assert connection.recv(1) == b'A'
+    Path(os.environ['CHILD_FINISHED']).touch()
+    evidence = Path(args[args.index('--test-output') + 1])
+    evidence.mkdir(parents=True)
+    (evidence / 'receipt').write_text('retained artifact')
+    Path(args[args.index('--junit') + 1]).write_text('<testsuite/>')
+    print(json.dumps({'document': 'rpmx-run-report', 'version': 1, 'outcome': 'passed',
+                      'acceptance': 'completed', 'tests': [{'status': 'passed'}]}))
+''')
+            rpmx.chmod(0o755)
+            output = root / "reports"
+            finished = root / "child-finished"
+            marker = b"waiting-for-ack"
+            with socket.socket(socket.AF_UNIX) as listener:
+                address = str(root / "ack.sock")
+                listener.bind(address)
+                listener.listen(1)
+                listener.settimeout(10)
+                with subprocess.Popen([
+                    str(ROOT / "scripts/accept-rpms.py"), "recipe.yaml",
+                    "--install-dir", "rpms", "--output", str(output), "--arch", "x86_64",
+                ], env=dict(os.environ, RPMX=str(rpmx), ACK_SOCKET=address,
+                            CHILD_FINISHED=str(finished)), stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE) as process:
+                    connection, _ = listener.accept()
+                    try:
+                        observed = b""
+                        with selectors.DefaultSelector() as selector:
+                            selector.register(process.stderr, selectors.EVENT_READ)
+                            while len(observed) < len(marker):
+                                self.assertTrue(selector.select(timeout=10),
+                                                "child waits for acknowledgment: stderr must stream before exit")
+                                chunk = os.read(process.stderr.fileno(), len(marker) - len(observed))
+                                self.assertTrue(chunk, "acceptance stderr closed before progress arrived")
+                                observed += chunk
+                        self.assertEqual(observed, marker)
+                        self.assertIsNone(process.poll())
+                        self.assertFalse(finished.exists(), "output must arrive before child completion")
+                        self.assertEqual((output / "run.log").read_bytes(), marker)
+                    finally:
+                        # Release the child even when the old non-streaming implementation fails.
+                        connection.sendall(b'A')
+                        connection.close()
+                        stdout, stderr = process.communicate(timeout=10)
+                    self.assertEqual(process.returncode, 0, stderr)
+                    self.assertEqual(stdout, b"", "the child JSON belongs in results.json")
+            self.assertTrue(finished.exists())
+            self.assertEqual((output / "run.log").read_bytes(), marker)
+            self.assertEqual((output / "run/receipt").read_text(), "retained artifact")
+            self.assertTrue((output / "junit.xml").is_file())
+            self.assertEqual(json.loads((output / "results.json").read_text())["outcome"], "passed")
+
+    def test_failed_child_preserves_exact_stderr_once_and_nonzero_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rpmx = root / "rpmx"
+            rpmx.write_text('''#!/usr/bin/env python3
+import json, sys
+if sys.argv[1] == 'plan':
+    print(json.dumps({'plan': {'cells': [{'tests': [{}]}]}}))
+else:
+    # Even a complete report cannot override the process's failure status.
+    print(json.dumps({'document': 'rpmx-run-report', 'version': 1, 'outcome': 'passed',
+                      'acceptance': 'completed', 'tests': [{'status': 'passed'}]}))
+    sys.stderr.buffer.write(b'worker failed: \\xff\\rpartial')
+    sys.stderr.buffer.flush()
+    sys.exit(23)
+''')
+            rpmx.chmod(0o755)
+            output = root / "reports"
+            result = subprocess.run([
+                str(ROOT / "scripts/accept-rpms.py"), "recipe.yaml",
+                "--install-dir", "rpms", "--output", str(output), "--arch", "x86_64",
+            ], env=dict(os.environ, RPMX=str(rpmx)), capture_output=True)
+            expected = b"worker failed: \xff\rpartial"
+            self.assertEqual(result.returncode, 23)
+            self.assertEqual(result.stdout, b"")
+            self.assertEqual(result.stderr, expected, "stderr must be streamed exactly once")
+            self.assertEqual((output / "run.log").read_bytes(), expected)
+            self.assertEqual(json.loads((output / "results.json").read_text())["outcome"], "passed")
 
 
 if __name__ == "__main__":

@@ -84,14 +84,11 @@ outputs:
         - zstd-libs
         - rpm-libs
     tests:
-      - name: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
-        script: |
-          for lib in /usr/lib64/libsolv.so.* /usr/lib/libsolv.so.*; do
-            test -e "$lib" && exit 0
-          done
-          exit 1
-
+      - name: runtime-linkage
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["libsolv.so.*", "libsolvext.so.*"]
   - name: libsolv-devel
     summary: Development files for libsolv
     files:
@@ -105,18 +102,16 @@ outputs:
         - libsolv = ${package.version}-${package.release}
         - rpm-devel
     tests:
-      - name: link
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
+      - name: api-behavior
+        packages:
+          - gcc
+          - glibc-devel
+          - pkgconf
+        files: tests
         script: |
-          cat > /tmp/solv.c <<'EOF'
-          #include <solv/pool.h>
-          #include <solv/repo_comps.h>
-          #include <solv/pool_parserpmrichdep.h>
-          int main(void){return 0;}
-          EOF
-          gcc /tmp/solv.c $(pkg-config --cflags --libs libsolv) -o /tmp/solv-test
-          /tmp/solv-test
-
+          pkg-config --exists libsolv
+          gcc -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror=implicit-function-declaration $(pkg-config --cflags libsolv) "$TEST_FILES/behavior.c" $(pkg-config --libs libsolv) -o behavior
+          ./behavior
   - name: libsolv-tools
     summary: Tools for working with libsolv repositories
     files:
@@ -129,8 +124,8 @@ outputs:
       run:
         - libsolv = ${package.version}-${package.release}
     tests:
-      - name: installed
-        packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
+      - name: solver-cases
+        files: tests
         script: |
-          test -x /usr/bin/testsolv
-          test -x /usr/bin/dumpsolv
+          testsolv "$TEST_FILES/install.t"
+          testsolv "$TEST_FILES/missing.t"

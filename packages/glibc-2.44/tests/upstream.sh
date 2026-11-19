@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Keep unexpected and unsupported results even when make check exits immediately.
+set -euo pipefail
+
+collect_test_evidence() {
+  mkdir -p upstream-reports || return
+  [[ -f build/tests.sum ]] || return 0
+  cp build/tests.sum upstream-reports/ || return
+  while IFS= read -r line; do
+    case "$line" in
+      FAIL:*|XPASS:*|ERROR:*|UNRESOLVED:*) unexpected=true ;;
+      UNSUPPORTED:*) unexpected=false ;;
+      *) continue ;;
+    esac
+    name=${line#*: }
+    if [[ ! $name =~ ^[a-zA-Z0-9_+./-]+$ || $name == /* || $name == *..* ]]; then
+      printf 'invalid upstream test result path: %s\n' "$name" >&2
+      return 1
+    fi
+    for suffix in .out .test-result -out; do
+      path="build/$name$suffix"
+      [[ -f $path ]] || continue
+      cp --parents -- "$path" upstream-reports/ || return
+      if "$unexpected"; then
+        printf 'upstream failure diagnostic: %s\n' "$path" >&2
+        cat -- "$path" >&2 || return
+      fi
+    done
+  done < build/tests.sum
+}
+
+finish() {
+  status=$?
+  trap - EXIT
+  if ! collect_test_evidence; then
+    echo 'cannot retain upstream test diagnostics' >&2
+    ((status != 0)) || status=1
+  fi
+  exit "$status"
+}
+trap finish EXIT
+
+# These source cases require C++ coverage; configure must not silently drop it.
+if ! grep -Eq '^CXX[[:space:]]*=[[:space:]]*[^[:space:]]' build/config.make; then
+  echo 'glibc upstream tests require a configured C++ compiler (CXX in build/config.make)' >&2
+  exit 1
+fi
+if ! grep -Eq '^static-cxx-tests[[:space:]]*=[[:space:]]*yes[[:space:]]*$' build/config.make; then
+  echo 'glibc upstream tests require static-cxx-tests = yes in build/config.make' >&2
+  exit 1
+fi
+
+make -C build -j2 check
+test -s build/tests.sum
+grep '^PASS:' build/tests.sum
+if grep -E '^(FAIL|XPASS|ERROR|UNRESOLVED):' build/tests.sum; then
+  echo 'unexpected glibc upstream test result' >&2
+  exit 1
+fi

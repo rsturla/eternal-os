@@ -1,0 +1,237 @@
+From b20b94006c79d65d75e5bd3a8d14fbcf9cd5bee6 Mon Sep 17 00:00:00 2001
+From: Adhemerval Zanella <adhemerval.zanella@linaro.org>
+Date: Thu, 21 May 2026 13:55:41 -0300
+Subject: [PATCH] support: Skip malloc hugetlb={1,2} variants when kernel
+ cannot honor them
+
+The malloc test variants run with GLIBC_TUNABLES=glibc.malloc.hugetlb=1
+exercise transparent huge pages via MADV_HUGEPAGE, which is only
+meaningful when /sys/kernel/mm/transparent_hugepage/enabled is set to
+'madvise' ('always' makes the madvise redundant and 'never' makes it
+ineffective).  The hugetlb=2 variants rely on MAP_HUGETLB, which
+requires a positive /proc/sys/vm/nr_hugepages.  On systems that do not
+satisfy these prerequisites - including any non-Linux target - those
+runs only consume CPU time in this case.
+
+Add support/support_check_hugetlb.{c,h} exposing:
+
+  - support_thp_is_madvise: true iff THP is in 'madvise' mode;
+  - support_hugepages_reserved: true iff nr_hugepages > 0;
+  - support_check_malloc_hugetlb: inspects GLIBC_TUNABLES and calls
+    FAIL_UNSUPPORTED when the requested hugetlb mode cannot be honored.
+
+Gate the check at compile time so only the variant binaries pay for
+it.
+
+Reviewed-by: DJ Delorie <dj@redhat.com>
+Backport: adjust support/Makefile context for 2.43, which lacks support_check_nss.
+
+--- a/Rules
++++ b/Rules
+@@ -290,7 +290,8 @@
+ endif
+ 
+ ifneq "$(strip $(binaries-malloc-hugetlb1-tests))" ""
+-$(addprefix $(objpfx),$(binaries-malloc-hugetlb1-tests)): %-malloc-hugetlb1: %.o \
++$(addprefix $(objpfx),$(binaries-malloc-hugetlb1-tests)): \
++%-malloc-hugetlb1: %-malloc-hugetlb1.o \
+   $(link-extra-libs-tests) \
+   $(sort $(filter $(common-objpfx)lib%,$(link-libc))) \
+   $(addprefix $(csu-objpfx),start.o) $(+preinit) $(+postinit)
+@@ -298,7 +299,8 @@
+ endif
+ 
+ ifneq "$(strip $(binaries-malloc-hugetlb2-tests))" ""
+-$(addprefix $(objpfx),$(binaries-malloc-hugetlb2-tests)): %-malloc-hugetlb2: %.o \
++$(addprefix $(objpfx),$(binaries-malloc-hugetlb2-tests)): \
++%-malloc-hugetlb2: %-malloc-hugetlb2.o \
+   $(link-extra-libs-tests) \
+   $(sort $(filter $(common-objpfx)lib%,$(link-libc))) \
+   $(addprefix $(csu-objpfx),start.o) $(+preinit) $(+postinit)
+--- a/malloc/Makefile
++++ b/malloc/Makefile
+@@ -347,6 +347,19 @@
+ $(objpfx)%-threaded-worker.o: %.c $(before-compile)
+ 	$(compile-command.c)
+ 
++# Compile the hugetlb={1,2} test variants from their base sources with
++# -DTEST_HUGETLB so support/test-driver.c gates them on kernel support.
++$(foreach t,$(tests-malloc-hugetlb1),\
++  $(eval libof-$(t)-malloc-hugetlb1 := testsuite))
++$(foreach t,$(tests-malloc-hugetlb2),\
++  $(eval libof-$(t)-malloc-hugetlb2 := testsuite))
++$(objpfx)%-malloc-hugetlb1.o: CPPFLAGS += -DTEST_HUGETLB
++$(objpfx)%-malloc-hugetlb1.o: %.c $(before-compile)
++	$(compile-command.c)
++$(objpfx)%-malloc-hugetlb2.o: CPPFLAGS += -DTEST_HUGETLB
++$(objpfx)%-malloc-hugetlb2.o: %.c $(before-compile)
++	$(compile-command.c)
++
+ # Include the cleanup handler.
+ aux := set-freeres thread-freeres
+ 
+--- a/support/Makefile
++++ b/support/Makefile
+@@ -46,6 +46,7 @@
+   support_can_chroot \
+   support_capture_subprocess \
+   support_capture_subprocess_check \
++  support_check_hugetlb \
+   support_check_stat_fd \
+   support_check_stat_path \
+   support_chroot \
+--- /dev/null
++++ b/support/support_check_hugetlb.c
+@@ -0,0 +1,79 @@
++/* Runtime detection of huge-page support for malloc tests.
++   Copyright (C) 2026 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#include <fcntl.h>
++#include <intprops.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++
++#include <elf/dl-tunables.h>
++#include <support/support_check_hugetlb.h>
++#include <support/check.h>
++
++bool
++support_thp_is_madvise (void)
++{
++  int fd = open ("/sys/kernel/mm/transparent_hugepage/enabled", O_RDONLY);
++  if (fd == -1)
++    return false;
++
++#define MODE_MADVISE "always [madvise] never\n"
++
++  char str[sizeof(MODE_MADVISE)];
++  ssize_t s = read (fd, str, sizeof (str));
++  close (fd);
++  if (s != sizeof (str) - 1)
++    return false;
++  str[s] = '\0';
++  return strcmp (str, MODE_MADVISE) == 0;
++}
++
++bool
++support_hugepages_reserved (void)
++{
++  int fd = open ("/proc/sys/vm/nr_hugepages", O_RDONLY);
++  if (fd == -1)
++    return false;
++
++  char str[INT_BUFSIZE_BOUND(unsigned long int)];
++  ssize_t s = read (fd, str, sizeof (str));
++  close (fd);
++  if (s >= sizeof str || s < 0)
++    return false;
++  str[s] = '\0';
++  unsigned long int n = 0;
++  return sscanf (str, "%lu", &n) == 1 && n > 0;
++}
++
++void
++support_check_malloc_hugetlb (void)
++{
++  if (!TUNABLE_IS_INITIALIZED (glibc, malloc, hugetlb))
++    return;
++
++  size_t hugetlb = TUNABLE_GET_FULL (glibc, malloc, hugetlb, size_t, NULL);
++  if (hugetlb == 1 && !support_thp_is_madvise ())
++    FAIL_UNSUPPORTED ("glibc.malloc.hugetlb=1 requires"
++                      " /sys/kernel/mm/transparent_hugepage/enabled"
++                      " = madvise");
++  if (hugetlb == 2 && !support_hugepages_reserved ())
++    FAIL_UNSUPPORTED ("glibc.malloc.hugetlb=2 requires"
++                      " /proc/sys/vm/nr_hugepages > 0");
++}
+--- /dev/null
++++ b/support/support_check_hugetlb.h
+@@ -0,0 +1,48 @@
++/* Runtime detection of huge-page support for malloc tests.
++   Copyright (C) 2026 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#ifndef SUPPORT_SUPPORT_CHECK_HUGETLB_H
++#define SUPPORT_SUPPORT_CHECK_HUGETLB_H
++
++#include <stdbool.h>
++#include <sys/cdefs.h>
++
++__BEGIN_DECLS
++
++/* Returns true if /sys/kernel/mm/transparent_hugepage/enabled selects
++   `madvise' as the active mode (i.e. MADV_HUGEPAGE is honored, but
++   THP is not applied automatically).  Returns false on any other
++   configuration, on read failure, or on non-Linux systems.  */
++bool support_thp_is_madvise (void);
++
++/* Returns true if /proc/sys/vm/nr_hugepages reports a strictly
++   positive number of pre-allocated huge pages (the prerequisite for
++   MAP_HUGETLB allocations).  Returns false on read failure or on
++   non-Linux systems.  */
++bool support_hugepages_reserved (void);
++
++/* If the current process is running with GLIBC_TUNABLES requesting
++   glibc.malloc.hugetlb=1 or glibc.malloc.hugetlb=2, verifies that the
++   kernel can actually satisfy the requested mode.  If not, terminates
++   the test with EXIT_UNSUPPORTED.  No-op when no such tunable is set,
++   so it is safe to call unconditionally.  */
++void support_check_malloc_hugetlb (void);
++
++__END_DECLS
++
++#endif /* SUPPORT_SUPPORT_CHECK_HUGETLB_H */
+--- a/support/test-driver.c
++++ b/support/test-driver.c
+@@ -103,9 +103,19 @@
+ 
+ #include <string.h>
+ 
++#ifdef TEST_HUGETLB
++# include <support/support_check_hugetlb.h>
++#endif
++
+ int
+ main (int argc, char **argv)
+ {
++#ifdef TEST_HUGETLB
++  /* For malloc hugetlb=1/=2 test variants: skip the test (UNSUPPORTED)
++     when the kernel cannot honor the requested mode.  */
++  support_check_malloc_hugetlb ();
++#endif
++
+   struct test_config test_config;
+   memset (&test_config, 0, sizeof (test_config));
+ 

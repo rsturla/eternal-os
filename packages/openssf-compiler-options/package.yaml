@@ -17,7 +17,7 @@ schema: 2
 package:
   name: openssf-compiler-options
   version: "20261109"
-  release: 2
+  release: 4
   summary: OpenSSF compiler hardening options
   description: |
     GCC wrapper scripts and versioned spec files that apply the OpenSSF
@@ -74,6 +74,8 @@ outputs:
     files:
       license:
         - /usr/share/licenses/openssf-compiler-options/LICENSE
+    dependencies:
+      run: [coreutils, sed]
 
 tests:
   - name: layout
@@ -101,52 +103,95 @@ tests:
         "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-arch-x86_64.spec"
       grep -q -- '-mbranch-protection=standard' \
         "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-arch-aarch64.spec"
-
+      grep -q -- '-fuse-ld=bfd' \
+        "$TEST_PACKAGE_ROOT/usr/lib/eternal/gcc/openssf-arch-aarch64.spec"
   - name: default-wrapper
     packages: [gcc]
+    files: tests
     environment:
       PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     pipeline:
       - uses: test/compiler-hardening-check
         with:
           cc: cc
+      - runs: |
+          bash "$TEST_FILES/explicit-options.sh" cc openssf-default.spec
+    artifacts:
+      - explicit-options
+
+  - name: linker-selection
+    packages: [gcc, grep]
+    files: tests
+    environment:
+      PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    script: |
+      bash "$TEST_FILES/linker-selection.sh"
+    artifacts:
+      - default-driver.txt
+      - default-options.txt
+      - explicit-driver.txt
+      - explicit-options.txt
 
   - name: spec-13
-    packages: [gcc]
+    packages:
+      - gcc-13
+    files: tests
     environment:
       PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       GCC_SPEC_FILE: openssf-13.spec
     pipeline:
       - uses: test/compiler-hardening-check
         with:
-          cc: cc
+          cc: gcc-13
+      - runs: |
+          bash "$TEST_FILES/explicit-options.sh" gcc-13 openssf-13.spec openssf-soft-format-13.spec
+    artifacts:
+      - explicit-options
 
   - name: spec-14
-    packages: [gcc]
+    packages:
+      - gcc-14
+    files: tests
     environment:
       PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       GCC_SPEC_FILE: openssf-14.spec
     pipeline:
       - uses: test/compiler-hardening-check
         with:
-          cc: cc
+          cc: gcc-14
+      - runs: |
+          bash "$TEST_FILES/explicit-options.sh" gcc-14 openssf-14.spec openssf-soft-format-14.spec
+    artifacts:
+      - explicit-options
 
   - name: spec-15
-    packages: [gcc]
+    packages:
+      - gcc-15
+    files: tests
     environment:
       PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       GCC_SPEC_FILE: openssf-15.spec
     pipeline:
       - uses: test/compiler-hardening-check
         with:
-          cc: cc
+          cc: gcc-15
+      - runs: |
+          bash "$TEST_FILES/explicit-options.sh" gcc-15 openssf-15.spec openssf-soft-format-15.spec
+    artifacts:
+      - explicit-options
 
   - name: spec-16
-    packages: [gcc]
+    packages:
+      - gcc-16
+    files: tests
     environment:
       PATH: /usr/libexec/eternal/gcc/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       GCC_SPEC_FILE: openssf-16.spec
     pipeline:
       - uses: test/compiler-hardening-check
         with:
-          cc: cc
+          cc: gcc-16
+      - runs: |
+          bash "$TEST_FILES/explicit-options.sh" gcc-16 openssf-16.spec openssf-soft-format-16.spec
+    artifacts:
+      - explicit-options

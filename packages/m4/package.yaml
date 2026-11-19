@@ -46,6 +46,13 @@ build:
         outputs: [m4, m4-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+      artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: m4
     summary: GNU macro processor
@@ -53,10 +60,12 @@ outputs:
       license:
         - /usr/share/licenses/m4/COPYING
     tests:
-      - name: installed
-        packages: [bash-binsh, coreutils]
+      - name: macros
+        packages:
+          - coreutils
+        files: tests
         script: |
-          test "$(printf 'eval(2+3)\n' | m4)" = 5
+          bash "$TEST_FILES/macros.sh"
 
   - name: m4-doc
     summary: GNU macro processor documentation

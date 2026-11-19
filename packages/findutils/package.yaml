@@ -52,6 +52,13 @@ build:
         outputs: [findutils, findutils-locate, findutils-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+      artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: findutils
     summary: GNU find utilities
@@ -59,13 +66,13 @@ outputs:
       license:
         - /usr/share/licenses/findutils/COPYING
     tests:
-      - name: installed
-        packages: [bash-binsh, coreutils]
+      - name: selection-and-exec
+        packages:
+          - coreutils
+          - bash-binsh
+        files: tests
         script: |
-          mkdir -p /tmp/tree/a
-          touch /tmp/tree/a/file
-          test "$(find /tmp/tree -name file)" = /tmp/tree/a/file
-          test "$(printf 'one\ntwo\n' | xargs -n1 printf '%s,')" = one,two,
+          bash "$TEST_FILES/selection-and-exec.sh"
 
   - name: findutils-locate
     summary: findutils locate and updatedb
@@ -82,12 +89,12 @@ outputs:
       run:
         - findutils = ${package.version}-${package.release}
     tests:
-      - name: installed
-        packages: [bash-binsh, coreutils]
+      - name: database
+        packages:
+          - coreutils
+        files: tests
         script: |
-          locate --version
-          test -x /usr/bin/updatedb
-          test -x /usr/libexec/findutils/frcode
+          bash "$TEST_FILES/database.sh"
 
   - name: findutils-doc
     summary: GNU find utilities documentation

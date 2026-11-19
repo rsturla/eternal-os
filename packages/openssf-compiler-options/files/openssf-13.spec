@@ -9,19 +9,18 @@
   %{!fno-exceptions:-fexceptions} \
   %{!fno-asynchronous-unwind-tables:-fasynchronous-unwind-tables} \
   %{!gno-record-gcc-switches:-grecord-gcc-switches} \
-  -U_FORTIFY_SOURCE \
-  -D_FORTIFY_SOURCE=3 \
+  %{!O0:-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3} \
   -D_GLIBCXX_ASSERTIONS \
   -fstack-protector-strong \
   -fstack-clash-protection \
   -ftrivial-auto-var-init=zero \
-  %{!fpie:%{!fPIE:%{!fpic:%{!fPIC:%{!fno-pic:%{!fno-pie:-fPIE}}}}}} \
+  %{!fpie:%{!fPIE:%{!fpic:%{!fPIC:%{!fno-pic:%{!fno-PIC:%{!fno-pie:%{!fno-PIE:-fPIE}}}}}}}} \
   %{!fdelete-null-pointer-checks:-fno-delete-null-pointer-checks} \
   -fno-strict-overflow \
   -fno-strict-aliasing \
   %{!fomit-frame-pointer:-fno-omit-frame-pointer} \
   -mno-omit-leaf-frame-pointer \
-  %{!static:%{!shared:%{!r:-pie}}}
+  %{!static:%{!shared:%{!r:%{!no-pie:-pie}}}}
 
 *link:
 + --as-needed \

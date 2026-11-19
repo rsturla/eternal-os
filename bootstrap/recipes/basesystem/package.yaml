@@ -46,5 +46,16 @@ outputs:
 
 tests:
   - name: license
-    script: |
+    script: |-
       test -f "$TEST_PACKAGE_ROOT/usr/share/licenses/basesystem/LICENSE"
+  - name: installed-layout-closure
+    packages:
+      - bash
+      - coreutils
+    script: |
+      test -d /etc/eternal
+      test -d /usr/lib/eternal
+      test -d /usr/share/eternal
+      test -d /var/lib/eternal
+      test -L /bin
+      test "$(readlink /bin)" = usr/bin

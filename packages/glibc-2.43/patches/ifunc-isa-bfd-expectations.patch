@@ -1,0 +1,37 @@
+Backport the IFUNC test expectation condition from pinned glibc 2.44,
+c5c6fc6f449dbc95e3a68cacd61852dc0a48e57c, sysdeps/x86/Makefile.
+Makeconfig treats every nonempty test-xfail value as true, including the
+literal "no" returned by with-lld when LLD is not used. Set the expected-
+failure markers only when LLD has not been ruled out. Preserve the LLD
+expectation and all four IFUNC behavior tests.
+
+https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/x86/Makefile;hb=c5c6fc6f449dbc95e3a68cacd61852dc0a48e57c
+
+--- a/sysdeps/x86/Makefile
++++ b/sysdeps/x86/Makefile
+@@ -46,8 +46,10 @@
+ tests-static += \
+   tst-ifunc-isa-1-static \
+ # tests-static
+-test-xfail-tst-ifunc-isa-1 = $(with-lld)
+-test-xfail-tst-ifunc-isa-1-static = $(with-lld)
++ifneq (no, $(with-lld))
++test-xfail-tst-ifunc-isa-1 = yes
++test-xfail-tst-ifunc-isa-1-static = yes
++endif
+ tests += \
+   tst-ifunc-isa-2 \
+   tst-ifunc-isa-2-static \
+@@ -55,8 +57,10 @@
+ tests-static += \
+   tst-ifunc-isa-2-static \
+ # tests-static
+-test-xfail-tst-ifunc-isa-2 = $(with-lld)
+-test-xfail-tst-ifunc-isa-2-static = $(with-lld)
++ifneq (no, $(with-lld))
++test-xfail-tst-ifunc-isa-2 = yes
++test-xfail-tst-ifunc-isa-2-static = yes
++endif
+ endif
+ endif
+ ifeq (yes,$(enable-x86-isa-level))

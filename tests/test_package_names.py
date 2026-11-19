@@ -37,6 +37,10 @@ class PackageNames(unittest.TestCase):
         path.write_text(yaml.safe_dump(recipe))
         return root
 
+    def assert_problem(self, root, source, message):
+        path = root / "packages" / source / "package.yaml"
+        self.assertEqual(names.check(root), [f"{path}: {message}"])
+
     def test_versioned_modules_and_user_selectors_are_valid(self):
         self.assertEqual(names.check(self.fixture()), [])
 
@@ -50,7 +54,10 @@ class PackageNames(unittest.TestCase):
         data = yaml.safe_load(path.read_text())
         data["outputs"][0]["dependencies"]["provides"] = ["python3 = 0"]
         path.write_text(yaml.safe_dump(data))
-        self.assertTrue(names.check(root))
+        self.assert_problem(
+            root, "python-3.13",
+            "default command output must provide python3 = ${package.version}-${package.release}",
+        )
 
     def test_unversioned_module_alias_is_rejected(self):
         root = self.fixture()
@@ -58,13 +65,22 @@ class PackageNames(unittest.TestCase):
         data = yaml.safe_load(path.read_text())
         data["outputs"][0]["dependencies"] = {"provides": ["python-demo = 1-1"]}
         path.write_text(yaml.safe_dump(data))
-        self.assertTrue(names.check(root))
+        self.assert_problem(
+            root, "python-demo",
+            "Python modules must not provide the unversioned python-demo alias",
+        )
 
     def test_fedora_style_module_identity_is_rejected(self):
-        self.assertTrue(names.check(self.fixture(output="python${matrix.python.version}-demo")))
+        root = self.fixture(output="python${matrix.python.version}-demo")
+        self.assert_problem(
+            root, "python-demo", "main output must be python-${matrix.python.version}-demo",
+        )
 
     def test_missing_supported_stream_is_rejected(self):
-        self.assertTrue(names.check(self.fixture(versions=("3.14",))))
+        root = self.fixture(versions=("3.14",))
+        self.assert_problem(
+            root, "python-demo", "Python matrix must cover supported streams ['3.13', '3.14']",
+        )
 
 
 if __name__ == "__main__":

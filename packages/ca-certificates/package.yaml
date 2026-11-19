@@ -65,12 +65,13 @@ outputs:
       config:
         - /etc/ca-certificates.conf
     tests:
-      - name: installed
-        packages: [bash-binsh, coreutils, findutils]
+      - name: parse-every-trusted-root
+        packages:
+          - bash
+          - python3
+        files: tests
         script: |
-          test -n "$(find /usr/share/ca-certificates -name '*.crt' -print -quit)"
-          test -s /etc/ca-certificates.conf
-
+          python3 -I "$TEST_FILES/certificates.py" individual
   - name: ca-certificates-bundle
     summary: Concatenated Mozilla CA certificate bundle
     files:
@@ -83,10 +84,10 @@ outputs:
       license:
         - /usr/share/licenses/ca-certificates-bundle/**
     tests:
-      - name: installed
-        packages: [bash-binsh, coreutils]
+      - name: bundle-aliases-and-trust-store
+        packages:
+          - bash
+          - python3
+        files: tests
         script: |
-          test -s /etc/ssl/certs/ca-certificates.crt
-          test -s /etc/ssl/cert.pem
-          test -s /etc/pki/tls/certs/ca-bundle.crt
-          test "$(head -1 /etc/ssl/certs/ca-certificates.crt)" = "-----BEGIN CERTIFICATE-----"
+          python3 -I "$TEST_FILES/certificates.py" bundle

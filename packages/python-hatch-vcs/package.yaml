@@ -80,8 +80,8 @@ outputs:
     - python-${matrix.python.version}-hatchling
     - python-${matrix.python.version}-setuptools-scm
   tests:
-  - name: functional
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - from hatch_vcs.version_source import VCSVersionSource; assert VCSVersionSource.PLUGIN_NAME == "vcs"
+  - name: offline-behavior
+    files: tests
+    packages: ["git"]
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/check.py" "${matrix.python.version}" "hatch-vcs" "${package.version}"

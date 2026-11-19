@@ -50,6 +50,7 @@ produced by [rpmx](https://github.com/rsturla/rpmx):
 │   ├── adding-a-package.md
 │   ├── architecture.md
 │   ├── packaging.md             # house style for every recipe
+│   ├── testing.md               # installed-package and source tests
 │   └── signing.md
 ├── bootstrap/                     # dedicated seed -> self-hosted build definition
 │   ├── bootstrap.yaml              # stage graph, roots, replaces map
@@ -73,15 +74,16 @@ is written to `site/`. Both are ignored by Git.
 
 ## Quick start
 
-Requirements: Linux, Rust 1.88+, `podman`, `bubblewrap`, `dnf5` and `tar`.
+Requirements: Linux, Rust 1.88+, `podman`, `bubblewrap`, `dnf5`, `tar` and `jq`.
 Root resolution and test roots run through `podman`; build steps run through
 `bubblewrap`. `rpmx doctor` checks the host.
 
 ```console
 make bootstrap     # cargo install the pinned rpmx revision
 make doctor        # check podman/bubblewrap/dnf5
-make check         # pre-commit + lint every recipe
+make check         # pre-commit, commit checks, helper tests and recipe lint
 make build         # build only packages whose content hash changed
+make test          # run installed-package tests against existing RPMs
 make repo          # assemble site/rolling/<arch>/ with repodata
 make all           # check + build + repo
 ```
@@ -91,7 +93,7 @@ The bootstrap ladder is separate from the rolling build:
 ```console
 make bootstrap-plan                 # print stage order, roots, and seed replacements
 make bootstrap-build                # run the ladder for ARCH (default: x86_64)
-make bootstrap-build ARCH=aarch64   # cross-build the same ladder
+make bootstrap-build ARCH=aarch64   # run on native or emulated AArch64
 make bootstrap-clean                # remove root-owned bootstrap roots and locks
 ```
 
@@ -109,16 +111,22 @@ Build one package, or only the packages touched since a ref:
 ./scripts/build-all.sh --affected --since origin/main --output out
 ```
 
-Per-package artifacts land in `out/<package>/<arch>/`. Keeping package outputs
-separate matters: an installed-stage test root must not see RPMs from unrelated
-packages.
+Per-package artifacts land in `out/<package>/<arch>/`. Installed-package tests
+can use a shared candidate pool; each case installs only its selected outputs
+and declared dependencies.
+
+See [the testing guide](docs/testing.md) for strict scripts, external fixtures,
+upstream suites, isolated installed-package tests and package transaction tests.
+The guide also defines the coverage and verification required before release.
 
 ## Incremental builds
 
 Every package has a content hash over its tracked recipe, context, profiles,
-build scripts, the pinned rpmx revision, and its in-tree build dependencies
-transitively. `scripts/build-all.sh` records the hash in `out/.stamps/` and
-skips a package when the stamp matches and its RPMs are present.
+build scripts and the pinned rpmx revision. Published RPM dependencies do not
+create source rebuild edges. The Python bootstrap helper also hashes its actual
+local source dependencies, including test tools.
+`scripts/build-all.sh` records the hash and build/test policy in `out/.stamps/`.
+It skips a package when the stamp matches and its RPMs are present.
 
 `package.lock.json` files are local build metadata while the bootstrap root
 follows live Fedora. `make lock` writes them and `make lock-check` checks them,
@@ -165,7 +173,7 @@ and `scripts/package-hash.sh`; the rpmx revision comes from `.rpmx-revision`.
 Local builds and CI use the same entry points. Their resolved repository inputs
 can differ while the bootstrap repositories are mutable.
 
-The only difference is secret delivery. CI writes `RPMX_SIGNING_KEY` and
+CI supplies secrets through temporary files and environment variables. It writes `RPMX_SIGNING_KEY` and
 `RPMX_PUBLIC_KEY` to temporary files, and reads the `PACKAGES_S3_*`
 credentials and variables needed by `scripts/publish-bucket.sh`; locally, pass
 the files and environment directly:
@@ -204,9 +212,10 @@ When run as root with `dnf5`, they also test package upgrades and metadata signa
 `ci.yml` runs on pull requests and on demand. A `configure` job reads the
 target architectures, an `rpmx` job builds the pinned revision once per
 architecture, and `prepare` uses that binary to compute the package plan and
-hashes. A matrix then builds only the affected packages in parallel and
-uploads each package's artifacts; every cell unpacks the same rpmx artifact
-instead of compiling it. Lint runs first as a reusable workflow, and the
+hashes. A matrix then builds the affected packages and runs their source suites
+in parallel. A second parallel matrix runs installed-package tests against the
+same-architecture candidate pool. Every cell unpacks the same rpmx artifact
+instead of compiling it. Only passing package tests export release artifacts. Lint runs first as a reusable workflow, and the
 commits are checked against the [git workflow](docs/git-workflow.md) before
 anything is built.
 
@@ -215,12 +224,14 @@ anything is built.
 1. lint, then build rpmx once per architecture, then build **every** package in
    a matrix. Each build cell reuses the rpmx artifact, and content-addressed
    caches mean only changed packages execute `rpmx build`.
-2. A fan-in job downloads the per-package artifacts, verifies that the plan is
+2. A second matrix runs installed-package tests against the candidate RPMs.
+   Publication waits for every selected build and test job to pass.
+3. A fan-in job downloads the accepted package artifacts, verifies that the plan is
    complete, and rebuilds `repodata` into `site/rolling/<arch>/` plus
    `site/rolling/SRPMS/`. When a key is configured it signs the RPMs and
    `repomd.xml`, and writes `eternal.repo`, `RPM-GPG-KEY-eternal` and
    `.nojekyll` beside it.
-3. uploads the result to S3-compatible object storage. `rolling` is replaced;
+4. uploads the result to S3-compatible object storage. `rolling` is replaced;
    `archive` is append-only and keeps every historical EVR.
 
 Eternal is a rolling distribution: every push to `main` republishes the

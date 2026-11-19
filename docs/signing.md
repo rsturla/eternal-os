@@ -56,7 +56,9 @@ manual releases, or use `--signing-passphrase-env` locally.
 The metadata merge uses an isolated temporary GnuPG keyring. Its signing key
 must have no passphrase. The publisher verifies existing archive signatures
 with the supplied private and public keys. Include the old public key during
-rotation. A signed archive cannot receive an unsigned update.
+rotation. A signed archive cannot receive an unsigned update. Each new archive
+signature is verified before upload. An invalid signature stops publication
+before the publisher writes any objects to the bucket.
 
 ## Sign locally
 
@@ -70,6 +72,11 @@ Use the same scripts and flags as CI:
   --public-key ~/eternal-signing-key.asc.pub
 
 ```
+
+The publisher accepts binaries only at `out/<arch>/*.rpm` or
+`out/<package>/<arch>/*.rpm`, using the architectures in the distribution profile.
+Source RPMs must be directly under the corresponding `<arch>/src/` directory.
+Evidence, test reports and quarantined producer trees are excluded.
 
 To publish both channels locally, export `AWS_ACCESS_KEY_ID` and
 `AWS_SECRET_ACCESS_KEY` first (use `--endpoint-url` for R2):

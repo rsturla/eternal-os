@@ -75,8 +75,9 @@ outputs:
     license:
     - /usr/share/licenses/python-${matrix.python.version}-poetry-core/**
   tests:
-  - name: functional
-    argv:
-    - /usr/bin/python${matrix.python.version}
-    - -c
-    - from poetry.core.constraints.version import parse_constraint; assert parse_constraint("^1.2").allows_all(parse_constraint(">=1.3,<2.0"))
+  - name: behavior
+    files: tests
+    packages:
+    - python-${matrix.python.version}-installer
+    script: |
+      /usr/bin/python${matrix.python.version} -I "$TEST_FILES/test_behavior.py" "${matrix.python.version}" "poetry-core" "${package.version}"

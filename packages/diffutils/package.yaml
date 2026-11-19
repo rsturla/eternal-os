@@ -48,6 +48,13 @@ build:
         outputs: [diffutils, diffutils-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+      artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: diffutils
     summary: GNU diff utilities
@@ -55,14 +62,12 @@ outputs:
       license:
         - /usr/share/licenses/diffutils/COPYING
     tests:
-      - name: installed
-        packages: [bash-binsh, coreutils]
+      - name: comparison
+        packages:
+          - coreutils
+        files: tests
         script: |
-          printf 'a\n' > a
-          printf 'b\n' > b
-          if diff a b > /dev/null; then exit 1; fi
-          printf 'a\n' > b
-          diff a b
+          bash "$TEST_FILES/comparison.sh"
 
   - name: diffutils-doc
     summary: GNU diff utilities documentation

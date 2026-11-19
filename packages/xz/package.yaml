@@ -49,6 +49,13 @@ build:
         outputs: [xz, xz-libs, xz-devel, xz-doc]
     - uses: strip
 
+  tests:
+    - name: upstream
+      packages: [bash-binsh, coreutils, diffutils, grep, sed, gawk, perl]
+      artifacts: [test-suite.log, tests/test-suite.log, testsuite/test-suite.log]
+      pipeline:
+        - uses: make/check
+
 outputs:
   - name: xz
     summary: XZ and LZMA compression tools
@@ -68,14 +75,13 @@ outputs:
       run:
         - xz-libs = ${package.version}-${package.release}
     tests:
-      - name: installed
-        packages: [bash-binsh, coreutils]
+      - name: roundtrip
+        packages:
+          - coreutils
+          - diffutils
+        files: tests
         script: |
-          printf 'hello\n' > /tmp/file
-          xz /tmp/file
-          test -f /tmp/file.xz
-          unxz /tmp/file.xz
-          test "$(cat /tmp/file)" = hello
+          bash "$TEST_FILES/roundtrip.sh"
 
   - name: xz-libs
     summary: XZ runtime library
@@ -92,13 +98,17 @@ outputs:
         - /usr/share/licenses/xz-libs/COPYING.GPLv2
         - /usr/share/licenses/xz-libs/COPYING.LGPLv2.1
     tests:
-      - name: installed
-        packages: [bash-binsh, coreutils]
+      - name: minimal-runtime-dependencies
+        pipeline:
+          - uses: test/runtime-linkage
+            with:
+              libraries: ["liblzma.so.[0-9]*"]
+      - name: runtime
+        packages:
+          - python3
+        files: tests
         script: |
-          for lib in /usr/lib64/liblzma.so.* /usr/lib/liblzma.so.*; do
-            test -e "$lib" && exit 0
-          done
-          exit 1
+          python3 "$TEST_FILES/runtime.py"
 
   - name: xz-devel
     summary: XZ development files
@@ -117,6 +127,15 @@ outputs:
     dependencies:
       run:
         - xz-libs = ${package.version}-${package.release}
+    tests:
+      - name: compression-api
+        packages:
+          - gcc
+          - glibc-devel
+          - coreutils
+        files: tests
+        script: |
+          bash "$TEST_FILES/compression-api.sh"
 
   - name: xz-doc
     summary: XZ documentation
@@ -134,16 +153,3 @@ outputs:
         - /usr/share/licenses/xz-doc/COPYING.0BSD
         - /usr/share/licenses/xz-doc/COPYING.GPLv2
         - /usr/share/licenses/xz-doc/COPYING.LGPLv2.1
-
-tests:
-  - name: link
-    packages: [gcc, glibc-devel, bash-binsh, coreutils]
-    script: |
-      cat > /tmp/test.c <<'EOF'
-      #include <lzma.h>
-      int main(void) {
-        return lzma_version_number() != LZMA_VERSION;
-      }
-      EOF
-      gcc /tmp/test.c -llzma -o /tmp/test
-      /tmp/test
