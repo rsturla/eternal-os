@@ -33,14 +33,13 @@ repositories:
     # Adopt libarchive, librepo and libsolv together so XML consumers can use
     # Eternal's libxml2 without the Fedora libraries that require its older
     # ABI. fmt consumers also build against Eternal's ABI.
-    # Fedora CMake still needs jsoncpp ABI 26;
-    # allow that runtime while CMake itself bootstraps against Eternal's 27.
+    # CMake and its JSON library use the published Eternal ABI together.
     # Keep seed libxml2 available for bootstrap gettext tools used by ACL and
     # attr. XML consumers select Eternal's newer development package. Final
     # acceptance uses the candidate library through the distribution profile.
     # Explicit Lua stream requests can use Eternal. Seed Lua stays available
     # for bootstrap RPM libraries that still need Fedora's library name.
-    # util-linux stays on Fedora until its matching library splits are adopted.
+    # Adopt util-linux commands, libraries and development providers together.
     # Keep Eternal's system-release provider available for setup's real
     # account data. Fedora's release chain requires its newer filesystem RPM.
     exclude:
@@ -62,7 +61,6 @@ repositories:
       - libatomic-15*
       # New recipes held out of the shared root until their integration lands.
       - ca-certificates*
-      - cmake*
       - curl*
       - dnf5*
       - docbook-style-xsl*
@@ -79,12 +77,6 @@ repositories:
       - python-3.14*
       - shadow-utils*
       - toml11*
-      - util-linux*
-      - libblkid*
-      - libfdisk*
-      - libmount*
-      - libsmartcols*
-      - libuuid*
       - zchunk*
   - id: fedora
     baseurl: https://dl.fedoraproject.org/pub/fedora/linux/releases/$releasever/Everything/$basearch/os/
@@ -93,6 +85,22 @@ repositories:
     # repository instead of only using it for metadata.
     exclude:
       # Use published Eternal tools and their matching runtime libraries.
+      # Fedora libssh-devel still needs its directory-only cmake-filesystem.
+      # Remove that seed package when the curl development stack is adopted.
+      - cmake
+      - cmake-data
+      - cmake-doc
+      - cmake-gui
+      - cmake-rpm-macros
+      - jsoncpp*
+      - libuv*
+      - rhash*
+      - util-linux*
+      - libblkid*
+      - libfdisk*
+      - libmount*
+      - libsmartcols*
+      - libuuid*
       - expat*
       - bison*
       - bzip2*
@@ -178,6 +186,22 @@ repositories:
     metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch
     exclude:
       # Use published Eternal tools and their matching runtime libraries.
+      # Fedora libssh-devel still needs its directory-only cmake-filesystem.
+      # Remove that seed package when the curl development stack is adopted.
+      - cmake
+      - cmake-data
+      - cmake-doc
+      - cmake-gui
+      - cmake-rpm-macros
+      - jsoncpp*
+      - libuv*
+      - rhash*
+      - util-linux*
+      - libblkid*
+      - libfdisk*
+      - libmount*
+      - libsmartcols*
+      - libuuid*
       - expat*
       - bison*
       - bzip2*

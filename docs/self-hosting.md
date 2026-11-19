@@ -4,7 +4,7 @@ The minimal native build root and a recipe's complete build root are different
 package sets. Audit both. A profile can resolve entirely from Eternal while a
 recipe still adds Fedora tools or development libraries.
 
-## Current adoption batch
+## Tools adoption
 
 The native and distribution profiles now exclude Fedora providers for these
 published Eternal source packages:
@@ -47,11 +47,39 @@ Do not interpret a successful resolution as proof of a Fedora-free recipe.
 Check each locked package's repository origin. For a completed build,
 `rpmx provenance <binary.rpm>` exposes the exact consumed build inputs.
 
+## Build support adoption
+
+The next batch selects published Eternal CMake, jsoncpp, libuv, rhash and
+util-linux. It adopts util-linux's command, runtime and development outputs
+together. The existing development package provides the individual library
+development capabilities; it does not need Fedora's subpackage layout.
+
+Local resolution compares published main at `e3325be4` with this batch:
+
+| x86_64 package set | Packages before | Fedora before | Packages after | Fedora after |
+| --- | ---: | ---: | ---: | ---: |
+| DNF5 build dependencies | 164 | 70 | 161 | 57 |
+| GLib build dependencies | 77 | 18 | 78 | 13 |
+
+The proposed roots resolve on aarch64 with the same counts. GLib's development
+dependency now installs the matching Eternal util-linux library group, so its
+total package count increases while its Fedora count falls.
+
+Fedora's directory-only `cmake-filesystem` package remains available. The seed
+curl development stack still pulls libssh headers that require that exact
+capability. CMake's executable, data and JSON library come from Eternal. Remove
+the directory package with the curl development stack, rather than adding an
+Eternal package solely to reproduce the seed layout.
+
+Jsoncpp and GLib rebuild locally with the proposed profile. Jsoncpp's upstream
+tests and both packages' installed acceptance tests pass. A util-linux
+development consumer compiles and exercises all five libraries together.
+
 ## Next batches
 
 1. Adopt the remaining published build tools and libraries in dependency
-   groups. Prioritize CMake and its JSON libraries, util-linux's library
-   outputs, and the GLib/Meson/Ninja group. Check all runtime and development
+   groups. Next, adopt GLib, Meson and remaining headers such as toml11.
+   Check all runtime and development
    providers before excluding the seed family.
 2. Resolve the network stack together: CA certificates, OpenSSL, curl and
    nghttp2. Prefer Eternal's existing minimal feature sets. Rebuild consumers

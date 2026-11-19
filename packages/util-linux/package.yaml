@@ -209,6 +209,16 @@ outputs:
         - libmount-devel = ${package.version}-${package.release}
         - libsmartcols-devel = ${package.version}-${package.release}
         - libuuid-devel = ${package.version}-${package.release}
+    tests:
+      - name: library-consumer
+        files: tests
+        packages: [gcc, glibc-devel, pkgconf]
+        script: |
+          set -eu
+          gcc -Wall -Wextra -Werror "$TEST_FILES/libraries.c" \
+            $(pkg-config --cflags --libs blkid fdisk mount smartcols uuid) \
+            -o /tmp/util-linux-consumer
+          /tmp/util-linux-consumer
 
   - name: util-linux-doc
     summary: Documentation for util-linux
