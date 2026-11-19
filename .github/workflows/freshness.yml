@@ -1,0 +1,44 @@
+name: RPM freshness
+run-name: >-
+  ${{ github.event.pull_request.number && format('PR #{0} · RPM freshness', github.event.pull_request.number)
+      || format('{0} · RPM freshness', github.ref_name) }}
+
+on:
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+jobs:
+  freshness:
+    name: RPM freshness
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Check the candidate against the current base
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}
+          HEAD_REF: ${{ github.event.merge_group.head_ref }}
+          MERGE_GROUP: ${{ github.event_name == 'merge_group' }}
+        run: |
+          git fetch --no-tags origin "$BASE_REF"
+          BASE_SHA=$(git rev-parse FETCH_HEAD)
+          args=(--commit "$SOURCE_SHA" --base "$BASE_SHA")
+          if [ "$MERGE_GROUP" = true ]; then
+            if [[ ! "$HEAD_REF" =~ /pr-([0-9]+)- ]]; then
+              echo 'merge group does not identify its pull request' >&2
+              exit 1
+            fi
+            args+=(--pr-number "${BASH_REMATCH[1]}")
+          fi
+          python3 ./scripts/actions-build.py freshness "${args[@]}"

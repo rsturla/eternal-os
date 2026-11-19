@@ -54,7 +54,9 @@ jobs:
     uses: ./.github/workflows/_lint.yml
 
   packages:
-    if: github.event_name != 'workflow_dispatch' || inputs.phase == 'start'
+    if: >-
+      (github.event_name != 'workflow_dispatch' || inputs.phase == 'start')
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     name: Start RPM transaction
     needs: [lint, commits]
     permissions:
@@ -63,7 +65,7 @@ jobs:
       statuses: write
     uses: ./.github/workflows/_start-transaction.yml
     with:
-      base: ${{ github.event.pull_request.base.sha }}
+      base: ${{ github.event.pull_request.base.sha || 'origin/main' }}
       reuse_run: ${{ inputs.reuse_run }}
 
   wave:

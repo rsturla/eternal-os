@@ -273,6 +273,9 @@ assemble_repo() {
 }
 
 assemble_repo "$packages" "$release"
+if [[ -f "$packages/build-state.json" ]]; then
+  cp "$packages/build-state.json" "$output/$release/build-state.json"
+fi
 if [[ -n $archive_metadata ]]; then
   merge_archive
 elif [[ -n $archive_release ]]; then
