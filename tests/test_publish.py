@@ -15,6 +15,8 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 
+from test_candidate_release import ARCHES, SHA, candidate_fixture, load
+
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ('rpmx', 'rpmbuild', 'createrepo_c', 'mergerepo_c', 'modifyrepo_c', 'gpg', 'jq')
@@ -153,6 +155,60 @@ printf '%s\\n' '{version}' > %{{buildroot}}/opt/publish-test/{payload}
 
     def operations(self):
         return [json.loads(line) for line in self.log.read_text().splitlines()]
+
+    def test_promote_partial_candidate_preserves_unchanged_binaries_and_sources(self):
+        self.inputs('1', kept=True)
+        self.publish()
+        shutil.copytree(self.bucket / 'rolling/x86_64', self.bucket / 'rolling/aarch64')
+        planner = load('build-transaction')
+        baseline = {}
+        for arch in ARCHES:
+            frozen = self.work / 'baseline' / arch
+            command('mergerepo_c', '--repo', (self.bucket / 'rolling' / arch).as_uri(),
+                    '--outputdir', frozen, '--no-database', '--nogroups', '--noupdateinfo', '--compress-type=gz')
+            baseline[arch] = planner.baseline_packages(frozen)
+        tree = command('git', '-C', ROOT, 'rev-parse', 'HEAD^{tree}').strip()
+        binary = self.fixture_root / 'RPMS/noarch/publish-fixture-2-1.noarch.rpm'
+        source = self.fixture_root / 'SRPMS/publish-fixture-2-1.src.rpm'
+        candidate = candidate_fixture(self.work / 'transaction', binary, source, baseline, tree)
+        kept_bytes = (self.bucket / 'rolling/x86_64/publish-kept-1-1.noarch.rpm').read_bytes()
+        release = self.work / 'release'
+        args = ['python3', ROOT / 'scripts/transaction-artifacts.py', 'release', '--candidate', candidate,
+                '--output', release, '--source-sha', SHA, '--base-url', self.bucket.as_uri(), '--signing-key', self.key]
+        command(*args)
+        kept, = (release / '_baseline/x86_64').glob('*.rpm')
+        self.assertEqual(kept.read_bytes(), kept_bytes, 'published RPMs must remain byte-for-byte immutable')
+        signed = release / 'probe/x86_64' / binary.name
+        self.assertEqual(subprocess.check_output(['rpm2cpio', str(binary)]),
+                         subprocess.check_output(['rpm2cpio', str(signed)]))
+        self.packages = release
+        self.publish(signed=True)
+        for arch in ARCHES:
+            self.assertEqual(self.records('rolling', arch), {('publish-fixture', '2'), ('publish-kept', '1')})
+        self.assertEqual(self.records('rolling', 'SRPMS'), {('publish-fixture', '2'), ('publish-kept', '1')})
+        state = json.loads((self.bucket / 'rolling/build-state.json').read_text())
+        self.assertEqual(state['candidate_commit'], SHA)
+        self.assertEqual(state['tree'], tree)
+        # Reusing the same candidate keeps existing signatures and exact RPM bytes.
+        retry = self.work / 'retry-release'
+        args[args.index('--output') + 1] = retry
+        command(*args)
+        self.assertEqual((retry / 'probe/x86_64' / binary.name).read_bytes(), signed.read_bytes())
+        # A change outside the candidate's replaced families makes it stale.
+        rolling = self.bucket / 'rolling/x86_64'
+        metadata = planner.primary(rolling)
+        for package in metadata:
+            if package.findtext('{*}name') == 'publish-kept':
+                package.find('{*}checksum').text = '0' * 64
+        changed = self.work / 'changed-primary.xml'
+        ET.ElementTree(metadata).write(changed, encoding='utf-8', xml_declaration=True)
+        command('modifyrepo_c', '--mdtype', 'primary', '--compress', '--compress-type=gz',
+                '--unique-md-filenames', changed, rolling / 'repodata')
+        args[args.index('--output') + 1] = self.work / 'stale-release'
+        result = subprocess.run(list(map(str, args)), capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('published baseline moved', result.stderr)
+        self.assertFalse((self.work / 'stale-release').exists())
 
     def test_incremental_archive_and_rolling_selection(self):
         self.inputs('1', kept=True)

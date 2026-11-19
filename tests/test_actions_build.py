@@ -193,6 +193,99 @@ class SnapshotReuse(unittest.TestCase):
                 ACTIONS.restore(args)
             outputs.assert_called_once_with({'restored': True})
 
+    def test_new_pr_can_reuse_the_exact_merged_main_tree(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            args = self.args(Path(temporary))
+            args.run, args.previous_sha, args.base, args.pr_number = None, None, 'origin/main', 99
+
+            def api(path, **kwargs):
+                if path.endswith('/pulls'):
+                    return [{'head': {'sha': SHA}}]
+                if path.startswith('actions/workflows/ci.yml/runs?'):
+                    return {'workflow_runs': [self.api('actions/runs/13')]}
+                return self.api(path, **kwargs)
+
+            def download(run, name, destination, indexes):
+                self.download(run, name, destination, indexes)
+                if name.startswith('transaction-w'):
+                    path = destination / 'state.json'
+                    state = json.loads(path.read_text())
+                    state['tree'] = 'c' * 40
+                    path.write_text(json.dumps(state))
+
+            with patch.object(ACTIONS, 'api', side_effect=api), \
+                    patch.object(ACTIONS, 'download', side_effect=download), \
+                    patch.object(ACTIONS.subprocess, 'check_output', return_value='c' * 40), \
+                    patch.object(ACTIONS.subprocess, 'run'), patch.object(ACTIONS, 'outputs') as outputs:
+                ACTIONS.restore(args)
+            outputs.assert_called_once_with({'restored': True})
+
+
+class CandidateSelection(unittest.TestCase):
+    def test_string_outputs_are_literal_and_collections_remain_json(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'outputs'
+            with patch.dict(os.environ, GITHUB_OUTPUT=str(output)):
+                ACTIONS.outputs({'source_sha': SHA, 'packages': ['a'], 'skip': False})
+            self.assertEqual(output.read_text(), f'source_sha={SHA}\npackages=["a"]\nskip=false\n')
+
+    def args(self):
+        return argparse.Namespace(commit='b' * 40, run=13, pr_number=None)
+
+    def api(self, path, body=None):
+        if path == 'actions/runs/13':
+            return {'id': 13, 'path': '.github/workflows/ci.yml', 'repository': {'full_name': 'owner/repo'},
+                    'status': 'completed', 'conclusion': 'success', 'head_sha': SHA}
+        if path.endswith('/pulls'):
+            return [{'head': {'sha': SHA}}]
+        if path.startswith('actions/workflows/ci.yml/runs?'):
+            return {'workflow_runs': [self.api('actions/runs/13')] if SHA in path else []}
+        if path.startswith('actions/runs/13/artifacts?'):
+            return {'artifacts': [{'name': 'release-candidate', 'expired': False}]}
+        if path.startswith('commits/'):
+            return {'commit': {'tree': {'sha': 'c' * 40}}}
+        raise AssertionError(path)
+
+    def test_successful_candidate_survives_rebase_with_the_same_tree(self):
+        with patch.dict(os.environ, GITHUB_REPOSITORY='owner/repo'), \
+                patch.object(ACTIONS, 'api', side_effect=self.api), patch.object(ACTIONS, 'outputs') as outputs:
+            ACTIONS.candidate(self.args())
+        outputs.assert_called_once_with({'run': 13, 'source_sha': SHA, 'skip': False})
+
+    def test_merged_pr_discovers_its_original_head_artifacts(self):
+        args = self.args()
+        args.run = None
+        with patch.dict(os.environ, GITHUB_REPOSITORY='owner/repo'), \
+                patch.object(ACTIONS, 'api', side_effect=self.api), patch.object(ACTIONS, 'outputs') as outputs:
+            ACTIONS.candidate(args)
+        outputs.assert_called_once_with({'run': 13, 'source_sha': SHA, 'skip': False})
+
+    def test_expired_wrong_tree_failed_and_other_workflow_runs_cannot_release(self):
+        for error in ('expired', 'tree', 'failed', 'workflow', 'repository'):
+            def api(path, body=None):
+                result = self.api(path, body)
+                if error == 'expired' and '/artifacts?' in path:
+                    result['artifacts'][0]['expired'] = True
+                if error == 'tree' and path == f'commits/{SHA}':
+                    result['commit']['tree']['sha'] = 'd' * 40
+                if path == 'actions/runs/13':
+                    if error == 'failed': result['conclusion'] = 'failure'
+                    if error == 'workflow': result['path'] = '.github/workflows/other.yml'
+                    if error == 'repository': result['repository']['full_name'] = 'fork/repo'
+                return result
+            with self.subTest(error=error), patch.dict(os.environ, GITHUB_REPOSITORY='owner/repo'), \
+                    patch.object(ACTIONS, 'api', side_effect=api), patch.object(ACTIONS, 'outputs') as outputs:
+                with self.assertRaisesRegex(ValueError, 'no accepted candidate'):
+                    ACTIONS.candidate(self.args())
+                outputs.assert_not_called()
+
+    def test_reviewed_fork_sha_cannot_move_before_import(self):
+        pull = {'state': 'open', 'base': {'repo': {'full_name': 'owner/repo'}}, 'head': {'sha': SHA}}
+        with patch.dict(os.environ, GITHUB_REPOSITORY='owner/repo'), patch.object(ACTIONS, 'api', return_value=pull) as api:
+            with self.assertRaisesRegex(ValueError, 'moved since review'):
+                ACTIONS.import_pr(argparse.Namespace(number=42, sha='b' * 40))
+        self.assertEqual(api.call_count, 1)
+
 
 if __name__ == '__main__':
     unittest.main()

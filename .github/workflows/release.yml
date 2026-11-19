@@ -5,38 +5,27 @@ on:
     branches: [main]
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      candidate_run:
+        description: Successful CI run with the accepted candidate. Empty discovers the merged PR.
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: package-repository
   cancel-in-progress: false
 
 jobs:
-  lint:
-    name: Lint
-    uses: ./.github/workflows/_lint.yml
-
-  packages:
-    name: Packages
-    needs: lint
-    uses: ./.github/workflows/_build-packages.yml
-    with:
-      selection: all
-      sign: true
-    secrets: inherit
-
   repository:
     name: Repository
-    needs: packages
-    # All refs publish to the same rolling and archive prefixes.
-    concurrency:
-      group: package-repository
-      cancel-in-progress: false
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-26.04
     permissions:
       contents: read
+      actions: read
+      pull-requests: read
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.PACKAGES_S3_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.PACKAGES_S3_SECRET_ACCESS_KEY }}
@@ -46,39 +35,36 @@ jobs:
       PACKAGES_BASE_URL: ${{ vars.PACKAGES_BASE_URL || 'https://packages.eternal.sturla.tech' }}
       RPMX_SIGNING_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
       RPMX_PUBLIC_KEY: ${{ secrets.RPMX_PUBLIC_KEY }}
-      PACKAGES: ${{ needs.packages.outputs.packages }}
-      ARCHES: ${{ needs.packages.outputs.arches }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Setup rpmx
-        uses: ./.github/actions/setup-rpmx
+      - name: Locate accepted candidate
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.sha }}
+          CANDIDATE_RUN: ${{ inputs.candidate_run }}
+        run: |
+          args=(--commit "$TARGET_SHA")
+          if [ -n "$CANDIDATE_RUN" ]; then args+=(--run "$CANDIDATE_RUN"); fi
+          python3 ./scripts/actions-build.py candidate "${args[@]}"
 
-      - name: Download packages
+      - name: Download accepted candidate
+        if: steps.candidate.outputs.skip != 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: rpm-*
-          path: out
-          merge-multiple: true
+          name: release-candidate
+          run-id: ${{ steps.candidate.outputs.run }}
+          github-token: ${{ github.token }}
+          path: .work/candidate
 
-      - name: Verify the plan is complete
-        run: |
-          mapfile -t planned < <(jq -r '.[]' <<<"$PACKAGES")
-          mapfile -t arches < <(jq -r '.[]' <<<"$ARCHES")
-          missing=0
-          for package in "${planned[@]}"; do
-            for arch in "${arches[@]}"; do
-              if ! compgen -G "out/$package/$arch/*.rpm" >/dev/null; then
-                echo "missing artifacts for $package on $arch" >&2
-                missing=1
-              fi
-            done
-          done
-          ((missing == 0)) || exit 1
-          echo "all ${#planned[@]} packages downloaded for ${arches[*]}"
+      - name: Setup rpmx
+        if: steps.candidate.outputs.skip != 'true'
+        uses: ./.github/actions/setup-rpmx
 
       - name: Write keys
+        if: steps.candidate.outputs.skip != 'true'
         env:
           PRIVATE_KEY: ${{ secrets.RPMX_SIGNING_KEY }}
           PUBLIC_KEY: ${{ secrets.RPMX_PUBLIC_KEY }}
@@ -93,8 +79,26 @@ jobs:
             chmod 0644 "$RUNNER_TEMP/signing/rpmx.asc.pub"
           fi
 
-      - name: Publish repository
+      - name: Prepare signed release without rebuilding
+        if: steps.candidate.outputs.skip != 'true'
+        env:
+          SOURCE_SHA: ${{ steps.candidate.outputs.source_sha }}
         run: |
+          args=(--candidate .work/candidate --output out --source-sha "$SOURCE_SHA"
+            --base-url "$PACKAGES_BASE_URL")
+          if [ -f "$RUNNER_TEMP/signing/rpmx.asc" ]; then
+            args+=(--signing-key "$RUNNER_TEMP/signing/rpmx.asc")
+          fi
+          python3 ./scripts/transaction-artifacts.py release "${args[@]}"
+
+      - name: Publish repository
+        if: steps.candidate.outputs.skip != 'true'
+        run: |
+          current=$(git ls-remote origin refs/heads/main)
+          if [ "${current%%$'\t'*}" != "$(git rev-parse HEAD)" ]; then
+            echo 'main moved; publish its newer candidate instead' >&2
+            exit 1
+          fi
           args=(--packages out --output site --release rolling --archive archive
             --bucket "$PACKAGES_S3_BUCKET"
             --region "$AWS_DEFAULT_REGION"
@@ -109,3 +113,7 @@ jobs:
             args+=(--public-key "$RUNNER_TEMP/signing/rpmx.asc.pub")
           fi
           ./scripts/publish-bucket.sh "${args[@]}"
+
+      - name: Remove signing keys
+        if: always()
+        run: rm -f "$RUNNER_TEMP/signing/rpmx.asc" "$RUNNER_TEMP/signing/rpmx.asc.pub"

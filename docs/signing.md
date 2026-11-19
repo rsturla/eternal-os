@@ -2,7 +2,8 @@
 
 Eternal signs packages and repository metadata with OpenPGP. `rpmx` never
 stores or discovers keys: every signing operation takes an explicit key file.
-CI reads the key from repository secrets.
+Only the release job reads the key from repository secrets. PR workers export unsigned candidates.
+Release verifies acceptance and source identity before it signs those RPMs, without recompilation.
 
 Signing is optional in the workflows so a fork builds immediately. A production
 repository must be signed before it is announced.
@@ -34,7 +35,7 @@ Add them under **Settings → Secrets and variables → Actions**. The release
 workflow:
 
 1. writes `RPMX_SIGNING_KEY` to a mode-0600 temporary file;
-2. passes it to `rpmx build --signing-key` and `rpmx repo --signing-key`, then
+2. passes it to `rpmx sign --signing-key` for accepted RPMs and `rpmx repo --signing-key`, then
    imports it into a temporary GnuPG keyring to sign the merged archive index;
 3. publishes `RPMX_PUBLIC_KEY` as `RPM-GPG-KEY-eternal`;
 4. writes `gpgcheck=1` into the published `eternal.repo`;

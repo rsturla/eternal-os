@@ -261,4 +261,8 @@ if [[ -d "$output/$archive/SRPMS/repodata" ]]; then
     "$bucket_uri/$archive/SRPMS/repodata"
 fi
 
+if [[ -f "$output/$release/build-state.json" ]]; then
+  upload_file "$output/$release/build-state.json" "$release/build-state.json" 'no-cache'
+fi
+
 echo "published $release and $archive to $bucket_uri"

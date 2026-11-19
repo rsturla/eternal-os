@@ -220,7 +220,8 @@ def build_inputs(tree, package):
     transport and export scripts do not change that execution. Everything else
     in scripts/ remains an input, so new or unknown build helpers fail closed.
     """
-    scheduling = {'scripts/actions-build.py', 'scripts/build-waves.py', 'scripts/transaction-artifacts.py'}
+    scheduling = {'scripts/actions-build.py', 'scripts/build-waves.py', 'scripts/transaction-artifacts.py',
+                  'scripts/publish-repo.sh', 'scripts/publish-bucket.sh'}
     paths = [f'packages/{package}', 'packages/openssf-compiler-options', 'profiles',
              'scripts', '.rpmx-revision', 'rpmx-defaults.yaml']
     entries = capture('git', '-C', ROOT, 'ls-tree', '-rz', tree, '--', *paths)

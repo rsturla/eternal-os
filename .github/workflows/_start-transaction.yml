@@ -29,12 +29,14 @@ jobs:
         id: restore
         env:
           REUSE_RUN: ${{ inputs.reuse_run }}
+          BASE_REF: ${{ inputs.base }}
           PREVIOUS_SHA: ${{ github.event.before }}
           SOURCE_REF: ${{ github.event.pull_request.head.ref || github.ref }}
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
           GH_TOKEN: ${{ github.token }}
         run: |
           args=(--ref "$SOURCE_REF")
+          if [ -n "$BASE_REF" ]; then args+=(--base "$BASE_REF"); fi
           if [ -n "$PR_NUMBER" ]; then args+=(--pr-number "$PR_NUMBER"); fi
           if [ -n "$REUSE_RUN" ]; then args+=(--run "$REUSE_RUN");
           elif [ -n "$PREVIOUS_SHA" ]; then args+=(--previous-sha "$PREVIOUS_SHA"); fi
@@ -61,7 +63,8 @@ jobs:
             if [ -n "$BASE_REF" ]; then selection+=(--base "$BASE_REF"); fi
             packages=$(./scripts/affected.sh "${selection[@]}")
             python3 ./scripts/build-transaction.py init --state .work/transaction/state.json \
-              --packages "$packages" --base-url "$PACKAGES_BASE_URL" --build-release "$(date -u +%s)"
+              --packages "$packages" --base-url "$PACKAGES_BASE_URL" \
+              --published "$PACKAGES_BASE_URL/rolling" --build-release "$(date -u +%s)"
           fi
           python3 ./scripts/actions-build.py init "${args[@]}"
           if [ "$RESTORED" = true ] && jq -e '.pending == []' .work/transaction/state.json >/dev/null; then

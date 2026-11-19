@@ -71,7 +71,10 @@ def save(directory, context):
 def outputs(values):
     with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
         for name, value in values.items():
-            stream.write(f'{name}={json.dumps(value, separators=(",", ":"))}\n')
+            encoded = value if isinstance(value, str) else json.dumps(value, separators=(',', ':'))
+            if '\n' in encoded or '\r' in encoded:
+                raise ValueError('workflow outputs must fit on one line')
+            stream.write(f'{name}={encoded}\n')
 
 
 def initialise(args):
@@ -97,8 +100,12 @@ def restore(args):
             raise ValueError('invalid previous commit SHA')
         runs = api(f'actions/runs?head_sha={args.previous_sha}&status=success&per_page=100')['workflow_runs']
     else:
-        outputs({'restored': False})
-        return
+        runs = []
+    if not args.run and getattr(args, 'base', None):
+        base_sha = subprocess.check_output(['git', 'rev-parse', args.base], text=True).strip()
+        for pull in api(f'commits/{base_sha}/pulls'):
+            sha = pull['head']['sha']
+            runs.extend(api(f'actions/workflows/ci.yml/runs?head_sha={sha}&status=success&per_page=100')['workflow_runs'])
     for run in runs:
         if run['status'] != 'completed' or run['conclusion'] != 'success':
             continue
@@ -120,15 +127,20 @@ def restore(args):
             source = Path(temporary) / 'transaction'
             download(run['id'], name, source, indexes)
             state, context = read(source)
+            same_pr = (context['source_ref'].removeprefix('refs/heads/') == args.ref.removeprefix('refs/heads/')
+                       and context.get('pr_number') == args.pr_number)
+            base = getattr(args, 'base', None)
+            merged_base = base and state.get('tree') == subprocess.check_output(
+                ['git', 'rev-parse', f'{base}^{{tree}}'], text=True).strip()
             if (state['commit'] != run['head_sha'] or context['source_sha'] != state['commit']
-                    or context['source_ref'].removeprefix('refs/heads/') != args.ref.removeprefix('refs/heads/')
-                    or context.get('pr_number') != args.pr_number):
-                raise ValueError('reused artifacts belong to another source or pull request')
+                    or not (same_pr or merged_base)):
+                if args.run:
+                    raise ValueError('reused artifacts belong to another source or pull request')
+                continue
             if state['pending']:
                 if args.run:
                     raise ValueError('requested reuse transaction has not settled')
-                outputs({'restored': False})
-                return
+                continue
             shutil.copytree(source, args.output)
         subprocess.run(['git', 'fetch', '--no-tags', 'origin', state['commit']], check=True)
         download(run['id'], 'candidate-pool', args.artifacts, indexes)
@@ -137,6 +149,68 @@ def restore(args):
     if args.run:
         raise ValueError('requested run has no complete candidate snapshot')
     outputs({'restored': False})
+
+
+def candidate(args):
+    """Locate successful CI evidence for exactly the target tree, including rebases."""
+    target = api(f'commits/{args.commit}')['commit']['tree']['sha']
+    if args.run:
+        runs = [api(f'actions/runs/{args.run}')]
+        sources = None
+    else:
+        pulls = ([api(f'pulls/{args.pr_number}')] if args.pr_number
+                 else api(f'commits/{args.commit}/pulls'))
+        sources = {pull['head']['sha'] for pull in pulls}
+        sources.add(args.commit)
+        runs = []
+        for sha in sorted(sources):
+            runs.extend(api(f'actions/workflows/ci.yml/runs?head_sha={sha}&status=success&per_page=100')['workflow_runs'])
+    for run in sorted(runs, key=lambda run: run['id'], reverse=True):
+        if (run['status'] != 'completed' or run['conclusion'] != 'success'
+                or run['path'] != '.github/workflows/ci.yml'
+                or run['repository']['full_name'] != os.environ['GITHUB_REPOSITORY']
+                or (sources is not None and run['head_sha'] not in sources)):
+            continue
+        if api(f'commits/{run["head_sha"]}')['commit']['tree']['sha'] != target:
+            continue
+        artifacts = api(f'actions/runs/{run["id"]}/artifacts?name=release-candidate&per_page=100')['artifacts']
+        if any(item['name'] == 'release-candidate' and not item['expired'] for item in artifacts):
+            outputs({'run': run['id'], 'source_sha': run['head_sha'], 'skip': False})
+            return
+    # A successful empty transaction needs no repository publication.
+    if not args.run:
+        for sha in sorted(sources):
+            if api(f'commits/{sha}')['commit']['tree']['sha'] != target:
+                continue
+            statuses = api(f'commits/{sha}/status')['statuses']
+            latest = next((status for status in statuses if status['context'] == 'RPM transaction'), None)
+            if latest and latest['state'] == 'success' and latest['description'] == 'No RPM changes':
+                outputs({'skip': True})
+                return
+    raise ValueError('no accepted candidate matches the target tree; refresh PR CI before release')
+
+
+def freshness(args):
+    """Require the PR source to contain the current base before its RPMs can land."""
+    subprocess.run(['git', 'merge-base', '--is-ancestor', args.base, args.commit], check=True)
+    if args.pr_number:
+        candidate(args)
+
+
+def import_pr(args):
+    """Mirror explicitly reviewed fork code into a branch with dispatch permission."""
+    pull = api(f'pulls/{args.number}')
+    if pull['state'] != 'open' or pull['base']['repo']['full_name'] != os.environ['GITHUB_REPOSITORY']:
+        raise ValueError('pull request must be open and target this repository')
+    head = pull['head']
+    if head['sha'] != args.sha:
+        raise ValueError('pull request moved since review; supply its reviewed SHA')
+    if not re.fullmatch('[0-9a-f]{40}', args.sha):
+        raise ValueError('invalid reviewed commit SHA')
+    # Creating a ref never checks out or runs code from the fork.
+    branch = f'codex/reviewed-pr-{args.number}-{args.sha[:12]}'
+    api('git/refs', {'ref': 'refs/heads/' + branch, 'sha': args.sha})
+    print(f'Reviewed branch: {branch}\nStart: gh workflow run ci.yml --ref {branch} -f pr_number={args.number}')
 
 
 def describe(args):
@@ -217,10 +291,25 @@ def main():
             command.add_argument('--previous-sha')
             command.add_argument('--ref', required=True)
             command.add_argument('--pr-number', type=int)
+            command.add_argument('--base', help='Allow a settled candidate with the exact merged base tree')
             command.add_argument('--output', type=Path, default=Path('.work/previous'))
             command.add_argument('--artifacts', type=Path, default=Path('.work/candidates'))
         if name == 'sources':
             command.add_argument('--artifacts', type=Path, default=Path('.work/candidates'))
+    command = commands.add_parser('candidate')
+    command.add_argument('--commit', required=True)
+    command.add_argument('--run', type=int)
+    command.add_argument('--pr-number', type=int)
+    command.set_defaults(function=candidate)
+    command = commands.add_parser('freshness')
+    command.add_argument('--commit', required=True)
+    command.add_argument('--base', required=True)
+    command.add_argument('--pr-number', type=int)
+    command.set_defaults(function=freshness, run=None)
+    command = commands.add_parser('import-pr')
+    command.add_argument('--number', type=int, required=True)
+    command.add_argument('--sha', required=True, help='Exact fork head SHA that a maintainer reviewed')
+    command.set_defaults(function=import_pr)
     command = commands.add_parser('status')
     command.add_argument('--sha', required=True)
     command.add_argument('--result', choices=['success', 'failure'], required=True)

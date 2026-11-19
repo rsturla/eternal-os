@@ -8,8 +8,7 @@ The transaction publishes an `RPM transaction` commit status. It stays pending
 across worker runs and passes only after the dependency closure settles, all
 installed tests pass against the final repository, and the tested candidate is
 uploaded. The initial CI run starting successfully does not mean the RPM
-transaction has passed. Repository protection should require this status when
-this workflow lands.
+transaction has passed. Repository protection requires this status and `RPM freshness`, with up-to-date branches.
 
 Each CI continuation dispatch calls `_build-wave.yml` to execute one wave.
 Its dynamic package matrix calls `_build-package.yml`, which creates one SRPM and the root locks
@@ -72,7 +71,8 @@ checks archive hashes, and reports the aggregate commit status. It refuses to
 continue after the source branch moves. A new PR commit starts a new transaction.
 
 On a PR update, the adapter looks for a settled candidate snapshot from the
-previous commit. A manual start can select a completed build with `reuse_run`.
+previous commit. A new PR can reuse a settled snapshot whose tree exactly matches
+its merged main base. The adapter discovers that snapshot through the merged PR. A manual start can select a completed build with `reuse_run`.
 The shared `build-transaction.py reuse` operation verifies the old commit/tree,
 baseline metadata, binary inventories and checksums. It compares tracked recipe,
 context, profile, defaults, compiler-policy, rpmx and execution-script inputs.
@@ -107,18 +107,57 @@ keeping the shared operations, snapshots, and package workers. It does not
 need to interpret GitHub job outputs to calculate dependencies.
 
 The dispatcher needs Actions and commit-status write permission. Fork PR tokens
-do not have these permissions; this workflow does not use `pull_request_target`
-to run fork code with a write token. Fork builds need a separate trusted trigger
-or the local adapter.
+cannot dispatch workers. Fork PRs still run lint, commit and freshness checks.
+A maintainer can mirror an explicitly reviewed fork SHA into the main repository:
 
-## Rollout and publication
+```console
+GITHUB_REPOSITORY=rsturla/eternal-os python3 scripts/actions-build.py import-pr \
+  --number 123 --sha <reviewed-40-character-head-sha>
+```
 
-This draft changes PR execution. Release still calls the previous build path,
-in `_build-packages.yml`, so replacing PR scheduling does not change
-publication before candidate promotion has been connected and tested. The new
-workers do not receive signing or repository credentials. Candidate promotion,
-merge-queue freshness checks, and release-path replacement remain rollout work
-for this changeset.
+The command creates a branch without checking out or executing fork code. It
+prints the manual CI command, including the original PR number. A moved fork
+head requires a new review SHA. Workers receive no signing or repository keys.
+The local adapter remains available for builds without GitHub dispatch.
+
+## Publication
+
+`release.yml` promotes the accepted candidate from the merged PR. It does not
+call the old parallel build matrix. Rebase merges change commit IDs, so the
+adapter compares Git trees and locates the original PR head's successful CI run.
+The shared `transaction-artifacts.py release` command verifies the candidate
+inventory, RPM checksums, source manifests and final acceptance repository on
+every production architecture. It rejects a different tree or rpmx revision.
+
+Release preparation retains unchanged published binary and source RPMs. It
+rejects changed baseline packages outside the candidate's replaced source
+families. It then signs RPMs without recompilation. The publisher uploads RPMs
+before metadata indexes and writes `rolling/build-state.json` last. The build
+state records the merged commit, original candidate commit and recipe hashes.
+Only one release can publish at a time. A release stops if main has moved before
+publication. Signing and storage credentials exist only in the release job.
+
+For a retry on main, `workflow_dispatch` accepts an optional `candidate_run`.
+The same tree, acceptance and baseline checks apply. Missing or expired candidates
+fail instead of rebuilding implicitly. A successful transaction with no RPM
+changes skips publication. Candidate retention remains 14 days; intermediate
+snapshots expire after seven days. These transaction artifacts need no R2 side
+repositories or R2 cleanup tasks.
+
+## Merge freshness
+
+`RPM freshness` requires the PR head to contain the current base commit. Rebase
+an outdated branch and rerun CI. The planner can reuse unchanged build inputs,
+but all retained packages run acceptance against the refreshed final repository.
+Require `Commits`, `Lint / Lint`, `RPM transaction` and `RPM freshness`, with strict
+up-to-date checks in branch protection.
+
+The freshness workflow also handles `merge_group`. It requires a successful
+candidate whose tree exactly matches the merge group's tree, including current
+main. Configure one PR per merge group when a merge queue becomes available.
+A changed group tree requires refreshed PR CI; it cannot pass with stale artifacts.
+GitHub merge queues currently require an organisation-owned repository, so this
+personally owned repository uses strict branch protection instead.
 
 ## OpenSSL bootstrap follow-up
 

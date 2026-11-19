@@ -184,6 +184,8 @@ install -m 0644 LICENSE "$STAGE/usr/share/licenses/{package}/LICENSE"
         manifest = json.loads((candidate / 'candidate.json').read_text())
         for name, expected in manifest['files'].items():
             self.assertEqual(hashlib.sha256((candidate / name).read_bytes()).hexdigest(), expected)
+        exported = load(project, 'transaction-artifacts')
+        exported.verify_candidate(candidate, state['tree'], state['commit'])
 
         # A new commit changes only D. Keep A/B/C's exact source records and
         # binaries, rebuild D, then accept all four against the new repository.
