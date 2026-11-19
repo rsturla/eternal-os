@@ -25,6 +25,22 @@ repositories:
     # Exact Fedora names can otherwise override versioned Eternal providers.
     exclude:
       # Use published Eternal tools and their matching runtime libraries.
+      # Fedora libssh-devel still needs its directory-only cmake-filesystem.
+      # Remove that seed package when the curl development stack is adopted.
+      - cmake
+      - cmake-data
+      - cmake-doc
+      - cmake-gui
+      - cmake-rpm-macros
+      - jsoncpp*
+      - libuv*
+      - rhash*
+      - util-linux*
+      - libblkid*
+      - libfdisk*
+      - libmount*
+      - libsmartcols*
+      - libuuid*
       - expat*
       - bison*
       - bzip2*
@@ -111,6 +127,22 @@ repositories:
     metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f44&arch=$basearch
     exclude:
       # Use published Eternal tools and their matching runtime libraries.
+      # Fedora libssh-devel still needs its directory-only cmake-filesystem.
+      # Remove that seed package when the curl development stack is adopted.
+      - cmake
+      - cmake-data
+      - cmake-doc
+      - cmake-gui
+      - cmake-rpm-macros
+      - jsoncpp*
+      - libuv*
+      - rhash*
+      - util-linux*
+      - libblkid*
+      - libfdisk*
+      - libmount*
+      - libsmartcols*
+      - libuuid*
       - expat*
       - bison*
       - bzip2*
