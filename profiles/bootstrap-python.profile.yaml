@@ -40,7 +40,6 @@ repositories:
   - autoconf*
   - automake*
   - bison*
-  - bzip2*
   - ca-certificates*
   - cmake*
   - curl*
@@ -96,6 +95,9 @@ repositories:
 - id: fedora
   baseurl: https://dl.fedoraproject.org/pub/fedora/linux/releases/$releasever/Everything/$basearch/os/
   exclude:
+  # Rebuilt Eternal interpreters require the upstream bzip2 SONAME. Its runtime
+  # also provides the .so.1 alias needed by the Fedora seed interpreter.
+  - bzip2*
   # Eternal Python streams require the adopted glibc 2.44 ABI.
   - glibc*
   - zstd*
@@ -122,6 +124,7 @@ repositories:
 - id: updates
   metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch
   exclude:
+  - bzip2*
   # Eternal Python streams require the adopted glibc 2.44 ABI.
   - glibc*
   - zstd*

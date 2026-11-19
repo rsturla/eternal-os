@@ -13,6 +13,11 @@ published Eternal source packages:
 - json-c, libunistring, m4, ninja and popt;
 - readline, scdoc, sqlite and tzdata.
 
+The Python seed profile also adopts Eternal bzip2. Rebuilt Eternal interpreters
+require its upstream `libbz2.so.1.0` SONAME. Its tested `libbz2.so.1` alias
+supports the Fedora seed interpreter in the same root. Keep this runtime
+available while the remaining Python seed dependencies stay separate.
+
 Keep each library's runtime and development outputs together. The `file`
 exclusions use `file` and `file-*` so that they do not exclude `filesystem`.
 Use Eternal's existing package names and capability providers. Adoption does
