@@ -7,7 +7,7 @@ schema: 2
 package:
   name: expat
   version: "2.10.0"
-  release: 1
+  release: 2
   summary: XML parser library
   description: |
     Expat is a stream-oriented XML parser library written in C.
@@ -39,6 +39,7 @@ build:
       with:
         args:
           - --disable-static
+          - --enable-symbol-versioning
           - --without-docbook
           - --without-examples
     - uses: make/build
@@ -112,6 +113,8 @@ tests:
     script: |
       cat > /tmp/test.c <<'EOF'
       #include <expat.h>
+      /* Consumers built with the bootstrap library use versioned symbols. */
+      __asm__(".symver XML_ParserCreate,XML_ParserCreate@LIBEXPAT_1.0.0");
       int main(void) {
         XML_Parser parser = XML_ParserCreate(0);
         if (parser == 0) return 1;
