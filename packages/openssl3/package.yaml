@@ -5,7 +5,7 @@ schema: 2
 package:
   name: openssl3
   version: 3.5.9
-  release: 1
+  release: 2
   summary: TLS tools and cryptographic libraries
   description: TLS tools and cryptographic libraries.
   license: Apache-2.0
@@ -36,7 +36,9 @@ build:
   - perl
   pipeline:
   - runs: |
-      perl ./Configure --prefix="$PREFIX" --libdir="$LIBDIR" --openssldir=/etc/ssl shared no-comp no-zlib no-ssl3 no-weak-ssl-ciphers enable-pie
+      # Keep COMP_* APIs for bootstrap consumers built against seed headers.
+      # Disable all compression backends.
+      perl ./Configure --prefix="$PREFIX" --libdir="$LIBDIR" --openssldir=/etc/ssl shared no-brotli no-zstd no-zlib no-ssl3 no-weak-ssl-ciphers enable-pie
   - uses: make/build
   - uses: make/build
     with:
@@ -121,7 +123,15 @@ outputs:
     script: |
       cat > /tmp/test.c <<'EOF'
       #include <openssl/ssl.h>
-      int main(void) { SSL_CTX *ctx = SSL_CTX_new(TLS_method()); if (!ctx) return 1; SSL_CTX_free(ctx); return 0; }
+      #include <openssl/comp.h>
+      #include <openssl/objects.h>
+      int main(void) {
+        if (COMP_get_type(COMP_zlib()) != NID_undef) return 1;
+        SSL_CTX *ctx = SSL_CTX_new(TLS_method());
+        if (!ctx) return 1;
+        SSL_CTX_free(ctx);
+        return 0;
+      }
       EOF
       gcc /tmp/test.c $(pkg-config --cflags --libs openssl) -o /tmp/test
       /tmp/test
