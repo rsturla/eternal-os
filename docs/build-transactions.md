@@ -169,6 +169,8 @@ recipe disables compression APIs and all zlib, zstd and Brotli backends.
 The profile also selects Eternal's CA certificates and installs
 `ca-certificates-bundle`. Fedora's certificate package is excluded because it
 also owns OpenSSL configuration files supplied by Eternal's `openssl3-libs`.
+Eternal's curl and nghttp2 packages supply the matching HTTP client stack.
+Seed CMake can use Eternal's libcurl without requiring Fedora's OpenSSL RPM.
 
 Seed-only profiles keep their matching seed OpenSSL for build tools. They do
 not supply development headers to native OpenSSL consumers. Final acceptance

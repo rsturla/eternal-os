@@ -28,7 +28,7 @@ repositories:
     #
     # The recipes added in the first rolling release are published, but their
     # package layouts still overlap the Fedora set: archful/noarch pairs
-    # (meson, toml11), the python streams and the curl/openssl stack.
+    # (meson, toml11) and the python streams.
     # Keep them on the Fedora side until each
     # integration is validated; shrink this list as the packages are adopted.
     #
@@ -64,7 +64,6 @@ repositories:
       - libatomic-15*
       # New recipes held out of the shared root until their integration lands.
       - cmake*
-      - curl*
       - dnf5*
       - docbook-style-xsl*
       - gettext*
@@ -72,9 +71,6 @@ repositories:
       - libsemanage*
       - libxslt*
       - meson*
-      # Fedora curl requires an architecture-qualified libnghttp2 capability.
-      # Keep its matching library until the Eternal provider can replace it.
-      - nghttp2*
       - python-3.13*
       - python-3.14*
       - shadow-utils*
@@ -109,6 +105,10 @@ repositories:
       - sqlite*
       - tzdata*
       - ca-certificates*
+      - curl*
+      - libcurl*
+      - libnghttp2*
+      - nghttp2*
       - openssl*
       - fmt*
       - libarchive*
@@ -196,6 +196,10 @@ repositories:
       - sqlite*
       - tzdata*
       - ca-certificates*
+      - curl*
+      - libcurl*
+      - libnghttp2*
+      - nghttp2*
       - openssl*
       - fmt*
       - libarchive*
