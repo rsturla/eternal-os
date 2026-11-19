@@ -1,0 +1,322 @@
+schema: 2
+
+package:
+  name: nginx-1.31
+  version: "1.31.9"
+  release: 1
+  summary: HTTP server and reverse proxy, 1.31 series
+  license: BSD-2-Clause
+  upstream: https://nginx.org/
+  cpe:
+    vendor: f5
+    product: nginx
+
+sources:
+  - name: nginx-1.31.9.tar.gz
+    kind: archive
+    digest: sha512:282f12d4106b49f2e715defdea6855ecf32fe5957a8c61c19ed0ca73bad5ea737c47f73dd8c5fa2cfe67f441d2912cedc3649b5d00fce895537f54eb9f765210
+    locators:
+      - kind: https
+        url: https://nginx.org/download/nginx-1.31.9.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+patches:
+  - file: patches/perl-runtime-path.patch
+    strip: 1
+    reason: Find Eternal's versioned libperl when the optional Perl module loads
+
+build:
+  root:
+    # XSLT must use Eternal's adopted libxml2 ABI.
+    profile: ../../profiles/bootstrap-web.profile.yaml
+  packages: [gcc, make, bash, coreutils, grep, sed, findutils, perl-5.44]
+  sysroot:
+    - openssl-devel
+    - pcre2-devel
+    - zlib-devel
+    - gd-devel
+    - libxml2-devel
+    - libxslt-devel
+    # Select the Expat-backed fontconfig dependency for the image module.
+    - fontconfig-devel
+    - perl-5.44-devel
+  pipeline:
+    # NGINX uses its own configure script, which rejects Autoconf's --libdir.
+    - runs: |
+        ./configure \
+          --prefix=/usr/share/nginx \
+          --sbin-path=/usr/bin/nginx \
+          --modules-path="$LIBDIR/nginx/modules" \
+          --conf-path=/etc/nginx/nginx.conf \
+          --pid-path=/run/nginx.pid \
+          --lock-path=/run/nginx.lock \
+          --error-log-path=/var/log/nginx/error.log \
+          --http-log-path=/var/log/nginx/access.log \
+          --http-client-body-temp-path=/var/cache/nginx/client_temp \
+          --http-proxy-temp-path=/var/cache/nginx/proxy_temp \
+          --http-fastcgi-temp-path=/var/cache/nginx/fastcgi_temp \
+          --http-uwsgi-temp-path=/var/cache/nginx/uwsgi_temp \
+          --http-scgi-temp-path=/var/cache/nginx/scgi_temp \
+          --user=nobody \
+          --group=nobody \
+          --with-cc-opt="$${CFLAGS:-}" \
+          --with-ld-opt="$${LDFLAGS:-}" \
+          --with-http_ssl_module \
+          --with-http_v2_module \
+          --with-http_realip_module \
+          --with-http_stub_status_module \
+          --with-http_addition_module \
+          --with-http_sub_module \
+          --with-http_flv_module \
+          --with-http_mp4_module \
+          --with-http_gunzip_module \
+          --with-http_gzip_static_module \
+          --with-http_auth_request_module \
+          --with-http_random_index_module \
+          --with-http_secure_link_module \
+          --with-http_degradation_module \
+          --with-http_slice_module \
+          --with-file-aio \
+          --with-compat \
+          --with-http_image_filter_module=dynamic \
+          --with-http_xslt_module=dynamic \
+          --with-http_perl_module=dynamic \
+          --with-perl=/usr/bin/perl5.44.0 \
+          --with-perl_modules_path="$LIBDIR/nginx/perl" \
+          --with-mail=dynamic \
+          --with-mail_ssl_module \
+          --with-stream=dynamic \
+          --with-stream_ssl_module \
+          --with-stream_realip_module \
+          --with-stream_ssl_preread_module \
+          --with-threads \
+          --with-pcre-jit
+    - uses: make/build
+    - uses: make/install
+    - runs: |
+        install -d -m 0755 "$STAGE/var/cache/nginx"
+        install -D -m 0644 objs/nginx.8 "$STAGE/usr/share/man/man8/nginx.8"
+        sed -i \
+          -e 's|#error_log  logs/error.log;|error_log stderr notice;|' \
+          -e 's|#access_log  logs/access.log  main;|access_log /dev/stdout;|' \
+          "$STAGE/etc/nginx/nginx.conf"
+        # Perl's private runtime files belong to its optional module.
+        if test -d "$STAGE$LIBDIR/nginx/perl/man3"; then
+          install -d "$STAGE/usr/share/man/man3"
+          mv "$STAGE$LIBDIR/nginx/perl/man3/"* "$STAGE/usr/share/man/man3/"
+          rmdir "$STAGE$LIBDIR/nginx/perl/man3"
+        fi
+        find "$STAGE" -name .packlist -delete
+        find "$STAGE" -name perllocal.pod -delete
+        # Keep upstream's spare configurations in the optional documentation.
+        install -d -m 0755 "$STAGE/usr/share/doc/nginx-1.31"
+        mv "$STAGE"/etc/nginx/*.default "$STAGE/usr/share/doc/nginx-1.31/"
+        install -m 0644 CHANGES README.md "$STAGE/usr/share/doc/nginx-1.31/"
+    - uses: license/copy
+      with:
+        files: [LICENSE]
+        outputs: [nginx-1.31, nginx-1.31-doc, nginx-1.31-mod-stream, nginx-1.31-mod-mail, nginx-1.31-mod-image-filter, nginx-1.31-mod-xslt, nginx-1.31-mod-perl]
+    - uses: strip
+
+outputs:
+  - name: nginx-1.31
+    files:
+      license:
+        - /usr/share/licenses/nginx-1.31/LICENSE
+      directories:
+        - {path: /var/cache/nginx, mode: "0755", user: root, group: root}
+        - {path: /var/log/nginx, mode: "0755", user: root, group: root}
+      config:
+        - /etc/nginx/*
+      noreplace:
+        - /etc/nginx/*
+    dependencies:
+      run: [setup]
+      provides:
+        - nginx = ${package.version}-${package.release}
+      conflicts:
+        - nginx-1.30
+    tests:
+      - name: default-configuration
+        mode: transaction
+        packages: [sed]
+        script: |
+          # The test sandbox has no capability to bind privileged ports.
+          sed -i 's/listen       80;/listen       8080;/' /etc/nginx/nginx.conf
+          # The sandbox cannot chown cache directories to the worker account.
+          nginx -t -g 'user root;'
+      - name: serve-http-and-https
+        packages: [curl, openssl, grep]
+        script: |
+          nginx -v 2>&1 | grep -F 'nginx/${package.version}'
+          nginx -V 2>&1 | grep -F -- '--with-http_v2_module'
+          work=$(mktemp -d)
+          chmod 0755 "$work"
+          mkdir "$work/html"
+          printf 'eternal nginx test\n' > "$work/html/index.html"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -subj /CN=localhost -addext subjectAltName=DNS:localhost \
+            -keyout "$work/key.pem" -out "$work/cert.pem"
+          cat > "$work/nginx.conf" <<EOF
+          pid $work/nginx.pid;
+          error_log stderr;
+          events {}
+          http {
+              access_log off;
+              client_body_temp_path $work/client_temp;
+              proxy_temp_path $work/proxy_temp;
+              fastcgi_temp_path $work/fastcgi_temp;
+              uwsgi_temp_path $work/uwsgi_temp;
+              scgi_temp_path $work/scgi_temp;
+              server {
+                  listen 127.0.0.1:8080;
+                  listen 127.0.0.1:8443 ssl;
+                  server_name localhost;
+                  http2 on;
+                  ssl_certificate $work/cert.pem;
+                  ssl_certificate_key $work/key.pem;
+                  root $work/html;
+                  location = /status { stub_status; }
+                  location ~ ^/regex/[0-9]+$ { return 200 "pcre works\n"; }
+              }
+          }
+          EOF
+          nginx -t -e stderr -c "$work/nginx.conf"
+          nginx -e stderr -c "$work/nginx.conf" -g 'daemon off;' &
+          server=$!
+          trap 'kill -QUIT "$server"; wait "$server"; rm -rf "$work"' EXIT
+          curl --fail --silent --show-error --noproxy '*' \
+            --retry 5 --retry-connrefused --retry-delay 1 \
+            http://127.0.0.1:8080/ > "$work/http"
+          test "$(cat "$work/http")" = 'eternal nginx test'
+          curl --fail --silent --show-error --noproxy '*' \
+            --cacert "$work/cert.pem" --resolve localhost:8443:127.0.0.1 \
+            https://localhost:8443/ > "$work/https"
+          test "$(cat "$work/https")" = 'eternal nginx test'
+          protocol=$(curl --fail --silent --show-error --noproxy '*' --http2 \
+            --cacert "$work/cert.pem" --resolve localhost:8443:127.0.0.1 \
+            --output "$work/http2" --write-out '%{http_version}' https://localhost:8443/)
+          test "$protocol" = 2
+          test "$(cat "$work/http2")" = 'eternal nginx test'
+          curl --fail --silent --show-error --noproxy '*' \
+            http://127.0.0.1:8080/status > "$work/status"
+          grep -F 'Active connections:' "$work/status"
+          curl --fail --silent --show-error --noproxy '*' \
+            http://127.0.0.1:8080/regex/42 > "$work/regex"
+          test "$(cat "$work/regex")" = 'pcre works'
+
+  - name: nginx-1.31-doc
+    summary: NGINX 1.31 documentation and example configurations
+    dependencies:
+      conflicts: [nginx-1.30-doc]
+    files:
+      include:
+        - '@doc'
+        - '@man'
+        - /usr/share/licenses/nginx-1.31-doc/LICENSE
+      license:
+        - /usr/share/licenses/nginx-1.31-doc/LICENSE
+
+  - name: nginx-1.31-mod-stream
+    summary: TCP and UDP proxy module
+    files:
+      include:
+        - /usr/lib*/nginx/modules/ngx_stream_module.so
+        - /usr/share/licenses/nginx-1.31-mod-stream/LICENSE
+      license:
+        - /usr/share/licenses/nginx-1.31-mod-stream/LICENSE
+    dependencies:
+      run:
+        - nginx-1.31 = ${package.version}-${package.release}
+    tests:
+      - name: module-directives
+        files: tests
+        script: bash "$TEST_FILES/check-module.sh" stream
+
+  - name: nginx-1.31-mod-mail
+    summary: Mail proxy module
+    files:
+      include:
+        - /usr/lib*/nginx/modules/ngx_mail_module.so
+        - /usr/share/licenses/nginx-1.31-mod-mail/LICENSE
+      license:
+        - /usr/share/licenses/nginx-1.31-mod-mail/LICENSE
+    dependencies:
+      run:
+        - nginx-1.31 = ${package.version}-${package.release}
+    tests:
+      - name: module-directives
+        files: tests
+        script: bash "$TEST_FILES/check-module.sh" mail
+
+  - name: nginx-1.31-mod-image-filter
+    summary: HTTP image filter module
+    files:
+      include:
+        - /usr/lib*/nginx/modules/ngx_http_image_filter_module.so
+        - /usr/share/licenses/nginx-1.31-mod-image-filter/LICENSE
+      license:
+        - /usr/share/licenses/nginx-1.31-mod-image-filter/LICENSE
+    dependencies:
+      run:
+        - nginx-1.31 = ${package.version}-${package.release}
+    tests:
+      - name: module-directives
+        files: tests
+        script: bash "$TEST_FILES/check-module.sh" image-filter
+
+  - name: nginx-1.31-mod-xslt
+    summary: HTTP XSLT filter module
+    files:
+      include:
+        - /usr/lib*/nginx/modules/ngx_http_xslt_filter_module.so
+        - /usr/share/licenses/nginx-1.31-mod-xslt/LICENSE
+      license:
+        - /usr/share/licenses/nginx-1.31-mod-xslt/LICENSE
+    dependencies:
+      run:
+        - nginx-1.31 = ${package.version}-${package.release}
+    tests:
+      - name: module-directives
+        files: tests
+        script: bash "$TEST_FILES/check-module.sh" xslt
+
+  - name: nginx-1.31-mod-perl
+    summary: Embedded Perl module
+    generators:
+      # rpmx reads Perl's decimal 5.006001 as an RPM version, above 5.44.
+      # The explicit perl-5.44 requirement selects the supported interpreter.
+      exclude: ["perl(:VERSION) >= 5.006001"]
+    files:
+      include:
+        - /usr/lib*/nginx/modules/ngx_http_perl_module.so
+        - /usr/lib*/nginx/perl/**
+        - /usr/share/licenses/nginx-1.31-mod-perl/LICENSE
+      license:
+        - /usr/share/licenses/nginx-1.31-mod-perl/LICENSE
+    dependencies:
+      run:
+        - nginx-1.31 = ${package.version}-${package.release}
+        - perl-5.44
+    tests:
+      - name: module-directives
+        files: tests
+        script: bash "$TEST_FILES/check-module.sh" perl
+
+tests:
+  - name: hardening
+    pipeline:
+      # Image, mail, and Perl modules have no fortifiable libc call sites.
+      - uses: test/hardening-check
+        with:
+          skip: [fortify]
+      - uses: test/hardening-check
+        with:
+          paths:
+            - /usr/bin/nginx
+            - /usr/lib64/nginx/modules/ngx_stream_module.so
+            - /usr/lib/nginx/modules/ngx_stream_module.so
+            - /usr/lib64/nginx/modules/ngx_http_xslt_filter_module.so
+            - /usr/lib/nginx/modules/ngx_http_xslt_filter_module.so
