@@ -7,7 +7,7 @@ schema: 2
 package:
   name: gmp
   version: "6.3.0"
-  release: 1
+  release: 2
   summary: A library for arbitrary precision arithmetic
   description: |
     GMP is a free library for arbitrary precision arithmetic, operating on signed integers, rational numbers and floating-point numbers.
@@ -42,6 +42,10 @@ build:
     - uses: autotools/configure
       with:
         args:
+          # GMP's CPU probe varies between hosted runners. Use the same target
+          # on every build instead of selecting Nehalem, Zen 4, or another CPU.
+          - --build=$RPMX_TARGET_ARCH-pc-linux-gnu
+          - --host=$RPMX_TARGET_ARCH-pc-linux-gnu
           - --disable-cxx
           - --with-pic
           - --enable-shared
