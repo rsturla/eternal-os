@@ -6,7 +6,7 @@ schema: 2
 package:
   name: libsolv
   version: "0.7.41"
-  release: 2
+  release: 3
   summary: Package dependency solver
   description: |
     libsolv is a library for solving package dependencies and managing
@@ -44,7 +44,8 @@ build:
           - -DENABLE_RPMDB_LIBRPM=ON
           - -DENABLE_RPMPKG_LIBRPM=ON
           - -DENABLE_PUBKEY=OFF
-          - -DENABLE_COMPS=OFF
+          - -DENABLE_COMPS=ON
+          - -DENABLE_COMPLEX_DEPS=ON
           - -DENABLE_ZLIB_COMPRESSION=ON
           - -DENABLE_LZMA_COMPRESSION=ON
           - -DENABLE_BZIP2_COMPRESSION=ON
@@ -107,7 +108,12 @@ outputs:
       - name: link
         packages: [bash-binsh, coreutils, gcc, pkgconf, grep]
         script: |
-          printf '#include <solv/pool.h>\nint main(void){return 0;}\n' > /tmp/solv.c
+          cat > /tmp/solv.c <<'EOF'
+          #include <solv/pool.h>
+          #include <solv/repo_comps.h>
+          #include <solv/pool_parserpmrichdep.h>
+          int main(void){return 0;}
+          EOF
           gcc /tmp/solv.c $(pkg-config --cflags --libs libsolv) -o /tmp/solv-test
           /tmp/solv-test
 
