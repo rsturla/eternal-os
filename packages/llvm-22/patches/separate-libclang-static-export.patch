@@ -1,0 +1,12 @@
+diff --git a/clang/cmake/modules/AddClang.cmake b/clang/cmake/modules/AddClang.cmake
+--- a/clang/cmake/modules/AddClang.cmake
++++ b/clang/cmake/modules/AddClang.cmake
+@@ -130,7 +130,7 @@ macro(add_clang_library name)
+       target_link_libraries(${lib} INTERFACE ${LLVM_COMMON_LIBS})
+ 
+       if (NOT LLVM_INSTALL_TOOLCHAIN_ONLY OR ARG_INSTALL_WITH_TOOLCHAIN)
+-        get_target_export_arg(${name} Clang export_to_clangtargets UMBRELLA clang-libraries)
++        get_target_export_arg(${lib} Clang export_to_clangtargets UMBRELLA clang-libraries)
+         install(TARGETS ${lib}
+           COMPONENT ${lib}
+           ${export_to_clangtargets}
