@@ -33,6 +33,10 @@ release artifact.
 
 ## Bootstrap versus distribution
 
+See [Removing Fedora from build roots](self-hosting.md) for current adoption
+measurements and the next dependency groups. The minimal native root can use
+only Eternal RPMs while recipe-specific dependencies still come from Fedora.
+
 rpmx needs a running build root: a shell, a compiler, `dnf5`, glibc. A brand-new
 distribution cannot provide those on day one, so the first recipes build inside
 a Fedora 44 root.

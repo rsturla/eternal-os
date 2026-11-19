@@ -24,6 +24,22 @@ repositories:
     # Use the same adopted package families as the bootstrap build profile.
     # Exact Fedora names can otherwise override versioned Eternal providers.
     exclude:
+      # Use published Eternal tools and their matching runtime libraries.
+      - expat*
+      - bison*
+      - bzip2*
+      - file
+      - file-*
+      - flex*
+      - json-c*
+      - libunistring*
+      - m4*
+      - ninja*
+      - popt*
+      - readline*
+      - scdoc*
+      - sqlite*
+      - tzdata*
       - fmt*
       - libarchive*
       - librepo*
@@ -94,6 +110,22 @@ repositories:
   - id: bootstrap-updates
     metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f44&arch=$basearch
     exclude:
+      # Use published Eternal tools and their matching runtime libraries.
+      - expat*
+      - bison*
+      - bzip2*
+      - file
+      - file-*
+      - flex*
+      - json-c*
+      - libunistring*
+      - m4*
+      - ninja*
+      - popt*
+      - readline*
+      - scdoc*
+      - sqlite*
+      - tzdata*
       - fmt*
       - libarchive*
       - librepo*

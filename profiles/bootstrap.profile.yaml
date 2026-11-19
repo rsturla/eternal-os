@@ -60,40 +60,25 @@ repositories:
       - libatomic-13*
       - libatomic-14*
       - libatomic-15*
-      - expat*
       # New recipes held out of the shared root until their integration lands.
-      - bison*
-      - bzip2*
       - ca-certificates*
       - cmake*
       - curl*
       - dnf5*
       - docbook-style-xsl*
-      # Keep file out without also excluding filesystem.
-      - file
-      - file-*
-      - flex*
       - gettext*
       - glib2*
-      - json-c*
       - libsemanage*
-      - libunistring*
       - libxslt*
       - meson*
-      - ninja*
       # Fedora curl requires an architecture-qualified libnghttp2 capability.
       # Keep its matching library until the Eternal provider can replace it.
       - nghttp2*
       - openssl3*
-      - popt*
       - python-3.13*
       - python-3.14*
-      - readline*
-      - scdoc*
       - shadow-utils*
-      - sqlite*
       - toml11*
-      - tzdata*
       - util-linux*
       - libblkid*
       - libfdisk*
@@ -107,6 +92,22 @@ repositories:
     # copies is what makes the build root consume the published Eternal
     # repository instead of only using it for metadata.
     exclude:
+      # Use published Eternal tools and their matching runtime libraries.
+      - expat*
+      - bison*
+      - bzip2*
+      - file
+      - file-*
+      - flex*
+      - json-c*
+      - libunistring*
+      - m4*
+      - ninja*
+      - popt*
+      - readline*
+      - scdoc*
+      - sqlite*
+      - tzdata*
       - fmt*
       - libarchive*
       - librepo*
@@ -176,6 +177,22 @@ repositories:
   - id: updates
     metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch
     exclude:
+      # Use published Eternal tools and their matching runtime libraries.
+      - expat*
+      - bison*
+      - bzip2*
+      - file
+      - file-*
+      - flex*
+      - json-c*
+      - libunistring*
+      - m4*
+      - ninja*
+      - popt*
+      - readline*
+      - scdoc*
+      - sqlite*
+      - tzdata*
       - fmt*
       - libarchive*
       - librepo*
