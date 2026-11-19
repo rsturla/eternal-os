@@ -1,0 +1,183 @@
+# The ABI 4 runtime can coexist with openssl3-libs.
+schema: 2
+
+package:
+  name: openssl4
+  version: "4.1.0"
+  release: 1
+  summary: TLS tools and cryptographic libraries
+  license: Apache-2.0
+  upstream: https://openssl-library.org/
+  cpe:
+    vendor: openssl
+    product: openssl
+
+sources:
+  - name: openssl-4.1.0.tar.gz
+    kind: archive
+    digest: sha512:bb8f3c47955735253c161b412bd916401afa713736ebe38f12419a1cac0af6ea6db3523853dbd3073b90ab1beec8e0465355801b228386f2027b4ba47adf4869
+    locators:
+      - kind: https
+        url: https://github.com/openssl/openssl/releases/download/openssl-4.1.0/openssl-4.1.0.tar.gz
+      - kind: https
+        url: https://www.openssl.org/source/openssl-4.1.0.tar.gz
+    extract:
+      format: tar.gz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap.profile.yaml
+  packages: [gcc, make, bash, coreutils, perl]
+  pipeline:
+    - runs: |
+        # OpenSSL uses its own Perl configuration program.
+        # Keep the ABI 4 configuration separate from the ABI 3 runtime.
+        perl ./Configure --prefix="$PREFIX" --libdir="$LIBDIR" \
+          --openssldir=/etc/ssl4 shared no-comp no-brotli no-zstd no-zlib \
+          no-legacy no-module \
+          no-ssl3 no-weak-ssl-ciphers enable-pie
+    - uses: make/build
+    - uses: make/build
+      with:
+        args: [DESTDIR="$STAGE", install_sw, install_ssldirs]
+    - runs: |
+        rm -f "$STAGE/usr/bin/c_rehash"
+        rm -rf "$STAGE/etc/ssl4/misc"
+        rm -f "$STAGE"/usr/lib*/libssl.a "$STAGE"/usr/lib*/libcrypto.a
+        # Use the distribution trust bundle for both ABI streams.
+        rmdir "$STAGE/etc/ssl4/certs"
+        ln -s ../ssl/certs "$STAGE/etc/ssl4/certs"
+        ln -s ../ssl/cert.pem "$STAGE/etc/ssl4/cert.pem"
+    - uses: license/copy
+      with:
+        files: [LICENSE.txt]
+        outputs: [openssl4, openssl4-libs, openssl4-devel]
+    - uses: strip
+  tests:
+    - name: upstream
+      # The client/server tests resolve localhost through /etc/hosts.
+      packages: [setup]
+      artifacts: [test-runs]
+      script: |
+        make test HARNESS_JOBS="$JOBS"
+
+outputs:
+  - name: openssl4
+    files:
+      license:
+        - /usr/share/licenses/openssl4/LICENSE.txt
+    dependencies:
+      run:
+        - openssl4-libs = ${package.version}-${package.release}
+      provides:
+        - openssl = ${package.version}-${package.release}
+      conflicts:
+        - openssl3
+        - openssl < 4
+    tests:
+      - name: cli
+        packages: [grep]
+        script: |
+          openssl version | grep -F 'OpenSSL 4.1.0'
+          printf abc | openssl dgst -sha256 > /tmp/digest
+          grep -q ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad /tmp/digest
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 \
+            -noenc -subj /CN=eternal-test -days 1 \
+            -keyout /tmp/key.pem -out /tmp/cert.pem
+          openssl verify -CAfile /tmp/cert.pem /tmp/cert.pem
+
+  - name: openssl4-libs
+    files:
+      include:
+        - /usr/lib*/libssl.so.*
+        - /usr/lib*/libcrypto.so.*
+        - /etc/ssl4/**
+        - /usr/share/licenses/openssl4-libs/LICENSE.txt
+      license:
+        - /usr/share/licenses/openssl4-libs/LICENSE.txt
+      config:
+        - /etc/ssl4/openssl.cnf
+        - /etc/ssl4/ct_log_list.cnf
+      noreplace:
+        - /etc/ssl4/openssl.cnf
+        - /etc/ssl4/ct_log_list.cnf
+    dependencies:
+      run: [ca-certificates-bundle]
+      provides:
+        - openssl-libs = ${package.version}-${package.release}
+    tests:
+      - name: coexistence
+        packages: [python3, openssl3-libs]
+        script: |
+          python3 - <<'PY'
+          import ctypes
+          for major in (3, 4):
+              crypto = ctypes.CDLL(f"libcrypto.so.{major}")
+              ssl = ctypes.CDLL(f"libssl.so.{major}")
+              crypto.OPENSSL_version_major.restype = ctypes.c_uint
+              assert crypto.OPENSSL_version_major() == major
+              if major == 4:
+                  assert not hasattr(crypto, "COMP_get_type")
+                  assert not hasattr(crypto, "COMP_zlib")
+              ssl.TLS_method.restype = ctypes.c_void_p
+              ssl.SSL_CTX_new.argtypes = [ctypes.c_void_p]
+              ssl.SSL_CTX_new.restype = ctypes.c_void_p
+              ssl.SSL_CTX_free.argtypes = [ctypes.c_void_p]
+              ctx = ssl.SSL_CTX_new(ssl.TLS_method())
+              assert ctx
+              ssl.SSL_CTX_free(ctx)
+          PY
+          test -s /etc/ssl4/cert.pem
+
+  - name: openssl4-devel
+    files:
+      include:
+        - "@dev"
+        - /usr/share/licenses/openssl4-devel/LICENSE.txt
+      license:
+        - /usr/share/licenses/openssl4-devel/LICENSE.txt
+    dependencies:
+      run:
+        - openssl4-libs = ${package.version}-${package.release}
+      provides:
+        - openssl-devel = ${package.version}-${package.release}
+      conflicts:
+        - openssl3-devel
+        - openssl-devel < 4
+    tests:
+      - name: compile-and-run
+        packages: [gcc, glibc-devel, pkgconf]
+        script: |
+          cat > /tmp/test.c <<'EOF_C'
+          #include <openssl/ssl.h>
+          #include <openssl/evp.h>
+          #include <string.h>
+          #ifndef OPENSSL_NO_COMP
+          #error OpenSSL compression APIs must be disabled
+          #endif
+          int main(void) {
+            static const unsigned char expected[] = {
+              0xba,0x78,0x16,0xbf,0x8f,0x01,0xcf,0xea,
+              0x41,0x41,0x40,0xde,0x5d,0xae,0x22,0x23,
+              0xb0,0x03,0x61,0xa3,0x96,0x17,0x7a,0x9c,
+              0xb4,0x10,0xff,0x61,0xf2,0x00,0x15,0xad
+            };
+            unsigned char digest[EVP_MAX_MD_SIZE];
+            unsigned int size = 0;
+            if (OPENSSL_VERSION_MAJOR != 4 || OPENSSL_version_major() != 4) return 1;
+            if (!EVP_Digest("abc", 3, digest, &size, EVP_sha256(), NULL)) return 1;
+            if (size != sizeof(expected) || memcmp(digest, expected, size)) return 1;
+            SSL_CTX *ctx = SSL_CTX_new(TLS_method());
+            if (!ctx) return 1;
+            SSL_CTX_free(ctx);
+            return 0;
+          }
+          EOF_C
+          gcc /tmp/test.c $(pkg-config --cflags --libs openssl) -o /tmp/test
+          /tmp/test
+
+tests:
+  - name: hardening
+    pipeline:
+      - uses: test/hardening-check

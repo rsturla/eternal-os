@@ -69,6 +69,7 @@ repositories:
   - ncurses*
   - ninja*
   - openssl3*
+  - openssl4*
   - pam*
   - perl*
   - popt*
