@@ -8,7 +8,7 @@ schema: 2
 package:
   name: dnf5
   version: "5.4.7.0"
-  release: 2
+  release: 3
   summary: Package manager based on libdnf5 and libsolv
   description: |
     dnf5 is the next generation of the DNF package manager. It uses libdnf5
@@ -58,7 +58,6 @@ build:
     - libselinux-devel
     - libsolv-devel
     - libxml2-devel
-    - lua-devel
     - openssl-devel
     - popt-devel
     - rpm-devel
@@ -125,6 +124,12 @@ outputs:
         script: |
           dnf5 --version
           dnf5 --help >/dev/null
+          installed=$(dnf5 --cacheonly \
+            --setopt=persistdir="$PWD/dnf-state" \
+            --setopt=cachedir="$PWD/dnf-cache" \
+            --setopt=logdir="$PWD/dnf-log" \
+            repoquery --installed --queryformat '%{name}\n' rpm)
+          test "$installed" = rpm
 
   - name: libdnf5
     summary: Core library for dnf5
