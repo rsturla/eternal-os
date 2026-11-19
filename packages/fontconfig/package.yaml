@@ -1,0 +1,149 @@
+schema: 2
+
+package:
+  name: fontconfig
+  version: "2.18.4"
+  release: 1
+  summary: Font configuration tools and library
+  license: MIT
+  upstream: https://www.freedesktop.org/wiki/Software/fontconfig/
+  cpe:
+    vendor: fontconfig_project
+    product: fontconfig
+
+sources:
+  - name: fontconfig-2.18.4.tar.xz
+    kind: archive
+    digest: sha512:53b2759536963c649ef3950a94eb9971e9f2e3b96d8cc4e3265d4c3c2d14cb5cffa528435f04d5b22d0f43534e24e11c6e05822c933c77a58cb3a70dad2608d5
+    locators:
+      - kind: https
+        url: https://gitlab.freedesktop.org/api/v4/projects/890/packages/generic/fontconfig/2.18.4/fontconfig-2.18.4.tar.xz
+    extract:
+      format: tar.xz
+      strip-components: 1
+
+build:
+  root:
+    profile: ../../profiles/bootstrap-web.profile.yaml
+  packages: [gcc, meson, ninja, pkgconf, python3, gperf, bash, coreutils]
+  sysroot: [expat-devel, freetype-devel]
+  pipeline:
+    - uses: meson/setup
+      with:
+        args:
+          - --sysconfdir=/etc
+          - --localstatedir=/var
+          - --wrap-mode=nodownload
+          - -Ddefault_library=shared
+          - -Dxml-backend=expat
+          - -Ddoc=disabled
+          - -Dnls=disabled
+          - -Dfontations=disabled
+          - -Dtests=enabled
+          - -Dtests-bwrap=disabled
+          - -Dtests-external-fonts=disabled
+          - -Dcache-build=disabled
+    - uses: meson/compile
+    - uses: meson/install
+    - uses: license/copy
+      with:
+        files: [COPYING]
+        outputs: [fontconfig, fontconfig-libs, fontconfig-devel]
+    - uses: strip
+  tests:
+    - name: upstream
+      packages: [diffutils, grep]
+      argv: [meson, test, -C, build, --print-errorlogs]
+
+outputs:
+  - name: fontconfig
+    files:
+      license:
+        - /usr/share/licenses/fontconfig/COPYING
+    dependencies:
+      run:
+        - fontconfig-libs = ${package.version}-${package.release}
+    tests:
+      - name: pattern
+        packages: [grep]
+        script: |
+          fc-pattern -f '%{family}\n' serif | grep -Fx serif
+          fc-conflist
+
+  - name: fontconfig-libs
+    files:
+      include:
+        - /usr/lib*/libfontconfig.so.*
+        - /etc/fonts/**
+        - /usr/share/fontconfig/**
+        - /usr/share/xml/fontconfig/**
+        - /var/cache/fontconfig
+        - /usr/share/licenses/fontconfig-libs/COPYING
+      license:
+        - /usr/share/licenses/fontconfig-libs/COPYING
+      config:
+        - /etc/fonts/fonts.conf
+      noreplace:
+        - /etc/fonts/fonts.conf
+      directories:
+        - {path: /var/cache/fontconfig, mode: "0755", user: root, group: root}
+    tests:
+      - name: load
+        packages: [python3]
+        script: |
+          python3 - <<'PY'
+          import ctypes
+          library = ctypes.CDLL('libfontconfig.so.1')
+          library.FcNameParse.argtypes = [ctypes.c_char_p]
+          library.FcNameParse.restype = ctypes.c_void_p
+          library.FcPatternDestroy.argtypes = [ctypes.c_void_p]
+          pattern = library.FcNameParse(b'serif:size=12')
+          assert pattern
+          library.FcPatternDestroy(pattern)
+          PY
+
+  - name: fontconfig-devel
+    files:
+      include:
+        - '@dev'
+        - /usr/share/gettext/its/fontconfig.*
+        - /usr/share/licenses/fontconfig-devel/COPYING
+      license:
+        - /usr/share/licenses/fontconfig-devel/COPYING
+    dependencies:
+      run:
+        - fontconfig-libs = ${package.version}-${package.release}
+    tests:
+      - name: compile-and-run
+        packages: [gcc, glibc-devel, pkgconf]
+        script: |
+          cat > /tmp/fontconfig-test.c <<'EOF'
+          #include <fontconfig/fontconfig.h>
+          int main(void) {
+              FcPattern *pattern = FcNameParse((const FcChar8 *) "serif:size=12");
+              if (!pattern) return 1;
+              FcPatternDestroy(pattern);
+              return 0;
+          }
+          EOF
+          gcc /tmp/fontconfig-test.c $(pkg-config --cflags --libs fontconfig) -o /tmp/fontconfig-test
+          /tmp/fontconfig-test
+
+tests:
+  - name: hardening
+    pipeline:
+      # fc-list, fc-pattern, fc-query, and fc-scan have no eligible stack objects.
+      - uses: test/hardening-check
+        with:
+          skip: [stack-protector]
+      - uses: test/hardening-check
+        with:
+          paths:
+            - /usr/lib64
+            - /usr/lib
+            - /usr/bin/fc-cache
+            - /usr/bin/fc-cat
+            - /usr/bin/fc-conflist
+            - /usr/bin/fc-genconf
+            - /usr/bin/fc-match
+            - /usr/bin/fc-validate
