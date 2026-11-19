@@ -97,11 +97,11 @@ run do not establish coverage. Skipped or not-run cases make the run incomplete.
 A build report records `build_tests_requested`
 and its source cases separately from installed-package results.
 
-By default the shared scripts gate both phases before successful build stamps
-or private dependency promotion. CI defers installed-package tests to its parallel test matrix
-and gates publication on both phases. `--no-tests` skips both phases in these scripts; the direct
-`rpmx build --no-tests` flag skips only `build.tests`. Private OpenSSF seed build
-output stays under `.work/toolchain-out/`.
+By default the local build scripts gate both phases before successful build stamps
+or private dependency promotion. CI runs installed-package tests after its build
+transaction settles and gates publication on both phases. `--no-tests` skips both
+phases in the local scripts; the direct `rpmx build --no-tests` flag skips only
+`build.tests`.
 The explicit Python bootstrap helper keeps dependency evidence under
 `.work/python-deps/ARCH/NAME/` and accepts one concrete architecture per invocation.
 
@@ -126,12 +126,13 @@ Each test still installs only its selected outputs, baseline tools and explicit
 test dependencies. The profile's seed package list does not populate test roots.
 Standalone installed-package testing reads target metadata without preparing a build root.
 
-All selected packages build concurrently in CI, including compilers and core
-libraries. There are no package categories or ordered foundation stages.
-Each build runs its source suites. After the candidate artifacts are available,
-installed-package test jobs run concurrently against those artifacts. Publication
-requires both matrices to pass. Cross-package tests use candidate dependencies
-without making unrelated builds wait for them.
+CI builds packages in dependency waves. Packages within each wave run in parallel
+against the same repository view, and each build runs its source suites. When the
+build closure settles, installed-package tests run against the sealed final
+repository. The transaction passes only after every installed test passes; the
+initial CI run starting successfully is not the final result. See
+[build transactions](build-transactions.md) for ordering, candidate reuse and
+release gates.
 
 The same separation is available locally:
 
@@ -144,10 +145,8 @@ uv run --with pyyaml bash scripts/test-all.sh --package gcc-16 \
 
 `--defer-acceptance` runs source suites but leaves installed-package and transaction tests
 for the standalone command. Its build stamp differs from a fully accepted build.
-Private policy seeds are built without installed-package tests, so building
-another package does not start hidden package tests. The selected compiler-policy
-package has its own test job. Without this option, local builds run both
-phases as before.
+The compiler-policy package has its own test cases. Without this option, local
+builds run both phases.
 
 `--candidate-rpms DIR` takes binary outputs from `DIR/NAME/ARCH/`, including
 noarch outputs stored in that architecture's directory. Source RPMs and nested
