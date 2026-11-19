@@ -5,7 +5,7 @@ schema: 2
 package:
   name: openssl3
   version: 3.5.9
-  release: 2
+  release: 3
   summary: TLS tools and cryptographic libraries
   description: TLS tools and cryptographic libraries.
   license: Apache-2.0
@@ -36,9 +36,7 @@ build:
   - perl
   pipeline:
   - runs: |
-      # Keep COMP_* APIs for bootstrap consumers built against seed headers.
-      # Disable all compression backends.
-      perl ./Configure --prefix="$PREFIX" --libdir="$LIBDIR" --openssldir=/etc/ssl shared no-brotli no-zstd no-zlib no-ssl3 no-weak-ssl-ciphers enable-pie
+      perl ./Configure --prefix="$PREFIX" --libdir="$LIBDIR" --openssldir=/etc/ssl shared no-comp no-brotli no-zstd no-zlib no-ssl3 no-weak-ssl-ciphers enable-pie
   - uses: make/build
   - uses: make/build
     with:
@@ -101,7 +99,13 @@ outputs:
     packages:
       - python3
     script: |
-      python3 -c 'import ctypes; ctypes.CDLL("libssl.so.3")'
+      python3 - <<'PY'
+      import ctypes
+      ctypes.CDLL("libssl.so.3")
+      crypto = ctypes.CDLL("libcrypto.so.3")
+      assert not hasattr(crypto, "COMP_get_type")
+      assert not hasattr(crypto, "COMP_zlib")
+      PY
 - name: openssl3-devel
   files:
     license:
@@ -123,10 +127,10 @@ outputs:
     script: |
       cat > /tmp/test.c <<'EOF'
       #include <openssl/ssl.h>
-      #include <openssl/comp.h>
-      #include <openssl/objects.h>
+      #ifndef OPENSSL_NO_COMP
+      #error OpenSSL compression APIs must be disabled
+      #endif
       int main(void) {
-        if (COMP_get_type(COMP_zlib()) != NID_undef) return 1;
         SSL_CTX *ctx = SSL_CTX_new(TLS_method());
         if (!ctx) return 1;
         SSL_CTX_free(ctx);

@@ -21,6 +21,7 @@ builder:
 repositories:
   - id: eternal
     baseurl: https://packages.eternal.sturla.tech/rolling/$basearch
+    # OpenSSL consumers use Eternal headers, including OPENSSL_NO_COMP.
     # Only packages that have completed the self-hosting switch are consumed
     # here. Select one compiler and C library stream for this build root.
     #
@@ -74,7 +75,6 @@ repositories:
       # Fedora curl requires an architecture-qualified libnghttp2 capability.
       # Keep its matching library until the Eternal provider can replace it.
       - nghttp2*
-      - openssl3*
       - python-3.13*
       - python-3.14*
       - shadow-utils*
@@ -108,6 +108,7 @@ repositories:
       - scdoc*
       - sqlite*
       - tzdata*
+      - openssl*
       - fmt*
       - libarchive*
       - librepo*
@@ -193,6 +194,7 @@ repositories:
       - scdoc*
       - sqlite*
       - tzdata*
+      - openssl*
       - fmt*
       - libarchive*
       - librepo*
