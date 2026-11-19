@@ -102,7 +102,7 @@ outputs:
         - python3.13 = ${package.version}-${package.release}
     tests:
       - name: installed
-        packages: [bzip2-libs, expat, libffi, zstd-libs, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
+        packages: [bzip2-libs, expat, libffi, zstd-libs, ncurses-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
         script: |
           python3.13 -c 'import sys; print("%d.%d" % sys.version_info[:2])' | grep -qx 3.13
           python3.13 -c 'import bz2, ctypes, decimal, hashlib, json, lzma, sqlite3, unicodedata, zlib; print("modules ok")'
@@ -154,7 +154,7 @@ outputs:
         - python-3.15-default
     tests:
       - name: installed
-        packages: [bzip2-libs, expat, libffi, zstd-libs, ncurses-libs, openssl-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
+        packages: [bzip2-libs, expat, libffi, zstd-libs, ncurses-libs, readline, sqlite-libs, xz-libs, zlib, bash-binsh, coreutils, gcc, grep]
         script: |
           python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])' | grep -qx 3.13
           pydoc3 -h >/dev/null
