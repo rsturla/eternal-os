@@ -7,7 +7,7 @@ schema: 2
 package:
   name: pkgconf
   version: "3.0.10"
-  release: 1
+  release: 2
   summary: An implementation of pkg-config
   description: |
     pkgconf is a package compiler and linker metadata toolkit that provides pkg-config compatibility.
@@ -31,6 +31,9 @@ build:
   packages: [gcc, make, bash, coreutils]
   pipeline:
     - uses: autotools/configure
+      with:
+        args:
+          - --with-pkg-config-dir=/usr/lib64/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
     - uses: make/build
     - uses: make/install
     - runs: |
@@ -63,6 +66,19 @@ outputs:
         script: |
           test "$(pkgconf --version)" = 3.0.10
           test "$(pkg-config --version)" = 3.0.10
+      - name: system-metadata-paths
+        mode: transaction
+        script: |
+          for directory in /usr/lib/pkgconfig /usr/lib64/pkgconfig; do
+            install -d "$directory"
+            cat > "$directory/eternal-pc-path-test.pc" <<'EOF'
+          Name: eternal-pc-path-test
+          Description: Default metadata search path test
+          Version: 1.0
+          EOF
+            test "$(pkg-config --modversion eternal-pc-path-test)" = 1.0
+            rm "$directory/eternal-pc-path-test.pc"
+          done
 
   - name: pkgconf-libs
     summary: pkgconf runtime library

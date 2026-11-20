@@ -1,0 +1,287 @@
+# Web application builds need Eternal's libxslt and libxml2 ABI.
+# Retain the bootstrap seed policy for the remaining build tools.
+document: rpmx-profile
+version: 1
+name: bootstrap-web
+releasever: "44"
+dist-tag: .eternal
+archs: [x86_64, aarch64]
+builder:
+  image: registry.fedoraproject.org/fedora@sha256:f08613fffc95f5c85c019b2f4ac9e9fb9bb84b9cfd59275671b84169567b157e
+repositories:
+  - id: eternal
+    baseurl: https://packages.eternal.sturla.tech/rolling/$basearch
+    # Only packages that have completed the self-hosting switch are consumed
+    # here. Select one compiler and C library stream for this build root.
+    #
+    # The recipes added in the first rolling release are published, but their
+    # package layouts still overlap the Fedora set: archful/noarch pairs
+    # (meson, toml11), the python streams and curl.
+    # Keep them on the Fedora side until each
+    # integration is validated; shrink this list as the packages are adopted.
+    #
+    # Adopt libarchive, librepo and libsolv together so XML consumers can use
+    # Eternal's libxml2 without the Fedora libraries that require its older
+    # ABI. fmt consumers also build against Eternal's ABI.
+    # Fedora CMake still needs jsoncpp ABI 26;
+    # allow that runtime while CMake itself bootstraps against Eternal's 27.
+    # Keep seed libxml2 available for bootstrap gettext tools used by ACL and
+    # attr. XML consumers select Eternal's newer development package. Final
+    # acceptance uses the candidate library through the distribution profile.
+    # Explicit Lua stream requests can use Eternal. Seed Lua stays available
+    # for bootstrap RPM libraries that still need Fedora's library name.
+    # util-linux stays on Fedora until its matching library splits are adopted.
+    # Keep Eternal's system-release provider available for setup's real
+    # account data. Fedora's release chain requires its newer filesystem RPM.
+    exclude:
+      - basesystem
+      - eternal-base
+      - eternal-baselayout
+      - glibc-2.43*
+      - ld-linux-2.43*
+      - libc-bin-2.43*
+      - nss-db-2.43*
+      - gcc-13*
+      - gcc-14*
+      - gcc-15*
+      - libstdc++-13*
+      - libstdc++-14*
+      - libstdc++-15*
+      - libatomic-13*
+      - libatomic-14*
+      - libatomic-15*
+      # New recipes held out of the shared root until their integration lands.
+      - cmake*
+      - curl*
+      - dnf5*
+      - docbook-style-xsl*
+      - gettext*
+      - libsemanage*
+      - meson*
+      # Fedora curl requires an architecture-qualified libnghttp2 capability.
+      # Keep its matching library until the Eternal provider can replace it.
+      - nghttp2*
+      # Follow the shared bootstrap policy for OpenSSL commands and headers.
+      # Keep ABI 3 available for seed tools that still need it.
+      - openssl3
+      - openssl3-devel
+      - python-3.13*
+      - python-3.14*
+      - shadow-utils*
+      - toml11*
+      - util-linux*
+      - libblkid*
+      - libfdisk*
+      - libmount*
+      - libsmartcols*
+      - libuuid*
+      - zchunk*
+  - id: fedora
+    baseurl: https://dl.fedoraproject.org/pub/fedora/linux/releases/$releasever/Everything/$basearch/os/
+    # These package names are already produced by Eternal. Hiding the Fedora
+    # copies is what makes the build root consume the published Eternal
+    # repository instead of only using it for metadata.
+    exclude:
+      # Use the published Eternal tools and matching libraries.
+      - expat*
+      - bison*
+      - bzip2*
+      - file
+      - file-*
+      - flex*
+      - json-c*
+      - libunistring*
+      - m4*
+      - ninja*
+      - popt*
+      - readline*
+      - scdoc*
+      - sqlite*
+      - tzdata*
+      - ca-certificates*
+      - openssl*
+      # Graphics development files need GLib without the seed TLS/trust stack.
+      - glib2*
+      - fmt*
+      - libarchive*
+      - librepo*
+      - libsolv*
+      - rpm*
+      - autoconf*
+      - automake*
+      - libtool*
+      - perl*
+      - texinfo*
+      - glibc*
+      - gcc
+      - gcc-*
+      - cpp
+      - cpp-*
+      - libgcc*
+      - libgomp*
+      - libstdc++*
+      - libatomic*
+      - acl*
+      - attr*
+      - audit*
+      - libacl*
+      - libattr*
+      - libcap*
+      - libselinux*
+      - libsepol*
+      - libxcrypt*
+      - pam*
+      - ncurses*
+      - zstd*
+      - libzstd*
+      - xz
+      - xz-*
+      - gmp*
+      - mpfr*
+      - libmpc*
+      - isl*
+      - kernel-headers*
+      - bash
+      - bash-binsh
+      - binutils
+      - coreutils
+      - coreutils-single
+      - diffutils
+      - diffutils-*
+      - filesystem
+      - findutils
+      - findutils-*
+      - grep
+      - grep-*
+      - make
+      - pcre2
+      - pcre2-*
+      - tar
+      - tar-*
+      - pkgconf
+      - pkgconf-m4
+      - pkgconf-pkg-config
+      - libpkgconf
+      - zlib
+      - zlib-devel
+      - zlib-static
+      - zlib-ng-compat
+      - zlib-ng-compat-devel
+      - zlib-ng-compat-static
+  - id: updates
+    metalink: https://mirrors.fedoraproject.org/metalink?repo=updates-released-f$releasever&arch=$basearch
+    exclude:
+      # Use the published Eternal tools and matching libraries.
+      - expat*
+      - bison*
+      - bzip2*
+      - file
+      - file-*
+      - flex*
+      - json-c*
+      - libunistring*
+      - m4*
+      - ninja*
+      - popt*
+      - readline*
+      - scdoc*
+      - sqlite*
+      - tzdata*
+      - ca-certificates*
+      - openssl*
+      - glib2*
+      - fmt*
+      - libarchive*
+      - librepo*
+      - libsolv*
+      - rpm*
+      - autoconf*
+      - automake*
+      - libtool*
+      - perl*
+      - texinfo*
+      - glibc*
+      - gcc
+      - gcc-*
+      - cpp
+      - cpp-*
+      - libgcc*
+      - libgomp*
+      - libstdc++*
+      - libatomic*
+      - acl*
+      - attr*
+      - audit*
+      - libacl*
+      - libattr*
+      - libcap*
+      - libselinux*
+      - libsepol*
+      - libxcrypt*
+      - pam*
+      - ncurses*
+      - zstd*
+      - libzstd*
+      - xz
+      - xz-*
+      - gmp*
+      - mpfr*
+      - libmpc*
+      - isl*
+      - kernel-headers*
+      - bash
+      - bash-binsh
+      - binutils
+      - coreutils
+      - coreutils-single
+      - diffutils
+      - diffutils-*
+      - filesystem
+      - findutils
+      - findutils-*
+      - grep
+      - grep-*
+      - make
+      - pcre2
+      - pcre2-*
+      - tar
+      - tar-*
+      - pkgconf
+      - pkgconf-m4
+      - pkgconf-pkg-config
+      - libpkgconf
+      - zlib
+      - zlib-devel
+      - zlib-static
+      - zlib-ng-compat
+      - zlib-ng-compat-devel
+      - zlib-ng-compat-static
+packages:
+  install:
+    - openssf-compiler-options
+    - bash
+    - bash-binsh
+    - binutils
+    - coreutils
+    - findutils
+    - gcc-16-default
+    - glibc-2.44
+    - glibc-2.44-devel
+    - make
+    - patch
+    - tar
+    - gzip
+    - sed
+    - grep
+    - gawk
+    - diffutils
+    - pkgconf
+sbom: true
+options:
+  weak_deps: false
+  docs: false
+paths:
+  prefix: /usr
+  libdir: /usr/lib64
+  libdir-by-arch:
+    aarch64: /usr/lib

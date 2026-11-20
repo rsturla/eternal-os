@@ -6,7 +6,7 @@ schema: 2
 package:
   name: bzip2
   version: "1.0.8"
-  release: 2
+  release: 3
   summary: A file compression utility
   description: |
     bzip2 is a freely available, patent free, high-quality data compressor.
@@ -18,6 +18,8 @@ package:
   cpe:
     vendor: bzip2
     product: bzip2
+
+context: files
 
 sources:
   - name: bzip2-1.0.8.tar.gz
@@ -51,6 +53,11 @@ build:
         install -Dm755 bzip2-shared "$STAGE"/usr/bin/bzip2
         ln -sf bzip2 "$STAGE"/usr/bin/bunzip2
         ln -sf bzip2 "$STAGE"/usr/bin/bzcat
+        # Upstream's Makefile does not install pkg-config metadata.
+        install -d "$STAGE$LIBDIR/pkgconfig"
+        sed -e "s|@PREFIX@|$PREFIX|g" -e "s|@LIBDIR@|$LIBDIR|g" \
+          -e 's|@VERSION@|${package.version}|g' bzip2.pc.in \
+          > "$STAGE$LIBDIR/pkgconfig/bzip2.pc"
     - uses: license/copy
       with:
         files: [LICENSE]
@@ -117,10 +124,12 @@ outputs:
     tests:
       - name: link
         files: tests
-        packages: [gcc, patchelf, grep]
+        packages: [gcc, patchelf, grep, pkgconf]
         artifacts: [upstream-needed.txt, alias-needed.txt]
         script: |
-          gcc -Wall -Wextra -Werror "$TEST_FILES/roundtrip.c" -lbz2 -o upstream-consumer
+          test "$(pkg-config --modversion bzip2)" = '${package.version}'
+          gcc -Wall -Wextra -Werror "$TEST_FILES/roundtrip.c" \
+            $(pkg-config --cflags --libs bzip2) -o upstream-consumer
           patchelf --print-needed upstream-consumer > upstream-needed.txt
           grep -Fx 'libbz2.so.1.0' upstream-needed.txt
           ./upstream-consumer
