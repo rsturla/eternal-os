@@ -6,6 +6,8 @@ import importlib.util
 import io
 import json
 import os
+import subprocess
+import tarfile
 from pathlib import Path
 import tempfile
 import unittest
@@ -20,6 +22,38 @@ SHA = 'a' * 40
 
 
 class ArtifactTransport(unittest.TestCase):
+    def test_build_evidence_preserves_upstream_paths_outside_candidates(self):
+        import yaml
+
+        workflow = yaml.safe_load((ROOT / '.github/workflows/_build-rpm.yml').read_text())
+        steps = {step.get('name'): step for step in workflow['jobs']['rebuild']['steps']}
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            output = root / 'out/probe/x86_64'
+            evidence = output / 'evidence/test-runs'
+            evidence.mkdir(parents=True)
+            files = {
+                'file:server.pem': b'upstream certificate',
+                'fixture.rpm': b'upstream RPM fixture',
+                '.hidden': b'hidden test evidence',
+                'line\nbreak': b'newline in filename',
+            }
+            for name, content in files.items():
+                (evidence / name).write_bytes(content)
+            (output / 'probe.rpm').write_bytes(b'candidate')
+            (output / 'source-manifest.json').write_text('{}')
+            subprocess.run(['bash', '-e', '-o', 'pipefail', '-c',
+                            steps['Archive build evidence']['run']], cwd=root, check=True)
+            with tarfile.open(root / '.work/build-evidence.tar.gz') as archive:
+                self.assertNotIn('out/probe/x86_64/probe.rpm', archive.getnames())
+                self.assertIn('out/probe/x86_64/source-manifest.json', archive.getnames())
+                for name, content in files.items():
+                    self.assertEqual(archive.extractfile(f'out/probe/x86_64/evidence/test-runs/{name}').read(), content)
+            patterns = steps['Upload candidates']['with']['path'].splitlines()
+            candidates = {path.relative_to(root).as_posix() for pattern in patterns for path in root.glob(pattern)}
+            self.assertEqual(candidates, {'out/probe/x86_64/probe.rpm',
+                                          'out/probe/x86_64/source-manifest.json'})
+
     def archive(self, filename='state.json'):
         stream = io.BytesIO()
         with zipfile.ZipFile(stream, 'w') as archive:

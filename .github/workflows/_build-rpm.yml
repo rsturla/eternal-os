@@ -47,18 +47,26 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: binary-w${{ inputs.wave }}-${{ inputs.package }}-${{ inputs.arch }}
-          path: out/
+          path: |
+            out/*/*/*.rpm
+            out/*/*/source-manifest.json
           if-no-files-found: error
           overwrite: true
           retention-days: 7
+      - name: Archive build evidence
+        if: always()
+        run: |
+          if [[ -d out ]]; then
+            mkdir -p .work
+            find out -type d -name evidence -prune -print0 -o -type f -name '*.json' -print0 |
+              tar --null --files-from=- --create --gzip --file=.work/build-evidence.tar.gz
+          fi
       - name: Upload build evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: build-evidence-w${{ inputs.wave }}-${{ inputs.package }}-${{ inputs.arch }}
-          path: |
-            out/**/evidence/
-            out/**/*.json
-            !out/**/*.rpm
+          path: .work/build-evidence.tar.gz
+          include-hidden-files: true
           overwrite: true
           retention-days: 7
