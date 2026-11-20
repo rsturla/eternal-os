@@ -142,6 +142,48 @@ install -m 0644 LICENSE "$STAGE/usr/share/licenses/{package}/LICENSE"
                 '--state', '.work/transaction/state.json', '--base-url', published.as_uri(),
                 '--packages', json.dumps(selected), '--build-release', release)
 
+    def test_new_stream_in_a_cycle_waits_for_a_compatible_candidate(self):
+        project = self.project('new-stream-cycle')
+        path = project / 'packages/wave-a/package.yaml'
+        recipe = yaml.safe_load(path.read_text())
+        recipe['build']['packages'].append('wave-b >= 2')
+        path.write_text(yaml.safe_dump(recipe, sort_keys=False))
+        path = project / 'packages/wave-b/package.yaml'
+        recipe = yaml.safe_load(path.read_text())
+        recipe['package']['version'] = '2'
+        path.write_text(yaml.safe_dump(recipe, sort_keys=False))
+        self.initialise(project, self.published, ['wave-a', 'wave-b'])
+        state = project / '.work/transaction/state.json'
+        planned = json.loads(state.read_text())
+        self.assertEqual(planned['pending'], ['wave-b'])
+        self.assertIn('wave-a', planned['blocked'])
+        artifacts = project / '.work/artifacts'
+        load(project, 'build-waves').LocalExecutor(artifacts, self.cache, self.rpmx).build_wave(state)
+        load(project, 'build-transaction').advance(argparse.Namespace(state=state, artifacts=artifacts, final=False))
+        planned = json.loads(state.read_text())
+        self.assertIn('wave-a', planned['pending'])
+        self.assertNotIn('wave-a', planned['blocked'])
+        record = json.loads((state.parent / f'readiness/wave-1/wave-a/{self.arch}/inputs/{self.arch}.json').read_text())
+        selected = [package for packages in record['inputs']['root']['packages'].values()
+                    for package in packages if package['name'] == 'wave-b']
+        self.assertEqual(len(selected), 1)
+        self.assertTrue(selected[0]['evr'].startswith('2-'))
+
+    def test_new_cycle_without_a_seed_reports_missing_inputs_before_dispatch(self):
+        project = self.project('unseeded-cycle')
+        path = project / 'packages/wave-a/package.yaml'
+        recipe = yaml.safe_load(path.read_text())
+        recipe['build']['packages'].append('wave-b')
+        path.write_text(yaml.safe_dump(recipe, sort_keys=False))
+        result = command(project, 'python3', 'scripts/build-transaction.py', 'init',
+                         '--arch', self.arch, '--state', '.work/transaction/state.json',
+                         '--base-url', self.empty.as_uri(), '--packages', json.dumps(['wave-a', 'wave-b']),
+                         '--build-release', 200, success=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((project / '.work/transaction/state.json').exists())
+        self.assertIn('compatible seed', (project / 'commands.log').read_text())
+        self.assertFalse((project / '.work/artifacts').exists())
+
     def scenario(self, name, *, change=True):
         project = self.project(name)
         if change:

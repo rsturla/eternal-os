@@ -73,7 +73,7 @@ def build(args, executor=None):
             break
         executor.build_wave(args.state)
         planner.advance(argparse.Namespace(state=args.state, artifacts=args.artifacts,
-                                           final=iteration == args.max_waves - 1))
+                                           final=iteration == args.max_waves - 1, cache=args.cache))
     repository = args.artifacts / 'acceptance-repository'
     planner.seal(argparse.Namespace(state=args.state, artifacts=args.artifacts, output=repository))
     executor.accept(args.state, repository)

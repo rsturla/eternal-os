@@ -20,6 +20,11 @@ ROOT = Path(__file__).resolve().parents[1]
 CAS_NAME = re.compile(r'(sha256/[0-9a-f]{64}|sha512/[0-9a-f]{128})')
 
 
+_INPUTS_SPEC = importlib.util.spec_from_file_location('recipe_inputs', ROOT / 'scripts/recipe-inputs.py')
+recipe_inputs = importlib.util.module_from_spec(_INPUTS_SPEC)
+_INPUTS_SPEC.loader.exec_module(recipe_inputs)
+
+
 def digest(path, algorithm='sha256'):
     with path.open('rb') as stream:
         return hashlib.file_digest(stream, algorithm).hexdigest()
@@ -129,11 +134,7 @@ def prepare(args):
         command += ['--build-release', args.build_release]
     with tempfile.TemporaryDirectory(prefix='eternal-source-profile-') as scratch:
         if args.repository_snapshot:
-            for repository in profile['repositories']:
-                if repository.get('id') == 'eternal':
-                    repository['baseurl'] = args.repository_snapshot.rstrip('/') + '/$basearch'
-            selected = Path(scratch) / 'profile.yaml'
-            selected.write_text(yaml.safe_dump(profile, sort_keys=False))
+            selected = recipe_inputs.snapshot_profile(recipe, args.repository_snapshot, Path(scratch) / 'profile.yaml')
             command += ['--profile', selected]
         # Runtime policy stays separate from the compiler/build-root policy.
         (bundle / 'test-profile.yaml').write_text(yaml.safe_dump(runtime_profile, sort_keys=False))
