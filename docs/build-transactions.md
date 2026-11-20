@@ -11,7 +11,7 @@ uploaded. The initial CI run starting successfully does not mean the RPM
 transaction has passed. Repository protection requires this status and `RPM freshness`, with up-to-date branches.
 
 Each CI continuation dispatch calls `_build-wave.yml` to execute one wave.
-Its dynamic package matrix calls `_build-package.yml`, which creates one SRPM and the root locks
+Its dynamic package matrix calls `_build-package.yml`, which creates one SRPM and complete input records
 for both architectures. That package then calls `_build-rpm.yml` on native
 runners. Packages do not wait for other packages' SRPMs before starting their
 binary builds.
@@ -91,8 +91,9 @@ adapter can use the same reuse operation with local snapshot and artifact paths.
 Source workers download one pool containing the latest canonical candidate
 RPMs. The coordinator creates that pool after it validates a wave; old
 iterations and build evidence do not enter it. Binary workers receive the
-original transaction, shared source RPM, locks, and checksum-verified CAS
-archive. They can rebuild in a fresh cache without contacting repositories or
+original transaction, shared source RPM, complete input records, and
+checksum-verified CAS archive. Each record pins the build root, sysroot, and
+source-test environments. Its payload inventory includes test-only dependencies. They can rebuild in a fresh cache without contacting repositories or
 downloading previous waves. The pinned rpmx executable uses the shared setup
 cache on each architecture.
 

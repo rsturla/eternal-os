@@ -119,7 +119,9 @@ install -m 0644 LICENSE "$STAGE/usr/share/licenses/{package}/LICENSE"
                 'context': 'files',
                 'build': {'root': {'profile': '../../profiles/bootstrap.profile.yaml'},
                           'packages': ['gcc', 'glibc-static', *([PACKAGES[index - 1]] if index else [])],
-                          'pipeline': [{'runs': pipeline}]},
+                          'pipeline': [{'runs': pipeline}],
+                          'tests': [{'name': 'source-inputs', 'packages': ['diffutils'],
+                                     'script': 'cmp main.c main.c'}]},
                 'outputs': [{'name': package, 'lint': {'allow': ['static-archive']},
                              'files': {'license': [f'/usr/share/licenses/{package}/LICENSE']},
                              'tests': [{'name': 'installed-marker', 'script': f'test "$(/usr/bin/{package})" = "{expected}"'}]}],
@@ -162,7 +164,7 @@ install -m 0644 LICENSE "$STAGE/usr/share/licenses/{package}/LICENSE"
         for index, package in enumerate(PACKAGES):
             with self.subTest(package=package):
                 bundle = project / f'.work/artifacts/source-w{index}-{package}'
-                lock = yaml.safe_load((bundle / f'locks/root-{self.arch}.lock.json').read_text())
+                lock = json.loads((bundle / f'inputs/{self.arch}.json').read_text())['inputs']['root']
                 locked = [entry for entries in lock['packages'].values() for entry in entries]
                 if index:
                     provider = PACKAGES[index - 1]
