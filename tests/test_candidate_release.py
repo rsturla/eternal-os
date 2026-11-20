@@ -34,7 +34,7 @@ def candidate_fixture(root, binary=None, source=None, baseline=None, tree=TREE):
     profile = bundle / 'test-profile.yaml'
     profile.write_text('repositories: []\n')
     ARTIFACTS.write_json(bundle / 'manifest.json', {
-        'schema': 1, 'package': 'probe', 'rpmx': (ROOT / '.rpmx-revision').read_text().strip(),
+        'schema': 2, 'package': 'probe', 'rpmx': (ROOT / '.rpmx-revision').read_text().strip(),
         'sources': [{'file': srpm.name, 'sha256': ARTIFACTS.digest(srpm)}],
         'targets': dict.fromkeys(ARCHES, {}), 'test_profile': ARTIFACTS.digest(profile),
         'has_tests': dict.fromkeys(ARCHES, True),

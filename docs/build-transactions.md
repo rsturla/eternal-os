@@ -11,7 +11,7 @@ uploaded. The initial CI run starting successfully does not mean the RPM
 transaction has passed. Repository protection requires this status and `RPM freshness`, with up-to-date branches.
 
 Each CI continuation dispatch calls `_build-wave.yml` to execute one wave.
-Its dynamic package matrix calls `_build-package.yml`, which creates one SRPM and the root locks
+Its dynamic package matrix calls `_build-package.yml`, which creates one SRPM and complete input records
 for both architectures. That package then calls `_build-rpm.yml` on native
 runners. Packages do not wait for other packages' SRPMs before starting their
 binary builds.
@@ -91,8 +91,9 @@ adapter can use the same reuse operation with local snapshot and artifact paths.
 Source workers download one pool containing the latest canonical candidate
 RPMs. The coordinator creates that pool after it validates a wave; old
 iterations and build evidence do not enter it. Binary workers receive the
-original transaction, shared source RPM, locks, and checksum-verified CAS
-archive. They can rebuild in a fresh cache without contacting repositories or
+original transaction, shared source RPM, complete input records, and
+checksum-verified CAS archive. Each record pins the build root, sysroot, and
+source-test environments. Its payload inventory includes test-only dependencies. They can rebuild in a fresh cache without contacting repositories or
 downloading previous waves. The pinned rpmx executable uses the shared setup
 cache on each architecture.
 
@@ -179,3 +180,27 @@ repository or candidate directories. See [the fixture instructions](../tests/fix
 `test_actions_build.py` checks artifact corruption, archive traversal, wave-to-run
 selection, and source-branch movement at the GitHub boundary. Those checks are
 separate from the native RPM tests so other adapters can reuse the latter.
+
+## Input availability and new dependency chains
+
+A transaction can introduce a provider and its consumers in the same merge
+request. Planned recipe capabilities define dependency order. They do not prove
+that an RPM is available for a build.
+
+Before dispatch, the planner builds one repository snapshot and runs `rpmx
+inputs` for each eligible recipe on every target architecture. This resolves the
+same build, sysroot and enabled source-test inputs as source preparation, with
+the same profile and repository exclusions. Only recipes that resolve on all
+targets enter the wave. Candidates from that wave become available in the next
+snapshot.
+
+For example, a new B builds before A when A requires B. Within a dependency
+cycle, published RPMs can supply compatible inputs. If a new stream is missing,
+its consumers wait while a resolvable cycle member builds first. Existing input
+fingerprints still drive further rebuilds after provider interfaces change.
+
+Readiness reports are kept under the transaction's `readiness/` directory.
+Unsatisfied dependencies defer a recipe. Network, authentication, invalid recipe
+and other resolution failures stop planning. If packages remain but none can
+resolve, the planner reports blocked providers and target diagnostics. Supply a
+compatible seed or an explicit bootstrap stage to break such a cycle.

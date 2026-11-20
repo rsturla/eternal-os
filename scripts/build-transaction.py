@@ -34,6 +34,11 @@ provenance = importlib.util.module_from_spec(_PROVENANCE_SPEC)
 _PROVENANCE_SPEC.loader.exec_module(provenance)
 
 
+_INPUTS_SPEC = importlib.util.spec_from_file_location('recipe_inputs', ROOT / 'scripts/recipe-inputs.py')
+recipe_inputs = importlib.util.module_from_spec(_INPUTS_SPEC)
+_INPUTS_SPEC.loader.exec_module(recipe_inputs)
+
+
 def run(*args):
     subprocess.run([str(arg) for arg in args], check=True, stdout=sys.stderr)
 
@@ -147,7 +152,9 @@ def catalog(arches=ARCHES):
                 'build_requires': sorted({capability(value) for cell in cells for value in cell['packages'] + cell['sysroot']} |
                                          {capability(value) for cell in cells for step in cell['pipeline']
                                           for value in step['needs_packages'] + step['needs_sysroot']} |
-                                         {capability(value) for value in profile.get('packages', {}).get('install', [])}),
+                                         {capability(value) for value in profile.get('packages', {}).get('install', [])} |
+                                         {capability(value) for cell in cells for test in cell.get('build_tests', [])
+                                          if not test.get('optional', False) for value in test.get('packages', [])}),
                 'candidate_repository': ({'exclude': candidate_repository.get('exclude', [])}
                                          if candidate_repository is not None else None),
                 'outputs': [{'name': output['name'], 'provides': sorted({output['name']} |
@@ -208,7 +215,7 @@ def initialise(args):
                        'build_release': args.build_release, 'builds': {}, 'interfaces': {},
                        'baseline_interfaces': {}, 'requested': selected,
                        'reasons': {name: repair_reasons.get(name, ['recipe inputs changed']) for name in selected}}
-    state['pending'] = ready_packages(state, set(selected))
+    state['pending'] = select_wave(state, args, set(selected))
     write(args.state, state)
     emit(state)
 
@@ -232,7 +239,7 @@ def build_inputs(tree, package):
         # Repo assembly and ABI interpretation are build inputs even though
         # they share a file with scheduling. Unknown functions stay inputs.
         scheduling_functions = {'initialise', 'reuse', 'build_inputs', 'next_packages',
-                                'ready_packages', 'advance', 'main', 'emit'}
+                                'ready_packages', 'select_wave', 'advance', 'main', 'emit'}
         syntax = ast.parse(capture('git', '-C', ROOT, 'show', f'{tree}:{planner}'))
         syntax.body = [node for node in syntax.body
                        if not isinstance(node, ast.FunctionDef) or node.name not in scheduling_functions]
@@ -283,8 +290,8 @@ def reuse(args):
     state.pop('repositories', None)
     state['requested'] = sorted(set(state['requested']) | (recipes.keys() - state['builds'].keys()))
     state['reasons'] = next_packages(state)
-    state['pending'] = ready_packages(state, set(state['reasons']))
     shutil.copytree(args.previous.parent / 'baseline', args.state.parent / 'baseline')
+    state['pending'] = select_wave(state, args, set(state['reasons']))
     write(args.state, state)
     emit(state)
 
@@ -434,8 +441,8 @@ def baseline_interface(state, package, arch, directory):
     return fingerprint(records, package in state['policy'])
 
 
-def available_provides(state, provider, arch, repository):
-    """Match only outputs the consumer's repository policy can select."""
+def planned_provides(state, provider, arch, repository):
+    """Potential providers for graph edges, including outputs not yet built."""
     if repository is None:
         return set()
     target = state['catalog'][provider]['targets'][arch]
@@ -469,7 +476,7 @@ def dependencies(state, package, arch):
         requires.update(build['targets'][arch]['requires'])
     result = set()
     for provider in state['catalog']:
-        provides = available_provides(state, provider, arch, target['candidate_repository'])
+        provides = planned_provides(state, provider, arch, target['candidate_repository'])
         if requires & provides or input_capabilities & provides or package in state['policy'].get(provider, []) or '*' in state['policy'].get(provider, []):
             result.add(provider)
     if build:
@@ -511,17 +518,17 @@ def build_dependencies(state, package, arch):
     for provider in state['catalog']:
         if package in state['policy'].get(provider, []) or '*' in state['policy'].get(provider, []):
             result.add(provider)
-        if requires & available_provides(state, provider, arch, repository):
+        if requires & planned_provides(state, provider, arch, repository):
             result.add(provider)
     return result - {package}
 
 
 def ready_packages(state, waiting):
-    """Build dependency SCCs before their consumers; use baseline for cycles."""
+    """Find dependency-closed graph candidates; readiness is checked separately."""
     edges = {package: set().union(*(build_dependencies(state, package, arch) for arch in architectures(state))) & waiting
              for package in waiting}
     # A package is ready if everything it waits for can reach it. Those edges
-    # are a cycle, which must bootstrap together against the published set.
+    # form a cycle. select_wave checks which members can use existing RPMs.
     def closure(start):
         seen, pending = set(), list(edges[start])
         while pending:
@@ -533,6 +540,43 @@ def ready_packages(state, waiting):
     closures = {package: closure(package) for package in waiting}
     return sorted(package for package, providers in closures.items()
                   if all(package in closures[provider] for provider in providers))
+
+
+def select_wave(state, args, waiting):
+    """Gate graph candidates on real input resolution against one fixed view."""
+    eligible = ready_packages(state, waiting)
+    state['blocked'] = {}
+    if not waiting:
+        return []
+    ready = []
+    artifacts = getattr(args, 'artifacts', Path('.work/candidates'))
+    cache = getattr(args, 'cache', Path(os.environ.get('RPMX_CACHE', Path.home() / '.cache/rpmx/cas')))
+    with tempfile.TemporaryDirectory(prefix='eternal-readiness-') as temporary:
+        repository = Path(temporary) / 'repository'
+        view(argparse.Namespace(state=args.state, artifacts=artifacts, output=repository), state=state)
+        for package in eligible:
+            failures = {}
+            for arch in architectures(state):
+                evidence = args.state.parent / 'readiness' / f'wave-{state["wave"]}' / package / arch
+                if evidence.exists():
+                    shutil.rmtree(evidence)
+                print(f'Checking inputs for {package}/{arch}', file=sys.stderr, flush=True)
+                failure = recipe_inputs.resolve(RPMX, ROOT / 'packages' / package / 'package.yaml',
+                    arch, repository.resolve().as_uri(), cache, evidence,
+                    state['build_release'] + state['wave'])
+                if failure:
+                    failures[arch] = failure
+            if failures:
+                state['blocked'][package] = {'providers': sorted(set().union(*(
+                    build_dependencies(state, package, arch) for arch in architectures(state)))),
+                    'targets': failures}
+            else:
+                ready.append(package)
+    if not ready:
+        details = json.dumps(state['blocked'], sort_keys=True, indent=2)
+        raise ValueError(f'no buildable package in the dependency closure; '
+                         f'provide a compatible seed or explicit bootstrap stage:\n{details}')
+    return ready
 
 
 def binary_directory(artifacts, package, arch, wave):
@@ -585,8 +629,8 @@ def advance(args):
         state['interfaces'][package] = {arch: state['builds'][package]['targets'][arch]['fingerprint'] for arch in architectures(state)}
     state['invalidated'] = sorted(set(state.get('invalidated', [])) - set(state['pending']))
     state['reasons'] = next_packages(state)
-    state['pending'] = ready_packages(state, set(state['reasons']))
     state['wave'] += 1
+    state['pending'] = select_wave(state, args, set(state['reasons']))
     if state['pending'] and (args.final or state['wave'] - state.get('wave_start', 0) >= 32):
         raise ValueError(f'rebuild closure did not settle: {state["reasons"]}')
     write(args.state, state)
@@ -634,8 +678,9 @@ def localise_repository(repository):
                 '--unique-md-filenames', xml, repository / 'repodata')
 
 
-def view(args):
-    state = json.loads(args.state.read_text())
+def view(args, state=None):
+    if state is None:
+        state = json.loads(args.state.read_text())
     spec = importlib.util.spec_from_file_location('filter_rolling', ROOT / 'scripts/filter-rolling.py')
     filtering = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(filtering)
@@ -698,6 +743,8 @@ def main():
     for name, function in [('init', initialise), ('reuse', reuse), ('advance', advance), ('view', view), ('seal', seal)]:
         command = operations.add_parser(name)
         command.add_argument('--state', type=Path, required=True)
+        if name in ('init', 'reuse', 'advance'):
+            command.add_argument('--cache', type=Path, default=Path(os.environ.get('RPMX_CACHE', Path.home() / '.cache/rpmx/cas')))
         command.set_defaults(function=function)
         if name == 'init':
             command.add_argument('--arch', choices=['all', *ARCHES], default='all')

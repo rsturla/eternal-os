@@ -138,6 +138,57 @@ class ArtifactTest(unittest.TestCase):
                 artifacts.prepare(args)
         run.assert_not_called()
 
+    def test_preparation_transfers_test_only_payloads_and_binds_rebuild_record(self):
+        recipe = self.root / 'packages/probe/package.yaml'
+        recipe.parent.mkdir(parents=True)
+        recipe.write_text('build:\n  root:\n    profile: ../../profiles/build.yaml\n')
+        profiles = self.root / 'profiles'
+        profiles.mkdir()
+        for name in ('build.yaml', 'eternal.profile.yaml'):
+            (profiles / name).write_text('repositories: []\n')
+        (self.root / '.rpmx-revision').write_text((ROOT / '.rpmx-revision').read_text())
+        args = argparse.Namespace(package='probe', output=self.root / 'prepared', transaction=None,
+                                  rpmx='rpmx', cache=self.root / 'source-cache', signing_key=None,
+                                  build_release=None, repository_snapshot=None)
+        args.cache.mkdir()
+        payloads = []
+        for content in (b'build dependency', b'test-only dependency'):
+            checksum = 'sha512:' + hashlib.sha512(content).hexdigest()
+            path = args.cache / checksum.replace(':', '/')
+            path.parent.mkdir(exist_ok=True)
+            path.write_bytes(content)
+            payloads.append(checksum)
+
+        def prepare(*command):
+            output = args.output / 'prepared'
+            (output / 'inputs').mkdir(parents=True)
+            (output / 'probe.src.rpm').write_bytes(b'source')
+            artifacts.write_json(output / 'inputs/x86_64.json', {'payloads': payloads})
+
+        with patch.object(artifacts, 'ROOT', self.root), \
+             patch.object(artifacts, 'fetch_sources'), patch.object(artifacts, 'run', side_effect=prepare), \
+             patch.object(artifacts.subprocess, 'check_output', side_effect=[
+                 'probe hash', json.dumps({'plan': {'cells': [{'tests': []}]}})]):
+            artifacts.prepare(args)
+        archive = args.output / 'inputs/x86_64.tar.gz'
+        with tarfile.open(archive) as tar:
+            self.assertEqual(set(tar.getnames()), {value.replace(':', '/') for value in payloads})
+        bundle = args.output / 'bundle'
+        manifest = json.loads((bundle / 'manifest.json').read_text())
+        self.assertEqual(manifest['targets']['x86_64']['inputs'],
+                         artifacts.digest(bundle / 'inputs/x86_64.json'))
+        rebuild = argparse.Namespace(bundle=bundle, arch='x86_64', inputs=args.output / 'inputs',
+                                     cache=self.root / 'fresh-cache', output=self.root / 'binaries',
+                                     transaction=None, rpmx='rpmx', signing_key=None)
+        manifest['recipe_hash'] = 'hash'
+        artifacts.write_json(bundle / 'manifest.json', manifest)
+        (bundle / 'inputs/x86_64.json').write_text('{}')
+        with patch.object(artifacts.subprocess, 'check_output', return_value='probe hash'), \
+             patch.object(artifacts, 'run') as run:
+            with self.assertRaisesRegex(ValueError, 'artifact digest mismatch'):
+                artifacts.rebuild(rebuild)
+        run.assert_not_called()
+
     def test_target_inputs_require_valid_payload_checksums(self):
         content = b'pinned dependency RPM'
         name = 'sha512/' + hashlib.sha512(content).hexdigest()
@@ -174,7 +225,7 @@ class ArtifactTest(unittest.TestCase):
         profile = bundle / 'test-profile.yaml'
         profile.write_text('profile')
         artifacts.write_json(bundle / 'manifest.json', {
-            'schema': 1, 'package': 'probe', 'rpmx': (ROOT / '.rpmx-revision').read_text().strip(),
+            'schema': 2, 'package': 'probe', 'rpmx': (ROOT / '.rpmx-revision').read_text().strip(),
             'sources': [{'file': source.name, 'sha256': artifacts.digest(source)}],
             'targets': {arch: {} for arch in ('x86_64', 'aarch64')},
             'test_profile': artifacts.digest(profile), 'has_tests': {'x86_64': True, 'aarch64': True},

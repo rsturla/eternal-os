@@ -20,6 +20,11 @@ ROOT = Path(__file__).resolve().parents[1]
 CAS_NAME = re.compile(r'(sha256/[0-9a-f]{64}|sha512/[0-9a-f]{128})')
 
 
+_INPUTS_SPEC = importlib.util.spec_from_file_location('recipe_inputs', ROOT / 'scripts/recipe-inputs.py')
+recipe_inputs = importlib.util.module_from_spec(_INPUTS_SPEC)
+_INPUTS_SPEC.loader.exec_module(recipe_inputs)
+
+
 def digest(path, algorithm='sha256'):
     with path.open('rb') as stream:
         return hashlib.file_digest(stream, algorithm).hexdigest()
@@ -129,11 +134,7 @@ def prepare(args):
         command += ['--build-release', args.build_release]
     with tempfile.TemporaryDirectory(prefix='eternal-source-profile-') as scratch:
         if args.repository_snapshot:
-            for repository in profile['repositories']:
-                if repository.get('id') == 'eternal':
-                    repository['baseurl'] = args.repository_snapshot.rstrip('/') + '/$basearch'
-            selected = Path(scratch) / 'profile.yaml'
-            selected.write_text(yaml.safe_dump(profile, sort_keys=False))
+            selected = recipe_inputs.snapshot_profile(recipe, args.repository_snapshot, Path(scratch) / 'profile.yaml')
             command += ['--profile', selected]
         # Runtime policy stays separate from the compiler/build-root policy.
         (bundle / 'test-profile.yaml').write_text(yaml.safe_dump(runtime_profile, sort_keys=False))
@@ -146,31 +147,40 @@ def prepare(args):
     if not sources:
         raise ValueError('rpmx produced no source RPMs')
     targets = {}
-    (bundle / 'locks').mkdir()
-    for lock in sorted((prepared / 'locks').glob('root-*.lock.json')):
-        arch = lock.name.removeprefix('root-').removesuffix('.lock.json')
+    (bundle / 'inputs').mkdir()
+    for record in sorted((prepared / 'inputs').glob('*.json')):
+        arch = record.stem
+        data = json.loads(record.read_text())
         paths = set()
         consumed = set()
-        shutil.copy2(lock, bundle / 'locks' / lock.name)
-        for target_lock in (prepared / 'locks').glob(f'*-{arch}.lock.json'):
-            data = yaml.safe_load(target_lock.read_text())
-            for packages in data['packages'].values():
-                for package in packages:
-                    relative = package['checksum'].replace(':', '/', 1)
-                    if not CAS_NAME.fullmatch(relative):
-                        raise ValueError(f'invalid CAS name: {relative}')
-                    path = args.cache / relative
-                    if digest(path, relative.split('/')[0]) != relative.split('/')[1]:
-                        raise ValueError(f'corrupt dependency: {relative}')
-                    paths.add(relative)
-                    if transaction:
-                        consumed.update(consumed_providers(path, package, transaction, arch))
+        shutil.copy2(record, bundle / 'inputs' / record.name)
+        # rpmx owns the inventory across build, sysroot, toolchain and test roles.
+        for checksum in data['payloads']:
+            relative = checksum.replace(':', '/', 1)
+            if not CAS_NAME.fullmatch(relative):
+                raise ValueError(f'invalid CAS name: {relative}')
+            path = args.cache / relative
+            if digest(path, relative.split('/')[0]) != relative.split('/')[1]:
+                raise ValueError(f'corrupt dependency: {relative}')
+            paths.add(relative)
+        if transaction:
+            roots = [data['inputs']['root'], data['inputs'].get('sysroot')]
+            roots.extend((data['inputs'].get('tests') or {}).values())
+            for root in filter(None, roots):
+                for packages in root['packages'].values():
+                    for package in packages:
+                        relative = package['checksum'].replace(':', '/', 1)
+                        if relative not in paths:
+                            raise ValueError(f'dependency missing from inventory: {relative}')
+                        consumed.update(consumed_providers(args.cache / relative, package, transaction, arch))
         archive = inputs / f'{arch}.tar.gz'
         with tarfile.open(archive, 'w:gz') as tar:
             for relative in sorted(paths):
                 tar.add(args.cache / relative, arcname=relative, recursive=False)
         targets[arch] = {'file': archive.name, 'sha256': digest(archive),
-                         'lock': digest(bundle / 'locks' / lock.name), 'consumed': sorted(consumed)}
+                         'inputs': digest(bundle / 'inputs' / record.name), 'consumed': sorted(consumed)}
+    if not targets:
+        raise ValueError('rpmx produced no target input records')
     has_tests = {}
     for arch in targets:
         plan_command = [args.rpmx, 'plan', str(recipe), '--arch', arch, '--json']
@@ -179,7 +189,7 @@ def prepare(args):
         plan = json.loads(subprocess.check_output(plan_command, text=True))['plan']
         has_tests[arch] = any(cell['tests'] for cell in plan['cells'])
     write_json(bundle / 'manifest.json', {
-        'schema': 1, 'package': args.package, 'rpmx': (ROOT / '.rpmx-revision').read_text().strip(),
+        'schema': 2, 'package': args.package, 'rpmx': (ROOT / '.rpmx-revision').read_text().strip(),
         'sources': sources, 'targets': targets, 'has_tests': has_tests, 'recipe_hash': recipe_hash,
         'dist_tag': profile.get('dist-tag'), 'build_release': args.build_release,
         'test_profile': digest(bundle / 'test-profile.yaml'),
@@ -211,7 +221,7 @@ def import_inputs(archive, cache):
 
 def load_bundle(bundle):
     data = json.loads((bundle / 'manifest.json').read_text())
-    if data['schema'] != 1 or not data['sources'] or not data['targets']:
+    if data['schema'] != 2 or not data['sources'] or not data['targets']:
         raise ValueError('invalid source manifest')
     if data['rpmx'] != (ROOT / '.rpmx-revision').read_text().strip():
         raise ValueError('source manifest uses another rpmx revision')
@@ -239,16 +249,16 @@ def rebuild(args):
         raise ValueError('invalid target input filename')
     archive = args.inputs / target['file']
     verify_file(archive, target['sha256'])
+    record = args.bundle / 'inputs' / f'{args.arch}.json'
+    verify_file(record, target['inputs'])
     import_inputs(archive, args.cache)
-    lock = args.bundle / 'locks' / f'root-{args.arch}.lock.json'
-    verify_file(lock, target['lock'])
     output = args.output / data['package'] / args.arch
     if output.exists():
         raise ValueError(f'output already exists: {output}')
     output.mkdir(parents=True)
     for source in data['sources']:
         command = [args.rpmx, 'rebuild', args.bundle / 'src' / source['file'],
-                   '--arch', args.arch, '--root-lock', lock, '--output', output, '--cache', args.cache]
+                   '--arch', args.arch, '--inputs', record, '--output', output, '--cache', args.cache]
         if args.signing_key:
             command += ['--signing-key', args.signing_key]
         run(*command)

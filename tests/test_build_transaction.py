@@ -134,7 +134,8 @@ class RebuildClosure(unittest.TestCase):
                         'interface': {'provides': [], 'files': [[f'/usr/include/{package}.h', 'new']]},
                     }
                 with patch.object(TX, 'inspect_rpm', side_effect=rpms.__getitem__), \
-                     patch.object(TX, 'baseline_interface', return_value='old'):
+                     patch.object(TX, 'baseline_interface', return_value='old'), \
+                     patch.object(TX, 'select_wave', side_effect=lambda state, args, waiting: TX.ready_packages(state, waiting)):
                     TX.advance(args)
                 state = json.loads(args.state.read_text())
                 self.assertEqual(state['pending'], following)
@@ -233,7 +234,8 @@ class RebuildClosure(unittest.TestCase):
             rpm = {'name': 'x', 'source': 'x', 'arch': 'noarch', 'sha512': 'checksum',
                    'provides': ['x-devel'], 'requires': [],
                    'interface': {'provides': ['libx.so.2'], 'files': []}}
-            with patch.object(TX, 'checked_binaries', return_value=record), patch.object(TX, 'inspect_rpm', return_value=rpm):
+            with patch.object(TX, 'checked_binaries', return_value=record), patch.object(TX, 'inspect_rpm', return_value=rpm), \
+                 patch.object(TX, 'select_wave', side_effect=lambda state, args, waiting: TX.ready_packages(state, waiting)):
                 with self.assertRaisesRegex(ValueError, 'did not settle'):
                     TX.advance(args)
             self.assertEqual(path.read_bytes(), original)
@@ -426,7 +428,8 @@ class TransactionReuse(unittest.TestCase):
             with patch.object(TX, 'capture', side_effect=self.capture), \
                  patch.object(TX, 'catalog', return_value=before['catalog']), \
                  patch.object(TX, 'build_inputs', side_effect=inputs), \
-                 patch.object(TX, 'baseline_packages', return_value=[]), patch.object(TX, 'emit'):
+                 patch.object(TX, 'baseline_packages', return_value=[]), patch.object(TX, 'emit'), \
+                 patch.object(TX, 'select_wave', side_effect=lambda state, args, waiting: TX.ready_packages(state, waiting)):
                 TX.reuse(args)
             state = json.loads(args.state.read_text())
             self.assertEqual(state['pending'], ['z'])
@@ -496,6 +499,50 @@ class TransactionReuse(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, message):
                         TX.reuse(args)
                 self.assertFalse(args.state.exists())
+
+
+
+class WaveReadiness(unittest.TestCase):
+    def test_cycle_releases_only_resolvable_members_on_every_architecture(self):
+        state = fixture()
+        state.update(wave=0, build_release=100)
+        for arch in TX.ARCHES:
+            state['catalog']['x']['targets'][arch]['build_requires'] = ['y-devel']
+        with tempfile.TemporaryDirectory() as temporary:
+            args = argparse.Namespace(state=Path(temporary) / 'state.json')
+            def resolve(rpmx, recipe, arch, repository, cache, output, release):
+                self.assertTrue(repository.startswith('file://'))
+                if recipe.parent.name == 'x' and arch == 'aarch64':
+                    return {'code': 'RPMX-ROOT-007', 'message': 'missing y-devel'}
+                return None
+            with patch.object(TX, 'view') as view, patch.object(TX.recipe_inputs, 'resolve', side_effect=resolve):
+                self.assertEqual(TX.select_wave(state, args, {'x', 'y', 'z'}), ['y'])
+                view.assert_called_once()
+            self.assertEqual(state['blocked']['x']['providers'], ['y'])
+            self.assertEqual(set(state['blocked']['x']['targets']), {'aarch64'})
+            with patch.object(TX, 'view'), patch.object(TX.recipe_inputs, 'resolve', return_value=None):
+                self.assertEqual(TX.select_wave(state, args, {'x', 'y', 'z'}), ['x', 'y'])
+                self.assertEqual(state['blocked'], {})
+
+    def test_missing_seed_fails_instead_of_finishing_an_empty_wave(self):
+        state = fixture()
+        state.update(wave=0, build_release=100)
+        with tempfile.TemporaryDirectory() as temporary:
+            args = argparse.Namespace(state=Path(temporary) / 'state.json')
+            with patch.object(TX, 'view'), patch.object(TX.recipe_inputs, 'resolve', return_value={
+                    'code': 'RPMX-ROOT-007', 'message': 'missing seed-devel'}):
+                with self.assertRaisesRegex(ValueError, 'compatible seed') as failure:
+                    TX.select_wave(state, args, {'x'})
+                self.assertIn('seed-devel', str(failure.exception))
+
+    def test_resolution_infrastructure_failures_are_not_deferred(self):
+        state = fixture()
+        state.update(wave=0, build_release=100)
+        with tempfile.TemporaryDirectory() as temporary:
+            args = argparse.Namespace(state=Path(temporary) / 'state.json')
+            with patch.object(TX, 'view'), patch.object(TX.recipe_inputs, 'resolve', side_effect=RuntimeError('metadata unavailable')):
+                with self.assertRaisesRegex(RuntimeError, 'metadata unavailable'):
+                    TX.select_wave(state, args, {'x'})
 
 
 if __name__ == '__main__':
